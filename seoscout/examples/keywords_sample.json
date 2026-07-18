@@ -1,0 +1,29 @@
+{
+  "game_name": "My Game",
+  "languages": ["es", "pt", "de", "fr"],
+  "categories": [
+    {
+      "category": "Guide",
+      "keywords": [
+        "My Game beginner guide",
+        "My Game walkthrough",
+        "My Game how to level up fast"
+      ]
+    },
+    {
+      "category": "Tier List",
+      "keywords": [
+        "My Game best characters tier list",
+        "My Game best weapons"
+      ]
+    },
+    {
+      "category": "Tips",
+      "keywords": [
+        "My Game tips and tricks",
+        "My Game release date",
+        "My Game early access"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "game_name": "animal hospital",
+  "filter_keyword": "roblox animal hospital",
+  "languages": [
+    "es",
+    "pt",
+    "de",
+    "fr"
+  ],
+  "categories": [
+    {
+      "category": "guide",
+      "keywords": [
+        "animal hospital guide",
+        "animal hospital tips",
+        "animal hospital walkthrough",
+        "animal hospital how to play",
+        "animal hospital how many shifts",
+        "animal hospital ending",
+        "animal hospital solo",
+        "animal hospital sanity",
+        "animal hospital surgery",
+        "animal hospital revive patient"
+      ]
+    },
+    {
+      "category": "anomalies",
+      "keywords": [
+        "animal hospital anomalies",
+        "animal hospital identify anomaly",
+        "animal hospital monsters",
+        "animal hospital ghost",
+        "animal hospital stalker",
+        "animal hospital jumpscares",
+        "animal hospital flickering lights"
+      ]
+    },
+    {
+      "category": "characters",
+      "keywords": [
+        "animal hospital characters",
+        "animal hospital ratthew",
+        "animal hospital barney",
+        "animal hospital secret agent",
+        "animal hospital liz",
+        "animal hospital dr harlow",
+        "animal hospital coffee guy",
+        "animal hospital ron"
+      ]
+    },
+    {
+      "category": "classes",
+      "keywords": [
+        "animal hospital classes",
+        "animal hospital best class",
+        "animal hospital nurse",
+        "animal hospital intern",
+        "animal hospital doctor",
+        "animal hospital head nurse",
+        "animal hospital secretary",
+        "animal hospital paramedic"
+      ]
+    },
+    {
+      "category": "items",
+      "keywords": [
+        "animal hospital key",
+        "animal hospital items",
+        "animal hospital medicine",
+        "animal hospital skins"
+      ]
+    },
+    {
+      "category": "map",
+      "keywords": [
+        "animal hospital map",
+        "animal hospital rooms",
+        "animal hospital patient rooms",
+        "animal hospital entrance"
+      ]
+    },
+    {
+      "category": "community",
+      "keywords": [
+        "animal hospital discord",
+        "animal hospital fanart"
+      ]
+    },
+    {
+      "category": "codes",
+      "keywords": [
+        "animal hospital codes"
+      ]
+    }
+  ]
+}
