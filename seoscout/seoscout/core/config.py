@@ -1,15 +1,40 @@
 """
 Unified configuration management.
 
-Loads all config from a .env file in the current working directory.
+Two sources, deliberately kept separate:
+  - .env          — secrets only (API keys/credentials). Gitignored, each
+                     user/deployment fills in their own, never committed.
+  - config.json    — everything else (tunable knobs: batch sizes, workers,
+                     timeouts, model name, blocked domains, ...). Has no
+                     secrets in it, so it's tracked in git and can be
+                     committed/pushed/shared like any other source file —
+                     no more copy-and-fill-in-forty-values step for a
+                     teammate who just wants the same tuning you already
+                     settled on.
+
 Data is stored under OUTPUT_DIR/<project_name>/ for isolation. Each
 project's keywords.json input is expected to live alongside it, e.g.
 projects/<project_name>/keywords.json.
 """
 
+import json
 import os
 import sys
 from dotenv import load_dotenv
+
+
+def _load_config_file(path: str = "config.json") -> dict:
+    """Read config.json from the current working directory. Missing file or
+    invalid JSON both fall back to {} (every lookup below already has a
+    hardcoded default) rather than crashing — config.json is optional."""
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"⚠️  Could not read {path} ({e}) — using built-in defaults")
+        return {}
 
 
 class _Tee:
@@ -136,14 +161,21 @@ class Config:
             project: Project name (e.g. "my-site"). Data will be stored
                      under OUTPUT_DIR/<project>/.
         """
-        # Load .env from current working directory
+        # .env → secrets only. config.json → everything else (tunables).
         load_dotenv()
+        cfg = _load_config_file()
+        yt_cfg = cfg.get("youtube", {})
+        web_cfg = cfg.get("web", {})
+        llm_cfg = cfg.get("llm", {})
+        gen_cfg = cfg.get("generate", {})
+        xlate_cfg = cfg.get("translate", {})
+        search_cfg = cfg.get("search", {})
 
         # Sanitize project name
         project_dir = project.replace('.', '_').replace('/', '_')
 
         # Read output root
-        cls.OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./projects")
+        cls.OUTPUT_DIR = cfg.get("output_dir", "./projects")
 
         # Set up project paths
         cls.DATA_DIR = os.path.join(cls.OUTPUT_DIR, project_dir)
@@ -156,45 +188,45 @@ class Config:
         os.makedirs(cls.CACHE_DIR, exist_ok=True)
         os.makedirs(cls.LOG_DIR, exist_ok=True)
 
-        # API Keys
+        # API Keys (secrets — .env only)
         cls.SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
         cls.JINA_API_KEY = os.getenv("JINA_API_KEY", "")
 
         # YouTube
-        cls.YOUTUBE_INITIAL_RESULTS = int(os.getenv("YOUTUBE_INITIAL_SEARCH_RESULTS", "2"))
-        cls.YOUTUBE_MAX_RESULTS = int(os.getenv("YOUTUBE_MAX_RESULTS_AFTER_FILTER", "1"))
-        cls.YOUTUBE_MAX_DURATION = int(os.getenv("YOUTUBE_MAX_DURATION", "3600"))
-        cls.YOUTUBE_EXTRACT_TOP_K = int(os.getenv("YOUTUBE_EXTRACT_TOP_K", "1"))
+        cls.YOUTUBE_INITIAL_RESULTS = int(yt_cfg.get("initial_search_results", 2))
+        cls.YOUTUBE_MAX_RESULTS = int(yt_cfg.get("max_results_after_filter", 1))
+        cls.YOUTUBE_MAX_DURATION = int(yt_cfg.get("max_duration", 3600))
+        cls.YOUTUBE_EXTRACT_TOP_K = int(yt_cfg.get("extract_top_k", 1))
 
-        cls.YOUTUBE_SEARCH_WORKERS = int(os.getenv("YOUTUBE_SEARCH_WORKERS", "3"))
-        cls.YOUTUBE_EXTRACT_WORKERS = int(os.getenv("YOUTUBE_TRANSCRIPT_WORKERS", "5"))
-        cls.YOUTUBE_RETRIES = int(os.getenv("YOUTUBE_TRANSCRIPT_RETRIES", "3"))
-        cls.YOUTUBE_TIMEOUT = int(os.getenv("YOUTUBE_SEARCH_TIMEOUT", "180"))
+        cls.YOUTUBE_SEARCH_WORKERS = int(yt_cfg.get("search_workers", 3))
+        cls.YOUTUBE_EXTRACT_WORKERS = int(yt_cfg.get("transcript_workers", 5))
+        cls.YOUTUBE_RETRIES = int(yt_cfg.get("transcript_retries", 3))
+        cls.YOUTUBE_TIMEOUT = int(yt_cfg.get("search_timeout", 180))
 
-        # DataForSEO
+        # DataForSEO — credentials are secrets (.env), everything else is config.json
         cls.DATAFORSEO_LOGIN = os.getenv("DATAFORSEO_LOGIN", "")
         cls.DATAFORSEO_PASSWORD = os.getenv("DATAFORSEO_PASSWORD", "")
-        cls.DATAFORSEO_BASE_URL = os.getenv("DATAFORSEO_BASE_URL", "https://api.dataforseo.com")
-        cls.YOUTUBE_LOCATION_CODE = int(os.getenv("YOUTUBE_LOCATION_CODE", "2840"))
-        cls.YOUTUBE_LANGUAGE_CODE = os.getenv("YOUTUBE_LANGUAGE_CODE", "en")
-        cls.YOUTUBE_DEVICE = os.getenv("YOUTUBE_DEVICE", "desktop")
-        cls.YOUTUBE_OS = os.getenv("YOUTUBE_OS", "windows")
-        cls.YOUTUBE_BLOCK_DEPTH = int(os.getenv("YOUTUBE_BLOCK_DEPTH", "10"))
+        cls.DATAFORSEO_BASE_URL = yt_cfg.get("base_url", "https://api.dataforseo.com")
+        cls.YOUTUBE_LOCATION_CODE = int(yt_cfg.get("location_code", 2840))
+        cls.YOUTUBE_LANGUAGE_CODE = yt_cfg.get("language_code", "en")
+        cls.YOUTUBE_DEVICE = yt_cfg.get("device", "desktop")
+        cls.YOUTUBE_OS = yt_cfg.get("os", "windows")
+        cls.YOUTUBE_BLOCK_DEPTH = int(yt_cfg.get("block_depth", 10))
 
         # Web
-        cls.WEB_SEARCH_TOP_N = int(os.getenv("WEB_SEARCH_TOP_N", "10"))
-        cls.WEB_EXTRACT_TOP_K = int(os.getenv("WEB_EXTRACT_TOP_K", "1"))
-        cls.WEB_EXTRACT_WORKERS = int(os.getenv("JINA_CONCURRENCY", "20"))
-        cls.WEB_EXTRACT_RETRIES = int(os.getenv("WEB_EXTRACT_RETRIES", "3"))
-        cls.WEB_SEARCH_CONCURRENCY = int(os.getenv("WEB_SEARCH_CONCURRENCY", "5"))
-        cls.JINA_RPM = int(os.getenv("JINA_RPM", "200"))
-        cls.JINA_CONCURRENCY = int(os.getenv("JINA_CONCURRENCY", "20"))
+        cls.WEB_SEARCH_TOP_N = int(web_cfg.get("search_top_n", 10))
+        cls.WEB_EXTRACT_TOP_K = int(web_cfg.get("extract_top_k", 1))
+        cls.WEB_EXTRACT_WORKERS = int(web_cfg.get("jina_concurrency", 20))
+        cls.WEB_EXTRACT_RETRIES = int(web_cfg.get("extract_retries", 3))
+        cls.WEB_SEARCH_CONCURRENCY = int(web_cfg.get("search_concurrency", 5))
+        cls.JINA_RPM = int(web_cfg.get("jina_rpm", 200))
+        cls.JINA_CONCURRENCY = int(web_cfg.get("jina_concurrency", 20))
 
         # General
-        cls.SEARCH_MAX_RETRIES = int(os.getenv("SEARCH_MAX_RETRIES", "3"))
-        cls.SEARCH_RETRY_DELAY = int(os.getenv("SEARCH_RETRY_DELAY", "2"))
+        cls.SEARCH_MAX_RETRIES = int(search_cfg.get("max_retries", 3))
+        cls.SEARCH_RETRY_DELAY = int(search_cfg.get("retry_delay", 2))
 
-        # LLM API (generate + translate)
+        # LLM API (generate + translate) — keys are secrets (.env), rest is config.json
         cls.LLM_API_KEY = os.getenv("LLM_API_KEY", "")
         # 支持多个 key 轮询（LLM_API_KEY_1, LLM_API_KEY_2, ...），
         # 用于分摊限速/瞬时错误。没配置多 key 时退回单一 LLM_API_KEY。
@@ -207,28 +239,27 @@ class Config:
             keys.append(k)
             i += 1
         cls.LLM_API_KEYS = keys or ([cls.LLM_API_KEY] if cls.LLM_API_KEY else [])
-        cls.LLM_API_BASE_URL = os.getenv("LLM_API_BASE_URL", "https://api.apifast.tech/v1")
-        cls.LLM_MODEL = os.getenv("LLM_MODEL", "gemini-2.5-flash")
-        cls.LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
-        cls.LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "10000"))
-        cls.LLM_FREQUENCY_PENALTY = float(os.getenv("LLM_FREQUENCY_PENALTY", "0.3"))
-        cls.LLM_PRESENCE_PENALTY = float(os.getenv("LLM_PRESENCE_PENALTY", "0.3"))
-        cls.LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "300"))
-        cls.LLM_RETRY_ATTEMPTS = int(os.getenv("LLM_RETRY_ATTEMPTS", "2"))
-        cls.LLM_RETRY_DELAY = int(os.getenv("LLM_RETRY_DELAY", "5"))
+        cls.LLM_API_BASE_URL = llm_cfg.get("base_url", "https://api.apifast.tech/v1")
+        cls.LLM_MODEL = llm_cfg.get("model", "gemini-2.5-flash")
+        cls.LLM_TEMPERATURE = float(llm_cfg.get("temperature", 0.7))
+        cls.LLM_MAX_TOKENS = int(llm_cfg.get("max_tokens", 10000))
+        cls.LLM_FREQUENCY_PENALTY = float(llm_cfg.get("frequency_penalty", 0.3))
+        cls.LLM_PRESENCE_PENALTY = float(llm_cfg.get("presence_penalty", 0.3))
+        cls.LLM_TIMEOUT = int(llm_cfg.get("timeout", 300))
+        cls.LLM_RETRY_ATTEMPTS = int(llm_cfg.get("retry_attempts", 2))
+        cls.LLM_RETRY_DELAY = int(llm_cfg.get("retry_delay", 5))
 
         # Generate concurrency
-        cls.GENERATE_BATCH_SIZE = int(os.getenv("GENERATE_BATCH_SIZE", "100"))
-        cls.GENERATE_CONCURRENT_LIMIT = int(os.getenv("GENERATE_CONCURRENT_LIMIT", "10"))
+        cls.GENERATE_BATCH_SIZE = int(gen_cfg.get("batch_size", 100))
+        cls.GENERATE_CONCURRENT_LIMIT = int(gen_cfg.get("concurrent_limit", 10))
 
         # Translate concurrency
-        cls.TRANSLATE_BATCH_SIZE = int(os.getenv("TRANSLATE_BATCH_SIZE", "10"))
-        cls.TRANSLATE_BATCH_DELAY = int(os.getenv("TRANSLATE_BATCH_DELAY", "1"))
+        cls.TRANSLATE_BATCH_SIZE = int(xlate_cfg.get("batch_size", 10))
+        cls.TRANSLATE_BATCH_DELAY = int(xlate_cfg.get("batch_delay", 1))
 
         cls.BLOCKED_DOMAINS = set(
             d.strip()
-            for d in os.getenv("BLOCKED_DOMAINS",
-                "youtube.com,youtu.be,reddit.com,discord.com").split(",")
+            for d in cfg.get("blocked_domains", ["youtube.com", "youtu.be", "reddit.com", "discord.com"])
             if d.strip()
         )
 

@@ -150,7 +150,7 @@ seoscout run --keywords keywords.json
 
 项目名会从关键词文件里的 `game_name` 自动生成（转小写、空格替换为 `_`）。如果没有设置 `game_name`，则使用文件名代替。
 
-> 约定把每个项目的关键词文件放在 `projects/<project_name>/keywords.json`，例如 `projects/my_game/keywords.json`。这样运行后 `OUTPUT_DIR`（默认 `./projects`）会在同一个目录下生成 `out/`、`logs/`、`articles/`，输入和产出都在一个项目文件夹里，方便管理多个项目。
+> 约定把每个项目的关键词文件放在 `projects/<project_name>/keywords.json`，例如 `projects/my_game/keywords.json`。这样运行后 `output_dir`（`config.json` 里配置，默认 `./projects`）会在同一个目录下生成 `out/`、`logs/`、`articles/`，输入和产出都在一个项目文件夹里，方便管理多个项目。
 
 ### 拿到一份 keywords.json，怎么在终端跑起来？
 
@@ -483,7 +483,7 @@ seoscout/
 ### 关键设计事实
 
 - **无数据库，纯文件驱动**。每个项目的状态就是 `projects/<name>/` 下的 JSON 文件 + Markdown 文件，`out/cache/{web,youtube}/` 按 URL hash / video_id 缓存已提取的内容。所有阶段都是幂等的——重新运行会跳过已存在的产出（`collect`/`generate`/`translate` 都有 skip-if-exists 逻辑），可以放心补跑失败项，不会重复消耗 API 额度。
-- **`Config` 是一个进程级单例**，每个子命令开始时调用 `Config.init(project)` 从 `.env` 加载配置并创建 `projects/<project>/{out,logs,articles}` 目录。`seoscout run` 会对每个阶段重复调用 `Config.init`，但控制台日志只在第一次调用时被镜像（tee）到 `projects/<name>/logs/seoscout.log`，所以整个 pipeline 共享一份日志文件。
+- **`Config` 是一个进程级单例**，每个子命令开始时调用 `Config.init(project)`，从 `.env` 读密钥、从 `config.json` 读其余所有调优参数（两者都缺省时退回代码里写死的默认值），并创建 `projects/<project>/{out,logs,articles}` 目录。`seoscout run` 会对每个阶段重复调用 `Config.init`，但控制台日志只在第一次调用时被镜像（tee）到 `projects/<name>/logs/seoscout.log`，所以整个 pipeline 共享一份日志文件。
 - **YouTube 完全通过 DataForSEO**（`core/dataforseo_client.py`），不使用 yt-dlp、不使用代理 IP、不使用 `youtube_transcript_api`。这是踩过坑之后的结论：yt-dlp + 代理 IP 的方案不稳定（代理商本身会挂，YouTube 也会封锁高频请求字幕的 IP）。Web 搜索（Serper）和内容提取（Jina）都是托管服务，**不需要也没有配置代理**。
 - **`filter_keyword` 先做搜索 query 消歧，再做 YouTube 结果的宽松过滤**。`core/utils.py` 的 `build_disambiguated_query()` 会把 `filter_keyword` 里关键词本身没有的词（比如 "Roblox"）拼进实际发给 Serper/DataForSEO 的搜索 query 里——这是主防线，让搜索引擎自己的排序做消歧，不丢结果。YouTube 结果之后还有一层宽松的标题过滤（拆词后任意一个词命中就保留，详见 `youtube.py` 的 `_filter_by_keyword`），Web 结果不做这层过滤。**不要把 YouTube 那层过滤改回完整短语匹配**——这是从真实项目"过滤太严导致产出稀少"的教训里得出的。
 - **`seoscout qa` 是文不对题问题的第二道防线，且和游戏/平台无关，是流水线里不可跳过的一步**。第一道防线（query 消歧）解决不了所有情况——某些常见英文词（职业名、地名）本身在 LLM 训练数据里就是极强的现实世界先验，即使参考资料是干净的游戏内容，模型也可能想歪。`qa.py` 用一次独立的 LLM 调用复核每篇生成的英文文章"内容是不是真的在讲这个游戏"，prompt 里只传 `game_name`，不写死任何具体游戏/平台名称，可以直接套用到任何项目。判定跑题就删——英文原文加上它当时已有的所有语言翻译一起删（避免留下孤立的旧翻译），删除记录写入 `out/qa_removed.jsonl` 方便事后抽查，结果缓存在 `out/qa_results.json`（`--overwrite` 才会重新复核）。`seoscout run` 里这一步没有跳过选项——不跑等于把可能文不对题的内容直接当成品交付，这一步存在的意义就是不允许这种情况发生。
@@ -493,25 +493,36 @@ seoscout/
 
 ## 配置参考
 
-所有配置都在 `.env` 中（从 `.env.example` 复制后填入你的 key）：
+配置分两个文件，**故意分开**：
+
+| 文件 | 放什么 | 会不会进 git |
+|------|--------|------|
+| `.env` | 只放密码/key/凭证这类**密钥** | ❌ 被 `.gitignore` 排除，每个人/每台机器自己填一份 |
+| `config.json` | 密钥以外的**所有调优参数**（batch size、并发数、超时、模型名、屏蔽域名……） | ✅ 直接跟踪，可以正常 commit/push/分享给团队 |
+
+不再需要把几十个调优变量抄进 `.env` 才能跑起来——`config.json` 已经带着一份可用的默认值，克隆仓库直接就能用；想改批量大小、模型名之类的参数，直接编辑并提交 `config.json` 就行，不需要每个人各自维护一份。
+
+`.env` 只需要填密钥：
 
 ```bash
 cp .env.example .env
 ```
-
-### 🔑 必需 —— API Key
-
-使用 seoscout 至少需要一个 API key：
 
 ```bash
 # 通过 Serper 进行 Google 搜索 —— 必需
 # 在 https://serper.dev/ 获取免费 key
 SERPER_API_KEY=your_serper_api_key_here
 
-# 通过 Jina 提取网页内容 —— 推荐
-# 不填也能用，但速率限制会更低
+# 通过 Jina 提取网页内容 —— 推荐（不填也能用，但速率限制更低）
 # 在 https://jina.ai/ 获取免费 key
 JINA_API_KEY=your_jina_api_key_here
+
+# DataForSEO（YouTube 搜索 + 字幕）—— 必需
+DATAFORSEO_LOGIN=your_login
+DATAFORSEO_PASSWORD=your_password
+
+# LLM（生成 + 翻译）—— 必需，可加 _2、_3... 配置多个 key 轮询
+LLM_API_KEY_1=your_llm_api_key_here
 ```
 
 | 变量 | 是否必需 | 获取地址 |
@@ -519,91 +530,119 @@ JINA_API_KEY=your_jina_api_key_here
 | `SERPER_API_KEY` | ✅ 必需 | [serper.dev](https://serper.dev/)（有免费额度） |
 | `JINA_API_KEY` | 推荐 | [jina.ai](https://jina.ai/)（有免费额度） |
 | `DATAFORSEO_LOGIN` / `DATAFORSEO_PASSWORD` | ✅ 必需（YouTube 搜索/字幕） | [dataforseo.com](https://app.dataforseo.com/api-dashboard) Basic Auth 凭证 |
-| `LLM_API_KEY_1`（可加 `_2`、`_3`...） | 用于生成/翻译 | 任意 OpenAI 兼容接口（Gemini、OpenAI 等）；配置多个 key 会自动轮询，分摊限速 |
+| `LLM_API_KEY_1`（可加 `_2`、`_3`...） | ✅ 必需（生成/翻译） | 任意 OpenAI 兼容接口（Gemini、OpenAI 等）；配置多个 key 会自动轮询，分摊限速 |
 
-### 📁 输出
+其余所有参数在 `config.json` 里，直接编辑这个文件即可，不需要重新 `cp` 什么模板：
 
-| 变量 | 默认值 | 说明 |
-|----------|---------|-------------|
-| `OUTPUT_DIR` | `./projects` | 所有项目数据的根目录。约定每个项目一个子目录（如 `projects/my_game/`），`keywords.json` 输入文件和 `out/`、`logs/`、`articles/` 产出放在一起 |
-
-### 🎬 YouTube —— DataForSEO
-
-`seoscout search`/`collect` 的 YouTube 环节需要。搜索和字幕都走 [DataForSEO](https://app.dataforseo.com/api-dashboard) 的 SERP API，不使用 yt-dlp，也不需要代理 IP。
-
-```bash
-DATAFORSEO_LOGIN=your_login
-DATAFORSEO_PASSWORD=your_password
+```json
+{
+  "output_dir": "./projects",
+  "youtube": {
+    "base_url": "https://api.dataforseo.com",
+    "initial_search_results": 2,
+    "max_results_after_filter": 1,
+    "max_duration": 3600,
+    "extract_top_k": 1,
+    "search_workers": 3,
+    "transcript_workers": 5,
+    "location_code": 2840,
+    "language_code": "en",
+    "device": "desktop",
+    "os": "windows",
+    "block_depth": 10
+  },
+  "web": {
+    "search_top_n": 10,
+    "extract_top_k": 1,
+    "search_concurrency": 5,
+    "jina_rpm": 200,
+    "jina_concurrency": 20
+  },
+  "llm": {
+    "base_url": "https://api.openai.com/v1",
+    "model": "gpt-4o",
+    "temperature": 0.7,
+    "max_tokens": 10000,
+    "frequency_penalty": 0.3,
+    "presence_penalty": 0.3,
+    "timeout": 300,
+    "retry_attempts": 2,
+    "retry_delay": 5
+  },
+  "generate": { "batch_size": 100, "concurrent_limit": 10 },
+  "translate": { "batch_size": 10, "batch_delay": 1 },
+  "search": { "max_retries": 3, "retry_delay": 2 },
+  "blocked_domains": ["youtube.com", "youtu.be", "reddit.com", "discord.com"]
+}
 ```
 
-| 变量 | 默认值 | 说明 |
+不存在的字段会退回代码里写死的默认值，`config.json` 整个文件缺失也不会报错——所以这个文件可以只写你想改的那几个字段，其他留空/删掉都行。
+
+### 📁 output_dir
+
+所有项目数据的根目录，默认 `./projects`。约定每个项目一个子目录（如 `projects/my_game/`），`keywords.json` 输入文件和 `out/`、`logs/`、`articles/` 产出放在一起。
+
+### 🎬 youtube —— DataForSEO
+
+`seoscout search`/`collect` 的 YouTube 环节需要，密钥在 `.env`（`DATAFORSEO_LOGIN`/`DATAFORSEO_PASSWORD`），其余在 `config.json` 的 `youtube` 部分。搜索和字幕都走 [DataForSEO](https://app.dataforseo.com/api-dashboard) 的 SERP API，不使用 yt-dlp，也不需要代理 IP。
+
+| 字段 | 默认值 | 说明 |
 |----------|---------|-------------|
-| `DATAFORSEO_LOGIN` | _(空)_ | DataForSEO 账号的 Basic Auth 用户名 |
-| `DATAFORSEO_PASSWORD` | _(空)_ | DataForSEO 账号的 Basic Auth 密码 |
-| `DATAFORSEO_BASE_URL` | `https://api.dataforseo.com` | API 地址，一般不用改 |
-| `YOUTUBE_LOCATION_CODE` | `2840` | 搜索地区代码（`2840` = 美国） |
-| `YOUTUBE_LANGUAGE_CODE` | `en` | 搜索语言代码 |
-| `YOUTUBE_DEVICE` / `YOUTUBE_OS` | `desktop` / `windows` | 模拟的设备类型 |
-| `YOUTUBE_BLOCK_DEPTH` | `10` | 每次搜索请求返回的结果深度（越大越贵，`collect` 阶段本来就只取每个关键词 Top-K，没必要设太大） |
-| `YOUTUBE_MAX_DURATION` | `3600` | 超过此时长（秒）的视频会被跳过 |
-| `YOUTUBE_EXTRACT_TOP_K` | `1` | 每个关键词提取的字幕数量 |
-| `YOUTUBE_SEARCH_WORKERS` | `3` | 并行搜索的 worker 数（受 DataForSEO 账号并发上限约束） |
-| `YOUTUBE_TRANSCRIPT_WORKERS` | `5` | 并行提取字幕的 worker 数 |
+| `base_url` | `https://api.dataforseo.com` | API 地址，一般不用改 |
+| `location_code` | `2840` | 搜索地区代码（`2840` = 美国） |
+| `language_code` | `en` | 搜索语言代码 |
+| `device` / `os` | `desktop` / `windows` | 模拟的设备类型 |
+| `block_depth` | `10` | 每次搜索请求返回的结果深度（越大越贵，`collect` 阶段本来就只取每个关键词 Top-K，没必要设太大） |
+| `max_duration` | `3600` | 超过此时长（秒）的视频会被跳过 |
+| `extract_top_k` | `1` | 每个关键词提取的字幕数量 |
+| `search_workers` | `3` | 并行搜索的 worker 数（受 DataForSEO 账号并发上限约束） |
+| `transcript_workers` | `5` | 并行提取字幕的 worker 数 |
 
-### 🌍 Web 调优
+### 🌍 web 调优
 
-| 变量 | 默认值 | 说明 |
+| 字段 | 默认值 | 说明 |
 |----------|---------|-------------|
-| `WEB_SEARCH_TOP_N` | `10` | 每个关键词的 Google 搜索结果数 |
-| `WEB_EXTRACT_TOP_K` | `1` | 每个关键词提取的页面数 |
-| `WEB_SEARCH_CONCURRENCY` | `5` | Serper API 并发数 |
-| `JINA_RPM` | `200` | Jina 速率限制（每分钟请求数） |
-| `JINA_CONCURRENCY` | `20` | Jina 并行请求数 |
-| `WEB_EXTRACT_RETRIES` | `3` | 网页提取重试次数 |
+| `search_top_n` | `10` | 每个关键词的 Google 搜索结果数 |
+| `extract_top_k` | `1` | 每个关键词提取的页面数 |
+| `search_concurrency` | `5` | Serper API 并发数 |
+| `jina_rpm` | `200` | Jina 速率限制（每分钟请求数） |
+| `jina_concurrency` | `20` | Jina 并行请求数 |
+| `extract_retries` | `3` | 网页提取重试次数 |
 
-### 🤖 LLM —— 用于生成 & 翻译
+### 🤖 llm —— 用于生成 & 翻译
 
-`seoscout generate` 和 `seoscout translate` 需要。任意 OpenAI 兼容接口都可以（Gemini、OpenAI、DeepSeek 等）。
+`seoscout generate` 和 `seoscout translate` 需要。任意 OpenAI 兼容接口都可以（Gemini、OpenAI、DeepSeek 等），密钥在 `.env` 的 `LLM_API_KEY_1`（可加 `_2`、`_3`...），其余（包括接口地址、模型名）在 `config.json` 的 `llm` 部分。
 
-支持配置多个 key（`LLM_API_KEY_1`、`_2`、`_3`...），请求会在这些 key 之间轮询，用来分摊限速和瞬时错误——LLM 网关偶尔会返回 `429`/`500`/`524` 这类瞬时错误，key 越多，单个 key 被限速的概率越低，整体吞吐越稳定。只有一个 key 也没问题，只填 `LLM_API_KEY_1` 即可。
+支持配置多个 key，请求会在这些 key 之间轮询，用来分摊限速和瞬时错误——LLM 网关偶尔会返回 `429`/`500`/`524` 这类瞬时错误，key 越多，单个 key 被限速的概率越低，整体吞吐越稳定。只有一个 key 也没问题，只填 `LLM_API_KEY_1` 即可。
 
-```bash
-LLM_API_KEY_1=your_api_key
-LLM_API_KEY_2=your_second_api_key   # 可选，继续加 _3、_4...
-LLM_API_BASE_URL=https://api.openai.com/v1
-LLM_MODEL=gpt-4o
-LLM_MAX_TOKENS=10000
-```
-
-| 变量 | 默认值 | 说明 |
+| 字段 | 默认值 | 说明 |
 |----------|---------|-------------|
-| `LLM_API_KEY_1`（可加 `_2`、`_3`...） | _(空)_ | LLM 的 API key，可配置多个用于轮询 |
-| `LLM_API_BASE_URL` | _(需设置)_ | OpenAI 兼容接口地址 |
-| `LLM_MODEL` | `gemini-2.5-flash` | 模型名称 |
-| `LLM_TEMPERATURE` | `0.7` | 采样温度 |
-| `LLM_MAX_TOKENS` | `10000` | 单次请求的最大输出 token 数（约一篇 1600 词文章 + 几个表格的量；调太大会让模型一旦进入重复输出的退化循环时能跑更远，见下方"生成内容异常膨胀"） |
-| `LLM_FREQUENCY_PENALTY` | `0.3` | 抑制重复 token 的惩罚系数，降低表格生成时陷入复读循环的概率 |
-| `LLM_PRESENCE_PENALTY` | `0.3` | 抑制重复主题的惩罚系数，同上 |
-| `LLM_TIMEOUT` | `300` | 请求超时时间（秒） |
-| `LLM_RETRY_ATTEMPTS` | `2` | 失败重试次数（每次重试会换下一个 key） |
-| `LLM_RETRY_DELAY` | `5` | 重试间隔（秒） |
+| `base_url` | `https://api.openai.com/v1` | OpenAI 兼容接口地址 |
+| `model` | `gpt-4o` | 模型名称 |
+| `temperature` | `0.7` | 采样温度 |
+| `max_tokens` | `10000` | 单次请求的最大输出 token 数（约一篇 1600 词文章 + 几个表格的量；调太大会让模型一旦进入重复输出的退化循环时能跑更远，见下方"生成内容异常膨胀"） |
+| `frequency_penalty` | `0.3` | 抑制重复 token 的惩罚系数，降低表格生成时陷入复读循环的概率 |
+| `presence_penalty` | `0.3` | 抑制重复主题的惩罚系数，同上 |
+| `timeout` | `300` | 请求超时时间（秒） |
+| `retry_attempts` | `2` | 失败重试次数（每次重试会换下一个 key） |
+| `retry_delay` | `5` | 重试间隔（秒） |
 
-### ⚡ 并发 —— 生成 & 翻译
+### ⚡ generate / translate 并发
 
-| 变量 | 默认值 | 说明 |
+| 字段 | 默认值 | 说明 |
 |----------|---------|-------------|
-| `GENERATE_BATCH_SIZE` | `100` | 每批并行生成的文章数 |
-| `GENERATE_CONCURRENT_LIMIT` | `10` | 生成阶段最大并发请求数 |
-| `TRANSLATE_BATCH_SIZE` | `10` | 每批并行翻译数 |
-| `TRANSLATE_BATCH_DELAY` | `1` | 翻译批次之间的间隔（秒） |
+| `generate.batch_size` | `100` | 每批并行生成的文章数 |
+| `generate.concurrent_limit` | `10` | 生成阶段最大并发请求数 |
+| `translate.batch_size` | `10` | 每批并行翻译数 |
+| `translate.batch_delay` | `1` | 翻译批次之间的间隔（秒） |
 
-### ⚙️ 通用
+### ⚙️ search / 通用
 
-| 变量 | 默认值 | 说明 |
+| 字段 | 默认值 | 说明 |
 |----------|---------|-------------|
-| `SEARCH_MAX_RETRIES` | `3` | 搜索重试次数 |
-| `SEARCH_RETRY_DELAY` | `2` | 重试间隔（秒） |
-| `BLOCKED_DOMAINS` | `youtube.com,youtu.be,...` | 从网页结果中排除的域名 |
+| `search.max_retries` | `3` | 搜索重试次数 |
+| `search.retry_delay` | `2` | 重试间隔（秒） |
+| `blocked_domains` | `["youtube.com", "youtu.be", ...]` | 从网页结果中排除的域名 |
 
 ## 常见问题
 
@@ -620,20 +659,20 @@ LLM_MAX_TOKENS=10000
 ### 网页内容过短或为空
 
 部分页面会屏蔽自动抓取。可以尝试：
-- 调低 `JINA_CONCURRENCY` 避免触发限速
+- 调低 `config.json` 里 `web.jina_concurrency` 避免触发限速
 - 配置 `JINA_API_KEY` 以获得更高的速率限制
 
 ### LLM 生成失败或返回空内容
 
 - 检查 `LLM_API_KEY_1`（及 `_2`、`_3`...）是否已设置且有效
-- 如果被限速，尝试调低 `GENERATE_BATCH_SIZE` 或 `GENERATE_CONCURRENT_LIMIT`
-- 检查 `LLM_MAX_TOKENS` —— 部分模型限制更低
+- 如果被限速，尝试调低 `config.json` 里 `generate.batch_size` 或 `generate.concurrent_limit`
+- 检查 `config.json` 里 `llm.max_tokens` —— 部分模型限制更低
 - 查看你所用 API 提供商的状态页面
 
 ### 生成的文章体积异常大，或表格里有大段空白/重复内容
 
 这是小/快模型（如 `gemini-2.5-flash`）在生成长表格时偶尔出现的"重复陷阱"退化输出——不是 seoscout 的 bug，`generate.py`/`translate.py` 都没有任何表格对齐/填充的后处理逻辑。`validate_markdown()` 已经内置了检测（单文件超过 50,000 字符、`export const metadata` 出现次数不为 1、或存在异常长的连续空白/重复片段，都会判定为无效并触发自动重新生成）。如果仍然偶尔出现：
-- 确认 `.env` 里配置了 `LLM_FREQUENCY_PENALTY`/`LLM_PRESENCE_PENALTY`（默认 `0.3`），可以适当调高（如 `0.5`）进一步降低复读概率
+- 确认 `config.json` 的 `llm.frequency_penalty`/`llm.presence_penalty`（默认 `0.3`）已生效，可以适当调高（如 `0.5`）进一步降低复读概率
 - 确认所用的 LLM 网关支持 `frequency_penalty`/`presence_penalty` 这两个字段——少数 OpenAI 兼容代理会拒绝未知字段导致请求报错，如遇到可以把这两个值改回 `0` 关闭
 
 ### 如何使用自定义 prompt 模板？
