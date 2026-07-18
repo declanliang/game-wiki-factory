@@ -1,0 +1,222 @@
+from __future__ import annotations
+
+import re
+from difflib import SequenceMatcher
+from typing import Any
+from urllib.parse import parse_qs, quote, urlparse
+
+from .http import CachedHttpClient, HttpError
+from .util import normalized_name, slugify, utc_now
+
+
+DISCOVER = "https://r.jina.ai/https://www.roblox.com/discover/?Keyword={}"
+
+
+class IdentityError(RuntimeError):
+    pass
+
+
+class RobloxClient:
+    def __init__(self, http: CachedHttpClient):
+        self.http = http
+
+    def discover(self, game_name: str, limit: int = 12) -> list[dict[str, Any]]:
+        response = self.http.get(DISCOVER.format(quote(game_name)), ttl=3600)
+        if response.status_code >= 400:
+            raise IdentityError(f"Roblox Discover reader returned HTTP {response.status_code}")
+        found: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        pattern = re.compile(r"https?://(?:www\.)?roblox\.com/games/(\d+)(?:/([^\s)\]]+))?", re.I)
+        for match in pattern.finditer(response.text):
+            place_id, tail = match.groups()
+            if place_id in seen:
+                continue
+            seen.add(place_id)
+            tail = tail or ""
+            parsed = urlparse("https://www.roblox.com/" + tail)
+            universe = parse_qs(parsed.query).get("universeId", [None])[0]
+            found.append({
+                "placeId": place_id,
+                "universeId": universe,
+                "slugFromSearch": parsed.path.strip("/"),
+                "position": len(found),
+            })
+            if len(found) >= limit:
+                break
+        if not found:
+            raise IdentityError(f"No Roblox candidates found for {game_name!r}")
+        missing = [item for item in found if not item["universeId"]]
+        for item in missing:
+            data = self.http.get_json(
+                f"https://apis.roblox.com/universes/v1/places/{item['placeId']}/universe",
+                ttl=30 * 86400,
+            )
+            item["universeId"] = str(data["universeId"])
+        universe_ids = ",".join(item["universeId"] for item in found)
+        games = self.http.get_json(
+            f"https://games.roblox.com/v1/games?universeIds={universe_ids}", ttl=86400
+        ).get("data", [])
+        by_id = {str(game["id"]): game for game in games}
+        query_norm = normalized_name(game_name)
+        for item in found:
+            game = by_id.get(item["universeId"], {})
+            item["name"] = game.get("name") or item["slugFromSearch"].replace("-", " ")
+            item["creator"] = game.get("creator")
+            item["description"] = game.get("description", "")
+            item["visits"] = game.get("visits")
+            candidate_norm = normalized_name(item["name"])
+            ratio = SequenceMatcher(None, query_norm, candidate_norm).ratio()
+            exact = query_norm == candidate_norm
+            contains = bool(query_norm and (query_norm in candidate_norm or candidate_norm in query_norm))
+            position_bonus = max(0.0, 0.08 - item["position"] * 0.01)
+            item["matchScore"] = round(min(1.0, ratio * 0.78 + (0.18 if exact else 0.08 if contains else 0) + position_bonus), 4)
+        return sorted(found, key=lambda x: (-x["matchScore"], x["position"]))
+
+    def select_identity(self, game_name: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        candidates = self.discover(game_name)
+        best = candidates[0]
+        if best["matchScore"] < 0.72:
+            raise IdentityError(
+                f"Top candidate confidence {best['matchScore']:.2f} is below 0.72; "
+                f"review candidates in raw/identity.json"
+            )
+        if len(candidates) > 1 and best["matchScore"] - candidates[1]["matchScore"] < 0.05:
+            raise IdentityError("Two Roblox candidates are too close to select safely")
+        return best, candidates
+
+    def collect(self, query: str, selected: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+        universe_id = str(selected["universeId"])
+        game_rows = self.http.get_json(
+            f"https://games.roblox.com/v1/games?universeIds={universe_id}", ttl=900
+        ).get("data", [])
+        if not game_rows:
+            raise HttpError(f"Roblox returned no game for universe {universe_id}")
+        game = game_rows[0]
+        place_id = str(game.get("rootPlaceId") or selected["placeId"])
+        votes_rows = self.http.get_json(
+            f"https://games.roblox.com/v1/games/votes?universeIds={universe_id}", ttl=21600
+        ).get("data", [])
+        votes = votes_rows[0] if votes_rows else {}
+        icons = self.http.get_json(
+            "https://thumbnails.roblox.com/v1/games/icons"
+            f"?universeIds={universe_id}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false",
+            ttl=86400,
+        ).get("data", [])
+        gallery_rows = self.http.get_json(
+            "https://thumbnails.roblox.com/v1/games/multiget/thumbnails"
+            f"?universeIds={universe_id}&countPerUniverse=10&defaults=true&size=768x432&format=Png&isCircular=false",
+            ttl=86400,
+        ).get("data", [])
+        thumbnails = (gallery_rows[0].get("thumbnails", []) if gallery_rows else [])
+        creator = game.get("creator") or {}
+        developer_url = None
+        developer_extra: dict[str, Any] = {}
+        if creator.get("type") == "Group" and creator.get("id"):
+            developer_url = f"https://www.roblox.com/communities/{creator['id']}/{slugify(creator.get('name', 'group'))}"
+            try:
+                developer_extra = self.http.get_json(
+                    f"https://groups.roblox.com/v1/groups/{creator['id']}", ttl=604800
+                )
+            except HttpError:
+                developer_extra = {}
+        elif creator.get("id"):
+            developer_url = f"https://www.roblox.com/users/{creator['id']}/profile"
+        total_votes = (votes.get("upVotes") or 0) + (votes.get("downVotes") or 0)
+        approval = round((votes.get("upVotes", 0) / total_votes) * 100, 1) if total_votes else None
+        retrieved = utc_now()
+        canonical_url = f"https://www.roblox.com/games/{place_id}/{slugify(game['name'])}"
+        facts = {
+            "identity": {
+                "query": query,
+                "canonicalName": re.sub(r"\s*\[[^]]+]\s*", "", game["name"]).strip(),
+                "currentRobloxName": game["name"],
+                "slug": slugify(re.sub(r"\s*\[[^]]+]\s*", "", game["name"])),
+                "platform": "Roblox",
+                "placeId": place_id,
+                "universeId": universe_id,
+                "canonicalUrl": canonical_url,
+                "matchConfidence": selected["matchScore"],
+            },
+            "developer": {
+                "name": creator.get("name"),
+                "type": creator.get("type"),
+                "id": str(creator.get("id")) if creator.get("id") is not None else None,
+                "url": developer_url,
+                "memberCount": developer_extra.get("memberCount"),
+                "verified": developer_extra.get("hasVerifiedBadge", creator.get("hasVerifiedBadge")),
+            },
+            "game": {
+                "officialDescription": game.get("description", ""),
+                "genre": game.get("genre") or game.get("genre_l1"),
+                "genreL1": game.get("genre_l1"),
+                "genreL2": game.get("genre_l2"),
+                "price": game.get("price"),
+                "maxPlayers": game.get("maxPlayers"),
+                "createdAt": game.get("created"),
+                "updatedAt": game.get("updated"),
+                "isPlayable": game.get("isPlayable"),
+                "copyingAllowed": game.get("copyingAllowed"),
+            },
+            "dynamicStats": {
+                "retrievedAt": retrieved,
+                "playing": game.get("playing"),
+                "visits": game.get("visits"),
+                "favorites": game.get("favoritedCount"),
+                "approvalPercent": approval,
+                "upVotes": votes.get("upVotes"),
+                "downVotes": votes.get("downVotes"),
+            },
+            "officialLinks": {
+                "website": None,
+                "roblox": canonical_url,
+                "robloxGroup": developer_url,
+                "discord": None,
+                "reddit": None,
+                "youtube": None,
+                "trailer": None,
+                "x": None,
+                "tiktok": None,
+            },
+            "codes": [],
+            "gameplayFacts": [],
+            "languageSignals": [],
+            "media": {
+                "icon": next((x.get("imageUrl") for x in icons if x.get("state") == "Completed"), None),
+                "thumbnails": [x.get("imageUrl") for x in thumbnails if x.get("state") == "Completed" and x.get("imageUrl")],
+                "heroImages": [x.get("imageUrl") for x in thumbnails if x.get("state") == "Completed" and x.get("imageUrl")][:5],
+            },
+        }
+        evidence = {
+            "sources": [
+                {
+                    "id": "src_roblox_game",
+                    "url": canonical_url,
+                    "title": f"{game['name']} | Play on Roblox",
+                    "sourceType": "official-platform",
+                    "publisher": "Roblox",
+                    "retrievedAt": retrieved,
+                    "httpStatus": 200,
+                    "accessible": True,
+                },
+                {
+                    "id": "src_roblox_api",
+                    "url": f"https://games.roblox.com/v1/games?universeIds={universe_id}",
+                    "title": "Roblox game details API",
+                    "sourceType": "official-api",
+                    "publisher": "Roblox",
+                    "retrievedAt": retrieved,
+                    "httpStatus": 200,
+                    "accessible": True,
+                },
+            ],
+            "claims": [
+                {"field": field, "sourceIds": ["src_roblox_api"], "confidence": 1.0, "classification": "fact"}
+                for field in [
+                    "identity.placeId", "identity.universeId", "identity.currentRobloxName",
+                    "developer.name", "game.officialDescription", "game.createdAt", "game.updatedAt",
+                    "dynamicStats.playing", "dynamicStats.visits", "dynamicStats.favorites",
+                ]
+            ],
+        }
+        raw = {"game": game, "votes": votes, "icons": icons, "thumbnails": thumbnails, "developer": developer_extra}
+        return facts, evidence, raw

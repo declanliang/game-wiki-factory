@@ -1,0 +1,5 @@
+requests>=2.31,<3
+python-dotenv>=1.0,<2
+Pillow>=10,<13
+jsonschema>=4.21,<5
+

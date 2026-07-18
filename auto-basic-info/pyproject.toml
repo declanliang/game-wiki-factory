@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gamewiki-automation"
+version = "0.1.0"
+description = "Roblox game homepage research and configuration automation"
+requires-python = ">=3.11"
+dependencies = [
+  "requests>=2.31,<3",
+  "python-dotenv>=1.0,<2",
+  "Pillow>=10,<13",
+  "jsonschema>=4.21,<5"
+]
+
+[project.scripts]
+gamewiki-auto = "gamewiki_automation.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
