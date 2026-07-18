@@ -1,0 +1,4 @@
+# One complete suggestion per line. Comments beginning with # are ignored.
+example game codes
+example game tier list
+example game release date
