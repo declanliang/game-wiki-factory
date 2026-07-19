@@ -82,28 +82,10 @@ if (fs.existsSync(structuredPath)) {
 }
 
 // --- 4. Catch-all: any remaining __GAME_NAME__/__OFFICIAL_GAME_URL__/__YEAR__ token ---
-// Covers fields that are templated but weren't worth a dedicated line above (e.g.
-// footer.officialDiscord/officialYoutube/communityTool label text still says
-// "__GAME_NAME__ Discord") and the 4 static legal pages, which hardcode the token
-// directly in JSX rather than reading it from en.json.
+// Covers templated locale fields that were not worth a dedicated line above,
+// including footer and localized legal-page copy.
 const TOKEN_VALUES = tokenValues(env);
 const enSubstituted = substituteTokens(en, TOKEN_VALUES);
 
 fs.writeFileSync(enPath, `${JSON.stringify(enSubstituted, null, 2)}\n`);
 console.log("✓ en.json 已写入");
-
-const legalPages = ["about", "copyright", "privacy-policy", "terms-of-service"].map((slug) =>
-  path.join(root, "src", "app", "[locale]", slug, "page.tsx"),
-);
-let legalPagesTouched = 0;
-for (const pagePath of legalPages) {
-  if (!fs.existsSync(pagePath)) continue;
-  let src = fs.readFileSync(pagePath, "utf-8");
-  const before = src;
-  for (const [token, replacement] of Object.entries(TOKEN_VALUES)) src = src.split(token).join(replacement);
-  if (src !== before) {
-    fs.writeFileSync(pagePath, src);
-    legalPagesTouched++;
-  }
-}
-if (legalPagesTouched > 0) console.log(`✓ 法务页面（about/copyright/privacy-policy/terms-of-service）里的占位符已替换（${legalPagesTouched} 个文件有改动）`);

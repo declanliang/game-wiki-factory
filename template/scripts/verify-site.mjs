@@ -97,13 +97,58 @@ function extractMetaContent(html, key) {
   return contentMatch ? contentMatch[1] : null;
 }
 
-function inspectHtmlMetadata(html, label, expectedOrigin = null) {
+function extractLinkHref(html, rel) {
+  const tag = html.match(new RegExp(`<link[^>]*rel=["']${rel}["'][^>]*>`, "i"))?.[0];
+  return tag?.match(/href=["']([^"']+)["']/i)?.[1] ?? null;
+}
+
+function inspectStructuredPageUrls(html, pageUrl) {
+  let issues = 0;
+  const parsedPage = new URL(pageUrl);
+  const firstSegment = parsedPage.pathname.split("/").filter(Boolean)[0];
+  const locale = ["es", "de", "fr", "ja", "ko"].includes(firstSegment) ? firstSegment : "en";
+  const localeBase = `${parsedPage.origin}${locale === "en" ? "" : `/${locale}`}`;
+  const isLocaleUrl = (value) => {
+    try {
+      const parsed = new URL(value);
+      return parsed.origin === parsedPage.origin && (parsed.href === localeBase || parsed.href.startsWith(`${localeBase}/`));
+    } catch { return false; }
+  };
+  for (const match of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    let data;
+    try { data = JSON.parse(match[1]); } catch { continue; }
+    const nodes = data?.["@graph"] || [data];
+    for (const node of nodes) {
+      if (node?.["@type"] === "Article" && new URL(node.mainEntityOfPage).href !== parsedPage.href) {
+        fail(`${parsedPage.pathname} Article.mainEntityOfPage 未使用页面 canonical：${node.mainEntityOfPage}`);
+        issues++;
+      }
+      if (["BreadcrumbList", "ItemList"].includes(node?.["@type"])) {
+        for (const item of node.itemListElement || []) {
+          const value = item.item || item.url;
+          if (value && !isLocaleUrl(value)) {
+            fail(`${parsedPage.pathname} ${node["@type"]} 含错误 locale URL：${value}`);
+            issues++;
+          }
+        }
+      }
+    }
+  }
+  return issues;
+}
+
+function inspectHtmlMetadata(html, label, expectedOrigin = null, expectedPageUrl = null) {
   const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || "";
+  const canonical = extractLinkHref(html, "canonical");
   const ogUrl = extractMetaContent(html, "og:url");
   const ogImage = extractMetaContent(html, "og:image");
   const twitterImage = extractMetaContent(html, "twitter:image");
   if (!title) fail(`${label}返回了 HTML，但没有非空 <title>；metadata 可能渲染失败，请检查 NEXT_PUBLIC_SITE_URL 和部署日志`);
   else ok(`${label}<title> = ${title}`);
+  if (!canonical) fail(`${label}HTML 里没有找到 canonical`);
+  else if (expectedPageUrl && new URL(canonical).href !== new URL(expectedPageUrl).href) {
+    fail(`${label}canonical 为 ${canonical}，期望 self-canonical ${expectedPageUrl}`);
+  } else ok(`${label}canonical = ${canonical}`);
   for (const [key, value] of [["og:url", ogUrl], ["og:image", ogImage], ["twitter:image", twitterImage]]) {
     if (!value) fail(`${label}HTML 里没有找到 ${key}`);
     else if (!/^https?:\/\//i.test(value)) fail(`${label}${key} 不是绝对 HTTP(S) URL：${value}`);
@@ -114,7 +159,7 @@ function inspectHtmlMetadata(html, label, expectedOrigin = null) {
   if (/Application error|metadata render error|An error occurred in the Server Components render/i.test(html)) {
     fail(`${label}HTML 包含 Next.js/metadata 运行时错误标记`);
   }
-  return { title, ogUrl, ogImage, twitterImage };
+  return { title, canonical, ogUrl, ogImage, twitterImage };
 }
 
 function inspectOriginDocument(text, label, expectedOrigin) {
@@ -125,9 +170,10 @@ function inspectOriginDocument(text, label, expectedOrigin) {
   }
   const bad = absoluteUrls.filter((value) => {
     try {
-      const origin = new URL(value.replace(/[),.;]+$/, "")).origin;
+      const parsed = new URL(value.replace(/[),.;]+$/, ""));
+      const origin = parsed.origin;
       if (["http://www.sitemaps.org", "http://www.w3.org"].includes(origin)) return false;
-      return origin !== expectedOrigin;
+      return origin !== expectedOrigin || parsed.pathname.startsWith("//");
     }
     catch { return true; }
   });
@@ -194,21 +240,37 @@ try {
   } else {
     sitemapXml = await sitemapRes.text();
     const locs = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+    const hreflangTargets = [...sitemapXml.matchAll(/<xhtml:link[^>]+href=["']([^"']+)["']/g)].map((m) => m[1]);
+    const allTargets = [...new Set([...locs, ...hreflangTargets])];
     let badCount = 0;
-    for (const loc of locs) {
-      const url = new URL(loc);
-      const res = await fetch(`http://localhost:${port}${url.pathname}${url.search}`);
-      if (res.status !== 200) {
-        fail(`${url.pathname} 返回 ${res.status}（期望 200）`);
+    for (const target of allTargets) {
+      const url = new URL(target);
+      if (url.pathname.startsWith("//")) {
+        fail(`sitemap URL 域名后含双斜杠：${target}`);
         badCount++;
+        continue;
+      }
+      const res = await fetch(`http://localhost:${port}${url.pathname}${url.search}`, { redirect: "manual" });
+      if (res.status !== 200) {
+        fail(`${url.pathname} 返回 ${res.status}（期望直接 200，不允许跳转）`);
+        badCount++;
+      } else if ((res.headers.get("content-type") || "").includes("text/html")) {
+        const html = await res.text();
+        const canonical = extractLinkHref(html, "canonical");
+        if (!canonical || new URL(canonical).href !== url.href) {
+          fail(`${url.pathname} canonical 为 ${canonical || "缺失"}，期望 ${url.href}`);
+          badCount++;
+        }
+        badCount += inspectStructuredPageUrls(html, url.href);
       }
     }
-    if (badCount === 0) ok(`sitemap.xml 里全部 ${locs.length} 条 URL 都返回 200`);
+    if (badCount === 0) ok(`sitemap.xml 的 ${locs.length} 个 loc 和 ${hreflangTargets.length} 个 hreflang 目标均为 self-canonical 且直接返回 200`);
   }
 
   const homeRes = await fetch(`http://localhost:${port}/`);
   const homeHtml = await homeRes.text();
-  const metadata = inspectHtmlMetadata(homeHtml, "本地生产首页：");
+  const homeUrl = sitemapXml.match(/<loc>([^<]+)<\/loc>/)?.[1] || null;
+  const metadata = inspectHtmlMetadata(homeHtml, "本地生产首页：", null, homeUrl);
   if (metadata.ogUrl) {
     const expectedOrigin = new URL(metadata.ogUrl).origin;
     if (sitemapXml) inspectOriginDocument(sitemapXml, "本地 sitemap.xml", expectedOrigin);
@@ -265,7 +327,7 @@ if (args.includes("--deploy")) {
     const live = {};
     for (const p of ["/", "/sitemap.xml", "/robots.txt"]) {
       try {
-        const res = await fetch(`${siteUrl}${p}`);
+        const res = await fetch(`${siteUrl}${p}`, { redirect: "manual" });
         const body = await res.text();
         if (res.status === 200) {
           ok(`线上 ${p} 返回 200`);
@@ -277,7 +339,7 @@ if (args.includes("--deploy")) {
       }
     }
     if (live["/"]) {
-      const metadata = inspectHtmlMetadata(live["/"], "线上首页：", siteUrl);
+      const metadata = inspectHtmlMetadata(live["/"], "线上首页：", siteUrl, siteUrl);
       const hreflangs = [...live["/"].matchAll(/rel="alternate"\s+hreflang="([^"]+)"/gi)].map((match) => match[1]);
       if (hreflangs.length > 0) ok(`线上 hreflang 标签：${hreflangs.join(", ")}`);
       else fail("线上首页没有 hreflang 标签；多语言 metadata 可能渲染失败");
@@ -285,7 +347,26 @@ if (args.includes("--deploy")) {
         fail("线上首页虽然返回 200，但 metadata 不完整；请检查 NEXT_PUBLIC_SITE_URL 和 Vercel Function 日志");
       }
     }
-    if (live["/sitemap.xml"]) inspectOriginDocument(live["/sitemap.xml"], "线上 sitemap.xml", siteUrl);
+    if (live["/sitemap.xml"]) {
+      inspectOriginDocument(live["/sitemap.xml"], "线上 sitemap.xml", siteUrl);
+      const targets = [...new Set([
+        ...[...live["/sitemap.xml"].matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]),
+        ...[...live["/sitemap.xml"].matchAll(/<xhtml:link[^>]+href=["']([^"']+)["']/g)].map((match) => match[1]),
+      ])];
+      let badTargets = 0;
+      for (const target of targets) {
+        try {
+          const parsed = new URL(target);
+          if (parsed.pathname.startsWith("//")) throw new Error("域名后含双斜杠");
+          const response = await fetch(target, { redirect: "manual" });
+          if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+        } catch (error) {
+          fail(`线上 sitemap 目标不是直接 200：${target}（${error.message}）`);
+          badTargets++;
+        }
+      }
+      if (badTargets === 0) ok(`线上 sitemap 的 ${targets.length} 个唯一 loc/hreflang 目标全部直接返回 200`);
+    }
     if (live["/robots.txt"]) inspectOriginDocument(live["/robots.txt"], "线上 robots.txt", siteUrl);
   }
 }

@@ -32,6 +32,22 @@ function walkMdx(dir) {
   return out;
 }
 
+function missingStructure(reference, candidate, prefix = "") {
+  const missing = [];
+  if (Array.isArray(reference)) {
+    if (!Array.isArray(candidate)) return [prefix || "(root)"];
+    return missing;
+  }
+  if (!reference || typeof reference !== "object") return missing;
+  if (!candidate || typeof candidate !== "object") return [prefix || "(root)"];
+  for (const key of Object.keys(reference)) {
+    const next = prefix ? `${prefix}.${key}` : key;
+    if (!(key in candidate)) missing.push(next);
+    else missing.push(...missingStructure(reference[key], candidate[key], next));
+  }
+  return missing;
+}
+
 const plan = readJson("src/config/site-plan.json");
 if (JSON.stringify(plan.languages) !== JSON.stringify(expectedLocales)) {
   fail(`site-plan 语言必须是 ${expectedLocales.join(", ")}`);
@@ -54,8 +70,11 @@ if (JSON.stringify(diskLocales) !== JSON.stringify(expectedSorted)) {
 }
 
 const englishTrees = new Map();
+const englishMessages = readJson("src/locales/en.json");
 for (const locale of expectedLocales) {
   const messages = readJson(`src/locales/${locale}.json`);
+  const missingKeys = missingStructure(englishMessages, messages);
+  if (missingKeys.length > 0) fail(`${locale}.json 缺少英文消息结构中的字段：${missingKeys.slice(0, 8).join(", ")}`);
   const localeDir = path.join(contentRoot, locale);
   const diskCategories = fs.existsSync(localeDir)
     ? fs.readdirSync(localeDir, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name).sort()
@@ -67,6 +86,10 @@ for (const locale of expectedLocales) {
   for (const category of categories) {
     if (!messages.nav?.[category.id]) fail(`${locale}.json 缺少 nav.${category.id}`);
     if (!messages[category.id]?.overviewTitle) fail(`${locale}.json 缺少 ${category.id}.overviewTitle`);
+    if (!messages[category.id]?.overviewDescription) fail(`${locale}.json 缺少 ${category.id}.overviewDescription`);
+    if (locale !== "en" && messages[category.id]?.overviewDescription === englishMessages[category.id]?.overviewDescription) {
+      fail(`${locale}.json 的 ${category.id}.overviewDescription 仍与英文完全相同`);
+    }
     const base = path.join(localeDir, category.id);
     const files = walkMdx(base).map((file) => path.relative(base, file).replaceAll("\\", "/")).sort();
     if (locale === "en") englishTrees.set(category.id, files);
@@ -77,7 +100,7 @@ for (const locale of expectedLocales) {
 }
 
 // Validate internal links emitted by homepage content.
-const en = readJson("src/locales/en.json");
+const en = englishMessages;
 function collectHrefs(value, out = []) {
   if (typeof value === "string" && value.startsWith("/") && !value.startsWith("//")) out.push(value);
   else if (Array.isArray(value)) value.forEach((item) => collectHrefs(item, out));

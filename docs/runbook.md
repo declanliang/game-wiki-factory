@@ -56,9 +56,10 @@ npm run launch:site
 - TypeScript 通过
 - 配置同步通过
 - production build 通过
-- sitemap 全 URL 200
+- sitemap 的 loc/hreflang 目标全部直接 200（不接受 3xx）
 - OG/Twitter image 正常
-- hreflang 包含六语言和 x-default
+- hreflang 包含六语言和 x-default；每个 locale 页面 canonical 等于自身最终 URL
+- 非英语分类描述、法律页和文章正文没有英语静默回退
 
 本地 `example.com` 是未配置正式域名的预期状态。部署前设置 `NEXT_PUBLIC_SITE_URL` 后运行：
 
@@ -66,7 +67,7 @@ npm run launch:site
 npm run verify:deploy
 ```
 
-`NEXT_PUBLIC_SITE_URL` 推荐填写完整 `https://...`；裸域名会自动补 HTTPS。它是公开站点 origin，不需要 Sensitive。`verify:deploy` 会读取线上 HTML 并检查 title、`og:url`、图片绝对 URL、sitemap/robots origin 和 hreflang，避免把 metadata 崩溃的 HTTP 200 当成成功。
+`NEXT_PUBLIC_SITE_URL` 推荐填写完整 `https://...`；裸域名会自动补 HTTPS。它是公开站点 origin，不需要 Sensitive。`verify:deploy` 会读取线上 HTML 并检查 title、canonical、`og:url`、图片绝对 URL、sitemap/robots 和全部 loc/hreflang 直接 200，避免把跳转或 metadata 崩溃的 HTTP 200 当成成功。
 
 ## 工厂升级已有网站
 

@@ -34,6 +34,9 @@ for (const category of plan.categories) {
   if (!category.labels || FIXED_LANGUAGES.some((locale) => !category.labels[locale])) {
     fail(`分类 ${category.id} 缺少六语言 labels`);
   }
+  if (!category.descriptions || FIXED_LANGUAGES.some((locale) => !category.descriptions[locale])) {
+    fail(`分类 ${category.id} 缺少六语言 descriptions`);
+  }
 }
 const published = plan.categories.filter((category) => category.status === "published");
 if (published.length < Number(plan.categoryPolicy?.minimum ?? 1)) {
@@ -50,11 +53,11 @@ for (const locale of FIXED_LANGUAGES) {
   const messages = fs.existsSync(localePath) ? JSON.parse(fs.readFileSync(localePath, "utf-8")) : {};
   messages.nav ||= {};
   for (const category of published) {
-    const label = category.labels[locale] || category.labels.en;
+    const label = category.labels[locale];
     messages.nav[category.id] = label;
     messages[category.id] = {
       overviewTitle: label,
-      overviewDescription: category.description || "",
+      overviewDescription: category.descriptions[locale],
     };
   }
   fs.writeFileSync(localePath, `${JSON.stringify(messages, null, 2)}\n`);

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Generates home.featured.items[] from the actual content/en/ article set, using the
+// Selects home.featured.items[] from the English article tree, then reads each
+// selected article's localized metadata for every declared locale.
 // deterministic rule documented in doc/新游戏上站提示词流程.md Part 3 — this used to be
 // "an AI reads the rule and executes it by hand each time"; the rule itself is fully
 // mechanical (no content understanding needed, just category/date/title lookups), so
@@ -152,22 +153,39 @@ if (fs.existsSync(overridePath)) {
 
 if (errors > 0) process.exit(1);
 
-const featuredItems = items.map(({ title, description, category, slug }) => ({
-  title,
-  description,
-  href: `/${category}/${slug}`,
-  category,
-}));
-
-// --- 4. Write into src/locales/en.json's home.featured.items -------------------------
-const enPath = path.join(root, "src", "locales", "en.json");
-const en = JSON.parse(fs.readFileSync(enPath, "utf-8"));
-if (!en.home || !en.home.featured) {
-  fail("en.json 里没有 home.featured —— 先完成 Part 2（首页内容）再跑这个脚本。");
-  process.exit(1);
+// --- 4. Materialize the same selections with each locale's own metadata --------
+for (const locale of plan.languages) {
+  const localePath = path.join(root, "src", "locales", `${locale}.json`);
+  const messages = JSON.parse(fs.readFileSync(localePath, "utf-8"));
+  if (!messages.home?.featured) {
+    fail(`${locale}.json 里没有 home.featured；非英语不能回退到英文精选内容`);
+    continue;
+  }
+  const localizedItems = [];
+  for (const selected of items) {
+    const file = walkMdx(path.join(root, "content", locale, selected.category))
+      .find((candidate) => fileNameToSlug(path.basename(candidate)) === selected.slug);
+    if (!file) {
+      fail(`${locale} 缺少精选文章 ${selected.category}/${selected.slug}`);
+      continue;
+    }
+    const source = fs.readFileSync(file, "utf-8");
+    const title = extractField(source, "title");
+    const description = extractField(source, "description");
+    if (!title || !description) {
+      fail(`${locale} 精选文章 ${selected.category}/${selected.slug} 缺少本地化 title/description`);
+      continue;
+    }
+    localizedItems.push({
+      title,
+      description,
+      href: `/${selected.category}/${selected.slug}`,
+      category: selected.category,
+    });
+  }
+  messages.home.featured.items = localizedItems;
+  fs.writeFileSync(localePath, `${JSON.stringify(messages, null, 2)}\n`);
+  ok(`${locale} home.featured.items 已生成 ${localizedItems.length} 条`);
 }
-en.home.featured.items = featuredItems;
-fs.writeFileSync(enPath, `${JSON.stringify(en, null, 2)}\n`);
 
-ok(`home.featured.items 已生成 ${featuredItems.length} 条：`);
-for (const item of featuredItems) console.log(`  - [${item.category}] ${item.title} → ${item.href}`);
+if (errors > 0) process.exit(1);

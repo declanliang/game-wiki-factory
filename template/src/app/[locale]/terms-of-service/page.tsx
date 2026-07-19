@@ -1,11 +1,10 @@
-import { LegalPage } from "@/components/legal-page";
+import { buildLegalMetadata, LegalPage } from "@/components/legal-page";
+import type { Locale } from "@/i18n/routing";
 
-export default function TermsOfServicePage() {
-  return (
-    <LegalPage title="Terms of Service">
-      <p>This site is an independent fan-made guide hub. Content is provided for informational and entertainment purposes only.</p>
-      <p>Game systems, codes, drops, and update details may change without notice. Always verify important information in-game or through official channels.</p>
-      <p>By using this site, you agree not to misuse it, attempt unauthorized access, or present this fan wiki as an official {"__GAME_NAME__"} property.</p>
-    </LegalPage>
-  );
+export async function generateMetadata({ params }: { params: Promise<{ locale: Locale }> }) {
+  return buildLegalMetadata((await params).locale, "termsOfService");
+}
+
+export default async function TermsOfServicePage({ params }: { params: Promise<{ locale: Locale }> }) {
+  return <LegalPage locale={(await params).locale} pageKey="termsOfService" />;
 }

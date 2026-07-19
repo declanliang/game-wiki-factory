@@ -40,7 +40,7 @@ npm run launch:site
 2. 应用身份、首页文案和素材。
 3. 清空生成的 `content/`，从 intake 幂等导入文章。
 4. 将 intake site-plan 复制为 `src/config/site-plan.json`。
-5. 从 site-plan 生成导航、分类标题和语言配置。
+5. 从 site-plan 生成导航、分类标题、分类描述和语言配置。
 6. 生成精选文章并运行 TypeScript、配置、生产构建验证。
 
 调试时可跳过最终 build，但仍执行全部导入与契约检查：
@@ -65,6 +65,7 @@ npm run build
 - `src/config/site-plan.json` 是生成文件，来源只能是 `intake/site-plan.json`。
 - `content/` 是生成投影，每次 ingest 会先清空，防止旧游戏或已删除文章残留。
 - site-plan 至少包含 1 个有真实关键词证据、最多 8 个 published 分类；不为数量生成 fallback 分类，每种语言必须交付相同文章树。
-- `NEXT_PUBLIC_SITE_URL` 集中规范化：裸域名自动补 HTTPS，非法协议在构建前失败；`verify:deploy` 会检查线上 metadata，而不只检查 HTTP 200。
-- 分类标签来自 site-plan 的六语言 `labels`，模板只负责机械使用。
+- `NEXT_PUBLIC_SITE_URL` 集中规范化：裸域名自动补 HTTPS，非法协议在构建前失败；`verify:deploy` 会检查线上 metadata、self-canonical 和 sitemap 直接 200，而不只检查首页 HTTP 200。
+- 分类标签和描述来自 site-plan 的六语言 `labels` / `descriptions`，模板只负责机械使用。
+- 根 URL 固定为英语/x-default；非英语页面、JSON-LD 和 sitemap 使用 locale 前缀。缺少译文时构建失败，不做英语回退。
 - 具体游戏仓库必须提交 `intake/`；原始调研、cache 和日志位于被 Git 忽略的 `.gamewiki/`。

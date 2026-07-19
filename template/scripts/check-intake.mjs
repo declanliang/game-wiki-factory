@@ -38,6 +38,14 @@ if (!fs.existsSync(sitePlanPath)) {
       fail(`site-plan.languages 必须是固定策略 ${FIXED_LANGUAGES.join(", ")}`);
     }
     const published = (sitePlan.categories || []).filter((category) => category.status === "published");
+    for (const category of published) {
+      if (!category.labels || FIXED_LANGUAGES.some((locale) => !category.labels[locale])) {
+        fail(`site-plan 分类 ${category.id || "(missing id)"} 缺少六语言 labels`);
+      }
+      if (!category.descriptions || FIXED_LANGUAGES.some((locale) => !category.descriptions[locale])) {
+        fail(`site-plan 分类 ${category.id || "(missing id)"} 缺少六语言 descriptions`);
+      }
+    }
     if (published.length < Number(sitePlan.categoryPolicy?.minimum ?? 1)) {
       fail(`site-plan 只有 ${published.length} 个 published 分类，低于最低门槛`);
     } else {
