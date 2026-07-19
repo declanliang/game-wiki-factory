@@ -1,0 +1,46 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# testing
+coverage/
+
+# next.js
+.next/
+out/
+
+# production
+build/
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env.*
+!.env.example
+
+# per-launch site orchestration input — see doc/上线准备手册.md
+# new-site.example.env stays tracked; the filled-in copy doesn't.
+/new-site.env
+
+# Per-game pipeline checkpoints, raw research, caches, and logs stay local.
+# The final, deployable input contract under intake/ is intentionally tracked.
+/.gamewiki/
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# same app
+.same/

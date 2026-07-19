@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "game-profile.schema.json",
+  "title": "Game Wiki Basic Info Profile",
+  "type": "object",
+  "required": ["schemaVersion", "source", "game", "languages", "categoryPolicy", "categoryCandidates"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "source": {"const": "auto-basic-info"},
+    "game": {"type": "object", "required": ["name", "slug", "platform"]},
+    "languages": {"const": ["en", "es", "de", "fr", "ja", "ko"]},
+    "categoryPolicy": {"type": "object", "required": ["minimum", "maximum"]},
+    "categoryCandidates": {"type": "array", "minItems": 4, "maxItems": 8}
+  }
+}

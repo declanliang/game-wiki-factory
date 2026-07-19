@@ -1,0 +1,42 @@
+{
+  "nav": {
+    "menu": "Menú",
+    "toggleTheme": "Cambiar tema",
+    "playCta": "Jugar ahora"
+  },
+  "shared": {
+    "wikiNavigation": "Navegación del wiki",
+    "activeCodes": "Estado de los códigos",
+    "updated": "Actualizado",
+    "viewAllCodes": "Ver estado de los códigos",
+    "playOnRoblox": "Jugar ahora",
+    "inThisSection": "En esta sección",
+    "tableOfContents": "Índice",
+    "nextSteps": "Próximos pasos",
+    "needHelp": "¿Necesitas ayuda?",
+    "relatedReading": "Lecturas relacionadas",
+    "relatedGuides": "Guías relacionadas",
+    "readMore": "Leer más",
+    "quickGuide": "Lo que cubre esta guía",
+    "quickFacts": "Datos rápidos",
+    "viewAllInCategory": "Ver todo {category}",
+    "officialMedia": "Medios oficiales",
+    "home": "Inicio",
+    "noGuidesAvailable": "Aún no hay guías disponibles. ¡Vuelve pronto!",
+    "noCodesAvailable": "No hay códigos activos en este momento. ¡Vuelve pronto!",
+    "activeCodesList": []
+  },
+  "footer": {
+    "aboutTitle": "Wiki de __GAME_NAME__",
+    "about": "La wiki de __GAME_NAME__ es una guía independiente hecha por fans que cubre todo sobre __GAME_NAME__.",
+    "guides": "Guías",
+    "legal": "Legal",
+    "copyright": "© __YEAR__ Wiki de __GAME_NAME__",
+    "description": "__Descripción de una línea del juego, reutilizada en el footer/meta__",
+    "officialDiscord": "Discord de __GAME_NAME__",
+    "officialYoutube": "YouTube oficial",
+    "communityTool": "Wiki comunitaria (Fandom)",
+    "privacyPolicy": "Política de privacidad",
+    "termsOfService": "Términos del servicio"
+  }
+}
