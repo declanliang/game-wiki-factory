@@ -32,7 +32,7 @@ FAVICON_FILES = {
     "android-chrome-512x512.png",
     "site.webmanifest",
 }
-MINIMUM_WIKI_CATEGORIES = 4
+MINIMUM_WIKI_CATEGORIES = 1
 
 
 class PipelineError(RuntimeError):

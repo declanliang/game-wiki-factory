@@ -44,19 +44,34 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn("upgrades", ids)
         self.assertIn("economy", ids)
 
-    def test_site_plan_rejects_unowned_category_and_keeps_four(self) -> None:
+    def test_site_plan_maps_strategy_to_guide_without_synthetic_fallbacks(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             profile = build_game_profile(self._basic_output(Path(temporary)))
         raw = {
             "categories": [
                 {"category": "guide", "keywords": ["hellhole guide"]},
+                {"category": "strategy", "keywords": ["hellhole tips and tricks"]},
                 {"category": "codes", "keywords": ["unverified code"]},
             ]
         }
         plan = build_site_plan(profile, raw)
-        self.assertGreaterEqual(len(plan["categories"]), 4)
+        self.assertEqual([item["id"] for item in plan["categories"]], ["guide"])
+        self.assertEqual(
+            plan["categories"][0]["keywords"],
+            ["hellhole guide", "hellhole tips and tricks"],
+        )
+        self.assertNotIn(
+            "site-plan-relevant-fallback",
+            [source for item in plan["categories"] for source in item["sources"]],
+        )
         self.assertNotIn("codes", [item["id"] for item in plan["categories"]])
         self.assertEqual(build_seo_keywords(plan)["languages"], FIXED_LANGUAGES[1:])
+
+    def test_site_plan_rejects_an_empty_evidence_set(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            profile = build_game_profile(self._basic_output(Path(temporary)))
+        with self.assertRaisesRegex(ValueError, "did not deliver any evidence-backed"):
+            build_site_plan(profile, {"categories": []})
 
     def test_reconcile_marks_only_delivered_categories_published(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -21,6 +21,7 @@
     "generate:featured": "node scripts/generate-featured.mjs",
     "verify:site": "node scripts/verify-site.mjs",
     "verify:deploy": "node scripts/verify-site.mjs --deploy",
+    "test:site-url": "node scripts/test-site-url.mjs",
     "validate:articles": "node scripts/validate-articles.mjs",
     "apply:content": "node scripts/apply-content.mjs",
     "process:assets": "node scripts/process-assets.mjs",

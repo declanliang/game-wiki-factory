@@ -22,7 +22,7 @@
 - 不接纳完全无关关键词，不为凑数量降低门槛。
 - 不手工补标签掩盖被截断的翻译。
 
-完成标准：至少 4 个 published 分类；en/es/de/fr/ja/ko；六语言文章树一致；
+完成标准：只保留有证据的 published 分类，通常争取 3–5 个可靠主题但不凑数；en/es/de/fr/ja/ko；六语言文章树一致；
 intake、MDX、TypeScript、production build、sitemap 200、OG 和 hreflang 全部通过。
 
 最终报告：网站根目录、分类、语言、文章数、manifest、最新日志、API 是否复用、部署前待配置项。

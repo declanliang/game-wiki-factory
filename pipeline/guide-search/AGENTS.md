@@ -25,7 +25,8 @@ python -m unittest discover -s tests -v
 - “只有 YouTube 证据”不是淘汰理由；应按具体性、搜索价值和游戏背景判断。
 - 低于 0.55 置信度、风险意图和含义残缺的主题仍应排除；上游基础信息是可信的同游戏证据。
 - 不为数量创造候选词；LLM 只能 keep、merge、drop 已有候选。
-- `keywords.json` 最多 40 个词、8 个分类；完整攻略站在有足够同游戏候选时至少规划 4 个分类。
+- `keywords.json` 最多 40 个词、8 个分类；通常争取 3–5 个可靠文章主题，但证据稀少时允许更少，禁止为数量合成候选。
+- 单个娱乐/挑战视频不能创建推断主题；juking、movement、passing、map positioning 等机制必须由至少两个不同视频共同支持，之后仍需 LLM 语义门判断。
 - 编排模式必须支持 `--run-dir <project>/planning/guide-search`；不要把真实游戏输出写回源码仓库的 `output/`。
 - 下游分类边界来自 Basic Info 的 game-profile。Guide Search 提议和排序关键词，但最终 site-plan 不能接纳 profile 之外的分类。
 - 攻略分类允许少量内容重叠；不能因为重叠就把不同的玩家信息需求全部合并。

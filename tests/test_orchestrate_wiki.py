@@ -98,7 +98,7 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(bridged["languages"], ["es"])
         self.assertEqual(bridged["categories"], raw["categories"])
 
-    def test_keyword_bridge_requires_four_guide_categories(self) -> None:
+    def test_keyword_bridge_accepts_one_evidence_backed_category(self) -> None:
         raw = {
             "categories": [
                 {"category": "guide", "keywords": ["hellhole roblox guide"]},
@@ -107,8 +107,8 @@ class OrchestratorTests(unittest.TestCase):
             ]
         }
         identity = {"GAME_NAME": "Hellhole", "LANGUAGES": ["en", "es"]}
-        with self.assertRaisesRegex(orchestrator.PipelineError, "at least 4"):
-            orchestrator.bridge_keywords(raw, identity)
+        bridged = orchestrator.bridge_keywords(raw, identity)
+        self.assertEqual(len(bridged["categories"]), 3)
 
     def test_trusted_keyword_context_contains_official_identity_and_content(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

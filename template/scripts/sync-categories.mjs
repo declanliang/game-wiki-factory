@@ -36,7 +36,7 @@ for (const category of plan.categories) {
   }
 }
 const published = plan.categories.filter((category) => category.status === "published");
-if (published.length < Number(plan.categoryPolicy?.minimum || 4)) {
+if (published.length < Number(plan.categoryPolicy?.minimum ?? 1)) {
   fail(`site-plan 只有 ${published.length} 个 published 分类，低于质量门槛`);
 }
 

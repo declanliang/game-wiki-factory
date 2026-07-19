@@ -41,7 +41,7 @@ const categories = (plan.categories || [])
   .sort((a, b) => a.order - b.order);
 const categoryIds = categories.map((category) => category.id);
 if (new Set(categoryIds).size !== categoryIds.length) fail("site-plan 有重复 published 分类");
-if (categories.length < Number(plan.categoryPolicy?.minimum || 4)) fail("published 分类低于 site-plan 最低门槛");
+if (categories.length < Number(plan.categoryPolicy?.minimum ?? 1)) fail("published 分类低于 site-plan 最低门槛");
 else ok(`site-plan 分类：${categoryIds.join(", ")}`);
 
 const contentRoot = path.join(root, "content");
