@@ -126,6 +126,8 @@ python gamewiki.py "Hellhole" --output-root D:\GameSites
 - `strategy/tips/tactics` 映射进 `guide`，但每个不同关键词仍生成独立文章。
 - SEO Scout 在翻译前执行文不对题 QA。
 - 翻译必须保留标题、列表、表格、FAQ 和 Callout 结构；截断响应不会成为 checkpoint。
+- 英文生成单独限制为 10,000 completion tokens；截断重试会自动改用紧凑、无表格的降级提示词，避免重复字符耗尽预算。
+- 翻译仅有标题或描述超限时会本地压缩 SERP 字段并重新验证正文，不会为元数据小问题重翻整篇文章。
 - 六语言文章树必须完全一致。
 - 最终验收包括 intake、TypeScript、配置、production build、sitemap 直接 200、self-canonical、OG 和 hreflang。
 

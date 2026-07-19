@@ -39,18 +39,46 @@ for (const category of plan.categories) {
   }
 }
 const published = plan.categories.filter((category) => category.status === "published");
-if (published.length < Number(plan.categoryPolicy?.minimum ?? 1)) {
+if (published.length === 0 || published.length < Number(plan.categoryPolicy?.minimum ?? 1)) {
   fail(`site-plan 只有 ${published.length} 个 published 分类，低于质量门槛`);
 }
 
 fs.mkdirSync(path.dirname(target), { recursive: true });
 fs.writeFileSync(target, `${JSON.stringify(plan, null, 2)}\n`);
 
-// Category labels/list-page headings are deterministic plan data.  Game copy
-// is merged later by apply-locales.mjs.
+const publishedIds = new Set(published.map((category) => category.id));
+const staticPaths = new Set(["/", "/about", "/privacy-policy", "/terms-of-service", "/copyright"]);
+const fallbackCategoryHref = `/${published[0].id}`;
+
+function rewriteUnpublishedInternalLinks(value, key = "", stats = { rewritten: 0 }) {
+  if (Array.isArray(value)) {
+    return value.map((item) => rewriteUnpublishedInternalLinks(item, key, stats));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([childKey, childValue]) => [
+        childKey,
+        rewriteUnpublishedInternalLinks(childValue, childKey, stats),
+      ]),
+    );
+  }
+  const isHrefField = key === "href" || key.endsWith("Href");
+  if (isHrefField && typeof value === "string" && value.startsWith("/") && !value.startsWith("//")) {
+    if (staticPaths.has(value)) return value;
+    const [category] = value.split("/").filter(Boolean);
+    if (!publishedIds.has(category)) {
+      stats.rewritten++;
+      return fallbackCategoryHref;
+    }
+  }
+  return value;
+}
+
+// Category labels/list-page headings and category destinations are
+// deterministic plan data. Structured game copy has already been merged.
 for (const locale of FIXED_LANGUAGES) {
   const localePath = path.join(root, "src", "locales", `${locale}.json`);
-  const messages = fs.existsSync(localePath) ? JSON.parse(fs.readFileSync(localePath, "utf-8")) : {};
+  let messages = fs.existsSync(localePath) ? JSON.parse(fs.readFileSync(localePath, "utf-8")) : {};
   messages.nav ||= {};
   for (const category of published) {
     const label = category.labels[locale];
@@ -60,7 +88,14 @@ for (const locale of FIXED_LANGUAGES) {
       overviewDescription: category.descriptions[locale],
     };
   }
+  const stats = { rewritten: 0 };
+  messages = rewriteUnpublishedInternalLinks(messages, "", stats);
   fs.writeFileSync(localePath, `${JSON.stringify(messages, null, 2)}\n`);
+  if (stats.rewritten > 0) {
+    console.log(
+      `\x1b[36mi\x1b[0m ${locale}：${stats.rewritten} 个未发布分类内链已指向 ${fallbackCategoryHref}`,
+    );
+  }
 }
 
 console.log(`\x1b[32m✓\x1b[0m site-plan 已同步：${published.map((item) => item.id).join(", ")}`);

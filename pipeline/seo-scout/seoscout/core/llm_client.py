@@ -64,17 +64,22 @@ class LLMClient:
         meta: Dict = None,
         system: str = None,
         reasoning_effort: str = None,
+        max_tokens: int = None,
+        length_retry_instruction: str = None,
     ) -> Optional[str]:
         """Send a single prompt, return content string or None."""
         self.stats['total_requests'] += 1
         label = (meta or {}).get('keyword', 'unknown')
+
+        active_prompt = prompt
+        completion_limit = max_tokens or self.max_tokens
 
         for attempt in range(self.retry_attempts):
             api_key = self._next_key()
             try:
                 payload = {
                     "model": self.model,
-                    "max_tokens": self.max_tokens,
+                    "max_tokens": completion_limit,
                     "temperature": self.temperature,
                     "frequency_penalty": self.frequency_penalty,
                     "presence_penalty": self.presence_penalty,
@@ -83,7 +88,7 @@ class LLMClient:
                             "role": "system",
                             "content": system or "You are a professional SEO content writer.",
                         },
-                        {"role": "user", "content": prompt},
+                        {"role": "user", "content": active_prompt},
                     ],
                     "stream": False,
                 }
@@ -103,7 +108,7 @@ class LLMClient:
                 ) as resp:
                     if resp.status == 200:
                         data = await resp.json()
-                        self._save_debug(meta or {}, data)
+                        self._save_debug(meta or {}, data, attempt=attempt + 1)
                         choice = data['choices'][0]
                         content = choice['message']['content']
                         finish_reason = choice.get('finish_reason')
@@ -126,6 +131,18 @@ class LLMClient:
                                 f"(attempt {attempt+1}/{self.retry_attempts})"
                             )
                             if attempt < self.retry_attempts - 1:
+                                if finish_reason == 'length':
+                                    retry_instruction = length_retry_instruction or (
+                                        "The previous response was truncated. Regenerate the complete "
+                                        "answer from scratch, be substantially more concise, and avoid "
+                                        "repetitive formatting or padded whitespace."
+                                    )
+                                    active_prompt = (
+                                        prompt
+                                        + "\n\n=== RETRY AFTER TRUNCATION ===\n"
+                                        + retry_instruction.strip()
+                                    )
+                                    print(f"  ↪️  Retrying {label} with compact fallback instructions")
                                 await asyncio.sleep(self.retry_delay * (attempt + 1))
                                 continue
                             self.stats['failed_requests'] += 1
@@ -174,6 +191,8 @@ class LLMClient:
         self,
         prompts: List[Tuple[str, Dict]],
         batch_size: int = None,
+        max_tokens: int = None,
+        length_retry_instruction: str = None,
     ) -> List[Tuple[Dict, Optional[str]]]:
         """
         Batch-generate from list of (prompt, meta) tuples.
@@ -194,7 +213,13 @@ class LLMClient:
                 print(f"\n  📦 Batch {batch_num}/{total_batches} ({len(batch)} items)...")
 
                 tasks = [
-                    self.generate_single(session, prompt, meta)
+                    self.generate_single(
+                        session,
+                        prompt,
+                        meta,
+                        max_tokens=max_tokens,
+                        length_retry_instruction=length_retry_instruction,
+                    )
                     for prompt, meta in batch
                 ]
                 batch_results = await asyncio.gather(*tasks)
@@ -213,14 +238,19 @@ class LLMClient:
 
     # ── debug ───────────────────────────────────────────────────
 
-    def _save_debug(self, meta: Dict, data: Dict):
+    def _save_debug(self, meta: Dict, data: Dict, attempt: int = None):
         try:
             debug_dir = Path(Config.LOG_DIR) / "debug"
             debug_dir.mkdir(parents=True, exist_ok=True)
             keyword = meta.get('keyword', 'unknown')
             lang = meta.get('language', 'en')
-            fp = debug_dir / f"{lang}_{keyword.replace(' ', '_')}_response.json"
-            fp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')
+            stem = f"{lang}_{keyword.replace(' ', '_')}"
+            serialized = json.dumps(data, indent=2, ensure_ascii=False)
+            latest = debug_dir / f"{stem}_response.json"
+            latest.write_text(serialized, encoding='utf-8')
+            if attempt is not None:
+                attempt_file = debug_dir / f"{stem}_attempt_{attempt}_response.json"
+                attempt_file.write_text(serialized, encoding='utf-8')
         except Exception:
             pass
 

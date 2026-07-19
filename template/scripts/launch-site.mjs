@@ -34,7 +34,6 @@ step("文章结构预检（metadata 完整性/重复 slug/异常大文件）", "
 step("站点身份 + 首页文案（机械字段 + 结构化 intake）", "npm run apply:content");
 step("素材处理（hero/favicon/manifest/主题色）", "npm run process:assets");
 step("文章接入 content/", "npm run ingest:articles");
-step("同步内容分类到导航", "npm run sync:categories");
 const plan = JSON.parse(fs.readFileSync(path.join(root, "intake", "site-plan.json"), "utf-8"));
 const locales = plan.languages.filter((locale) => locale !== "en");
 if (locales.length > 0) {
@@ -44,6 +43,9 @@ if (locales.length > 0) {
   console.log("\n（只有 en，跳过 sync:locales / apply:locales）");
 }
 
+// Run after all structured locale content has been merged so category labels
+// and internal links are projected from the final published site plan.
+step("同步内容分类与首页内链", "npm run sync:categories");
 step("生成六语言首页精选攻略", "npm run generate:featured");
 
 step("全站验证", `npm run verify:site${args.includes("--skip-build") ? " -- --skip-build" : ""}`);

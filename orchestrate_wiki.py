@@ -712,13 +712,18 @@ def main(argv: list[str] | None = None) -> int:
             ]
             if args.overwrite_articles:
                 command.append("--overwrite")
-            run_command(
-                command,
-                cwd=seo_dir,
-                env=env,
-                log_path=state_dir / "logs" / f"{attempt_id}-seo-scout.log",
-                run_log_path=run_log_path,
-            )
+            record("articles", "running", output=str(content_project_dir / "articles"))
+            try:
+                run_command(
+                    command,
+                    cwd=seo_dir,
+                    env=env,
+                    log_path=state_dir / "logs" / f"{attempt_id}-seo-scout.log",
+                    run_log_path=run_log_path,
+                )
+            except Exception:
+                record("articles", "failed", output=str(content_project_dir / "articles"))
+                raise
             articles_dir = content_project_dir / "articles"
             record("articles", "generated", output=str(articles_dir))
 

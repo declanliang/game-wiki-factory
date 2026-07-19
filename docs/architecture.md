@@ -79,6 +79,7 @@ SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。模板只
 - Basic Info：六语言首页、hero、favicon 和验证报告完整才可复用；cache 位于 `.gamewiki/basic-info/.cache/`。
 - Guide Search：保留 raw、LLM decision、rejected、manifest 和 keywords。
 - SEO Scout：搜索、收集、生成、QA、翻译按文件幂等；翻译与英文做结构完整性对照。
+- LLM 截断或退化输出不会落盘：英文生成使用独立 token 上限和紧凑降级重试；仅翻译元数据超限时本地压缩后复验正文。
 - Template：从 intake 重建 content，防止已删除文章或旧分类残留。
 
 `manifest.json.stages` 记录 generated/reused/migrated/reconciled/failed。日志按 UTC attempt 命名，不覆盖失败现场。

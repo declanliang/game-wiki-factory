@@ -14,7 +14,7 @@ Generate a title based on the keyword field in the reference material:
 
 ## Writing Requirements
 
-1. Write a fully original blog post, approximately 1,600 words
+1. Write a fully original blog post, approximately 1,200–1,600 words
 2. Include the main keyword at least 9 times:
    - Once in the title (H1)
    - Twice within the first 120 words
@@ -30,7 +30,7 @@ Generate a title based on the keyword field in the reference material:
 
 - **Do not include an H1 heading** — the title you provide serves as H1; start the body with H2 sections
 - 4–6 H2 headings, optional H3 subheadings
-- **Use Markdown tables extensively** (at least 3–5 tables) for comparisons, data, steps, rankings, stats, etc.
+- Use Markdown tables only when they make real source-backed information clearer; most articles need 0–2 tables, and sparse topics may need none
 - Do NOT pad table cells with extra spaces to visually align the `|` columns — GFM tables render correctly regardless of column width, and manual padding is unnecessary and error-prone
 - Use bullet lists where appropriate
 - Keep paragraphs under 120 words

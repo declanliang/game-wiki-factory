@@ -18,6 +18,10 @@ from .core.llm_client import LLMClient
 from .core.utils import ensure_dir, extract_source_fields
 
 
+class TranslationError(RuntimeError):
+    """Raised when one or more required translations could not be saved."""
+
+
 # ── language map ────────────────────────────────────────────────
 
 LANG_NAMES = {
@@ -158,6 +162,47 @@ STRUCTURAL_LINE_PATTERNS = {
         re.MULTILINE,
     ),
 }
+
+
+def _compact_serp_field(value: str, limit: int, lang_code: str) -> str:
+    """Shorten over-limit translated metadata without retranslating the body."""
+    value = value.strip()
+    if len(value) <= limit:
+        return value
+    if lang_code in CJK_LANGUAGES:
+        return value[:limit].rstrip(" ,.;:!?、。，：；！？-–—")
+    candidate = value[:limit + 1].rsplit(" ", 1)[0]
+    if len(candidate) < max(20, int(limit * 0.6)):
+        candidate = value[:limit]
+    return candidate.rstrip(" ,.;:!?-–—")
+
+
+def _compact_overlong_metadata(raw_content: str, lang_code: str) -> str | None:
+    """Reuse a complete translation body while compacting only SERP fields.
+
+    Retrying an entire article because a title is a few characters too long is
+    expensive and can introduce a new structural failure. The normal parser
+    and source-completeness validation still run after this transformation.
+    """
+    cleaned = clean_llm_output(raw_content)
+    try:
+        title, description, body = _parse_llm_output(cleaned)
+    except ValueError:
+        return None
+    is_cjk = lang_code in CJK_LANGUAGES
+    title_limit = 36 if is_cjk else 65
+    description_limit = 90 if is_cjk else 165
+    compact_title = _compact_serp_field(title, title_limit, lang_code)
+    compact_description = _compact_serp_field(
+        description, description_limit, lang_code
+    )
+    if compact_title == title and compact_description == description:
+        return None
+    return (
+        f"TITLE: {compact_title}\n"
+        f"DESCRIPTION: {compact_description}\n"
+        f"BODY:\n{body}"
+    )
 
 
 def _has_repeated_chunk(content: str, min_repeats: int = 10,
@@ -521,6 +566,26 @@ async def run_translate(
                     saved += 1
                     print(f"    ✅ [{lang_code.upper()}] {article_name}.mdx")
                 else:
+                    compacted = _compact_overlong_metadata(content, lang_code)
+                    compact_final, compact_error = (None, None)
+                    if compacted:
+                        compact_final, compact_error = _process_llm_response(
+                            compacted,
+                            task_info['category'],
+                            task_info['date'],
+                            task_info['source_body'],
+                            lang_code,
+                        )
+                    if compact_final:
+                        output_path.parent.mkdir(parents=True, exist_ok=True)
+                        output_path.write_text(compact_final, encoding='utf-8')
+                        saved += 1
+                        print(
+                            f"    ✅ [{lang_code.upper()}] {article_name}.mdx "
+                            "(metadata compacted locally)"
+                        )
+                        continue
+
                     # Single repair attempt
                     repair_prompt = _build_repair_prompt(task_info, content, err)
                     repaired = await client.generate_single(
@@ -537,6 +602,18 @@ async def run_translate(
                             task_info['source_body'],
                             lang_code,
                         )
+                        if not final2:
+                            compacted_repair = _compact_overlong_metadata(
+                                repaired, lang_code
+                            )
+                            if compacted_repair:
+                                final2, err2 = _process_llm_response(
+                                    compacted_repair,
+                                    task_info['category'],
+                                    task_info['date'],
+                                    task_info['source_body'],
+                                    lang_code,
+                                )
                     if final2:
                         output_path.parent.mkdir(parents=True, exist_ok=True)
                         output_path.write_text(final2, encoding='utf-8')
@@ -544,7 +621,10 @@ async def run_translate(
                         print(f"    ✅ [{lang_code.upper()}] {article_name}.mdx (repaired)")
                     else:
                         failed += 1
-                        print(f"    ❌ [{lang_code.upper()}] {article_name} — {err}")
+                        print(
+                            f"    ❌ [{lang_code.upper()}] {article_name} — "
+                            f"{err2 or compact_error or err}"
+                        )
 
             if i + batch_size < len(all_tasks):
                 await asyncio.sleep(batch_delay)
@@ -562,6 +642,13 @@ async def run_translate(
     client.stats['end_time'] = __import__('time').time()
     client.print_stats()
     print("=" * 70)
+
+    if failed:
+        raise TranslationError(
+            f"Translation failed for {failed} item(s); existing valid locale "
+            "checkpoints were preserved. Re-run without --overwrite to retry "
+            "only the missing translations."
+        )
 
 
 def _build_repair_prompt(task_info: dict, content: str, error: str) -> str:

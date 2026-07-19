@@ -578,7 +578,7 @@ LLM_API_KEY_1=your_llm_api_key_here
     "retry_attempts": 2,
     "retry_delay": 5
   },
-  "generate": { "batch_size": 100, "concurrent_limit": 10 },
+  "generate": { "max_tokens": 10000, "batch_size": 100, "concurrent_limit": 10 },
   "translate": { "batch_size": 10, "batch_delay": 1, "reasoning_effort": "none" },
   "search": { "max_retries": 3, "retry_delay": 2 },
   "blocked_domains": ["youtube.com", "youtu.be", "reddit.com", "discord.com"]
@@ -629,7 +629,7 @@ LLM_API_KEY_1=your_llm_api_key_here
 | `base_url` | `https://api.openai.com/v1` | OpenAI 兼容接口地址 |
 | `model` | `gpt-4o` | 模型名称 |
 | `temperature` | `0.7` | 采样温度 |
-| `max_tokens` | `10000` | 单次请求的最大 completion token 数；本仓库的长文配置使用 `24000`。某些模型会把 reasoning token 也计入该预算，因此仍需配合 finish reason 和结构完整性校验。 |
+| `max_tokens` | `10000` | 通用请求的最大 completion token 数；翻译等长文本配置可使用 `24000`。某些模型会把 reasoning token 也计入该预算。 |
 | `reasoning_effort` | `low` | 生成任务的推理强度；是否支持取决于 OpenAI 兼容供应商。 |
 | `frequency_penalty` | `0.3` | 抑制重复 token 的惩罚系数，降低表格生成时陷入复读循环的概率 |
 | `presence_penalty` | `0.3` | 抑制重复主题的惩罚系数，同上 |
@@ -641,6 +641,7 @@ LLM_API_KEY_1=your_llm_api_key_here
 
 | 字段 | 默认值 | 说明 |
 |----------|---------|-------------|
+| `generate.max_tokens` | `10000` | 英文文章生成的独立上限；截断后使用紧凑、无表格的提示词重试，避免退化循环消耗通用长文本预算。 |
 | `generate.batch_size` | `100` | 每批并行生成的文章数 |
 | `generate.concurrent_limit` | `10` | 生成阶段最大并发请求数 |
 | `translate.batch_size` | `10` | 每批并行翻译数 |

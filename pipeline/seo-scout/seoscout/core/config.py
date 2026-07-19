@@ -134,6 +134,7 @@ class Config:
     # ============================================================
     # Generate concurrency
     # ============================================================
+    GENERATE_MAX_TOKENS = 10000
     GENERATE_BATCH_SIZE = 100
     GENERATE_CONCURRENT_LIMIT = 10
 
@@ -260,6 +261,9 @@ class Config:
         cls.LLM_RETRY_DELAY = int(llm_cfg.get("retry_delay", 5))
 
         # Generate concurrency
+        cls.GENERATE_MAX_TOKENS = int(
+            gen_cfg.get("max_tokens", min(10000, cls.LLM_MAX_TOKENS))
+        )
         cls.GENERATE_BATCH_SIZE = int(gen_cfg.get("batch_size", 100))
         cls.GENERATE_CONCURRENT_LIMIT = int(gen_cfg.get("concurrent_limit", 10))
 
@@ -339,6 +343,7 @@ class Config:
         print(f"  - API base:        {cls.LLM_API_BASE_URL}")
         print(f"  - Max tokens:      {cls.LLM_MAX_TOKENS}")
         print(f"  - Reasoning effort:{cls.LLM_REASONING_EFFORT or 'provider default'}")
+        print(f"  - Gen max tokens:  {cls.GENERATE_MAX_TOKENS}")
         print(f"  - Gen batch size:  {cls.GENERATE_BATCH_SIZE}")
         print(f"  - Xlate batch:     {cls.TRANSLATE_BATCH_SIZE}")
         print(f"  - Xlate reasoning: {cls.TRANSLATE_REASONING_EFFORT or 'provider default'}")

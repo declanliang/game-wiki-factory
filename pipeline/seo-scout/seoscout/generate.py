@@ -19,6 +19,20 @@ from .core.llm_client import LLMClient
 from .core.utils import load_json, save_json, ensure_dir
 
 
+class GenerationError(RuntimeError):
+    """Raised when an expected article could not be generated safely."""
+
+
+LENGTH_RETRY_INSTRUCTION = """
+The previous response was truncated by a formatting repetition loop. Generate
+the complete article again from scratch in 900–1,300 words. Do not use Markdown
+tables in this retry. Use short paragraphs and bullet lists instead. Never pad
+lines, repeat separator characters, or repeat a phrase to fill space. Preserve
+the exact TITLE / DESCRIPTION / QUICKGUIDE / BODY output contract and finish the
+FAQ cleanly.
+"""
+
+
 # ── helpers ─────────────────────────────────────────────────────
 
 def keyword_to_slug(keyword: str) -> str:
@@ -436,7 +450,11 @@ async def run_generate(
 
     # Generate
     client = LLMClient()
-    results = await client.generate_batch(prompts)
+    results = await client.generate_batch(
+        prompts,
+        max_tokens=Config.GENERATE_MAX_TOKENS,
+        length_retry_instruction=LENGTH_RETRY_INSTRUCTION,
+    )
 
     # Save results with repair
     saved = 0
@@ -469,6 +487,8 @@ async def run_generate(
         repair_results = await client.generate_batch(
             repair_prompts,
             batch_size=min(10, len(repair_prompts)),
+            max_tokens=Config.GENERATE_MAX_TOKENS,
+            length_retry_instruction=LENGTH_RETRY_INSTRUCTION,
         )
 
         for meta, content in repair_results:
@@ -499,6 +519,13 @@ async def run_generate(
     print(f"  Output:  {articles_dir}/")
     client.print_stats()
     print("=" * 70)
+
+    if failed:
+        raise GenerationError(
+            f"Article generation failed for {failed} item(s); no incomplete "
+            "response was accepted. Re-run without --overwrite to retry only "
+            "the missing articles."
+        )
 
 
 def _build_repair_prompt(meta: dict, content: str, error: str) -> str:
