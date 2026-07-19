@@ -131,8 +131,14 @@ def _parse_llm_output(content: str) -> tuple:
 
     if not title:
         raise ValueError("TITLE is empty")
+    if len(title) > 60:
+        raise ValueError(f"TITLE is too long ({len(title)} chars; maximum 60)")
     if not description:
         raise ValueError("DESCRIPTION is empty")
+    if len(description) < 110 or len(description) > 160:
+        raise ValueError(
+            f"DESCRIPTION length is {len(description)} chars; expected 110-160"
+        )
     if not body:
         raise ValueError("Article body is empty")
 

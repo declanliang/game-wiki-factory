@@ -1,11 +1,10 @@
-import { LegalPage } from "@/components/legal-page";
+import { buildLegalMetadata, LegalPage } from "@/components/legal-page";
+import type { Locale } from "@/i18n/routing";
 
-export default function CopyrightPage() {
-  return (
-    <LegalPage title="Copyright">
-      <p>{"__GAME_NAME__"} and related media belong to their respective owners.</p>
-      <p>This site is a non-official fan wiki implementation for educational and guide presentation purposes.</p>
-      <p>If you own rights to content displayed here and have a concern, please contact the site operator for review.</p>
-    </LegalPage>
-  );
+export async function generateMetadata({ params }: { params: Promise<{ locale: Locale }> }) {
+  return buildLegalMetadata((await params).locale, "copyright");
+}
+
+export default async function CopyrightPage({ params }: { params: Promise<{ locale: Locale }> }) {
+  return <LegalPage locale={(await params).locale} pageKey="copyright" />;
 }

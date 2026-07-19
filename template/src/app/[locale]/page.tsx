@@ -3,13 +3,12 @@ import { getMessages } from "next-intl/server";
 import { JsonLd } from "@/components/site-widgets";
 import { getAllContent, type ContentItem, CONTENT_TYPES } from "@/lib/content";
 import { NAVIGATION_CONFIG } from "@/config/navigation";
-import { getSiteName, SITE_URL } from "@/config/site";
-import { languageAlternates, routing, type Locale } from "@/i18n/routing";
+import { getSiteName, localizedSiteUrl } from "@/config/site";
+import { localizeHref } from "@/lib/locale-path";
+import { languageAlternates, type Locale } from "@/i18n/routing";
 import { buildOpenGraph, buildTwitter } from "@/lib/seo";
 import en from "@/locales/en.json";
 import HomePageClient from "./HomePageClient";
-
-const siteUrl = SITE_URL;
 
 type Messages = typeof en;
 
@@ -21,8 +20,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return {
     title,
     description,
-    alternates: { canonical: locale === routing.defaultLocale ? "/" : `/${locale}`, languages: languageAlternates("/") },
-    openGraph: buildOpenGraph({ locale, title, description, url: siteUrl, siteName }),
+    alternates: { canonical: localizeHref("/", locale), languages: languageAlternates("/") },
+    openGraph: buildOpenGraph({ locale, title, description, url: localizedSiteUrl("/", locale), siteName }),
     twitter: buildTwitter({ title, description }),
   };
 }

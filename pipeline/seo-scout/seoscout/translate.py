@@ -307,6 +307,13 @@ def _process_llm_response(
         title, description, body = _parse_llm_output(cleaned)
     except ValueError as e:
         return None, str(e)
+    is_cjk = lang_code in CJK_LANGUAGES
+    title_limit = 36 if is_cjk else 65
+    description_limit = 90 if is_cjk else 165
+    if len(title) > title_limit:
+        return None, f"Translated TITLE is too long ({len(title)} chars; maximum {title_limit} for {lang_code})"
+    if len(description) > description_limit:
+        return None, f"Translated DESCRIPTION is too long ({len(description)} chars; maximum {description_limit} for {lang_code})"
     final = _build_mdx(title, description, category, date, body)
     is_valid, err = validate_markdown(final)
     if not is_valid:

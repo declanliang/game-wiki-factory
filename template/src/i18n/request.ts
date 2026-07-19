@@ -12,13 +12,7 @@ import ja from "@/locales/ja.json";
 import ko from "@/locales/ko.json";
 
 type Messages = typeof en;
-type DeepPartial<T> = T extends Array<infer U>
-  ? Array<DeepPartial<U>>
-  : T extends object
-    ? { [K in keyof T]?: DeepPartial<T[K]> }
-    : T;
-
-const messagesMap: Record<string, DeepPartial<Messages>> = {
+const messagesMap: Record<string, unknown> = {
   en,
   es,
   de,
@@ -27,46 +21,16 @@ const messagesMap: Record<string, DeepPartial<Messages>> = {
   ko,
 };
 
-/**
- * Recursively merge `override` onto `base`. Missing keys in a non-English
- * locale automatically fall back to the English value, so a partial
- * translation never throws a missing-message error.
- */
-function deepMerge<T>(base: T, override: DeepPartial<T>): T {
-  if (
-    typeof base !== "object" ||
-    base === null ||
-    typeof override !== "object" ||
-    override === null
-  ) {
-    return (override as T) ?? base;
-  }
-
-  if (Array.isArray(base)) {
-    return (Array.isArray(override) ? override : base) as T;
-  }
-
-  const result: Record<string, unknown> = { ...(base as Record<string, unknown>) };
-
-  for (const key of Object.keys(override as Record<string, unknown>)) {
-    const baseValue = (base as Record<string, unknown>)[key];
-    const overrideValue = (override as Record<string, unknown>)[key];
-    if (overrideValue === undefined) continue;
-    result[key] = deepMerge(baseValue as never, overrideValue as never);
-  }
-
-  return result as T;
-}
-
 export default getRequestConfig(async ({ requestLocale }) => {
   const requested = await requestLocale;
   const locale = hasLocale(routing.locales, requested)
     ? requested
     : routing.defaultLocale;
 
-  // Non-English locales are merged on top of English so untranslated keys
-  // gracefully fall back instead of erroring.
-  const messages = deepMerge(en, messagesMap[locale] ?? {});
+  // Never merge English at request time. The generation/build gates require
+  // every locale to be complete so a localized URL cannot silently render an
+  // English page and create duplicate-content or hreflang conflicts.
+  const messages = messagesMap[locale] as Messages;
 
   return { locale, messages };
 });

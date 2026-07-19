@@ -15,7 +15,7 @@
       "maxItems": 8,
       "items": {
         "type": "object",
-        "required": ["id", "order", "labels", "description", "keywords", "status", "articleCount"]
+        "required": ["id", "order", "labels", "description", "descriptions", "keywords", "status", "articleCount"]
       }
     }
   }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getSiteName, SITE_LOGO_URL, SITE_OG_IMAGE_URL, SITE_URL } from "@/config/site";
+import { getSiteName, localizedSiteUrl, SITE_LOGO_URL, SITE_OG_IMAGE_URL, SITE_URL } from "@/config/site";
 import { routing } from "@/i18n/routing";
 import type en from "@/locales/en.json";
 
@@ -58,9 +58,10 @@ export function buildTwitter({
  * from facts actually provided in site config (genre/gamePlatform/datePublished/
  * price/developer) — any missing field is simply omitted, never guessed.
  */
-export function buildSiteGraph(messages: Pick<Messages, "site">) {
+export function buildSiteGraph(messages: Pick<Messages, "site">, locale: string) {
   const siteName = getSiteName(messages);
-  const websiteId = `${SITE_URL}/#website`;
+  const localeUrl = localizedSiteUrl("/", locale);
+  const websiteId = `${localeUrl}#website`;
   const orgId = `${SITE_URL}/#organization`;
   const gameId = `${SITE_URL}/#game`;
 
@@ -68,9 +69,9 @@ export function buildSiteGraph(messages: Pick<Messages, "site">) {
     "@type": "WebSite",
     "@id": websiteId,
     name: siteName,
-    url: SITE_URL,
+    url: localeUrl,
     description: messages.site.description,
-    inLanguage: routing.defaultLocale,
+    inLanguage: locale,
     publisher: { "@id": orgId },
     about: { "@id": gameId },
   };

@@ -94,6 +94,24 @@ CATEGORY_DEFINITIONS: dict[str, dict[str, Any]] = {
     },
 }
 
+# Category copy is product-owned, stable UI text. Keep it deterministic here so
+# every generated site-plan carries localized labels *and* descriptions from the
+# same Basic Info-owned source instead of shipping English SEO copy on locale URLs.
+CATEGORY_DESCRIPTION_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "guide": {"es": "Ayuda para principiantes, controles e información práctica para aprender a jugar.", "de": "Einsteigerhilfe, Steuerung und praktische Anleitungen zum Spielen.", "fr": "Aide aux débutants, commandes et conseils pratiques pour apprendre à jouer.", "ja": "初心者向けの遊び方、操作方法、実践的な攻略情報です。", "ko": "초보자 도움말, 조작법과 실전 플레이 방법을 안내합니다."},
+    "progression": {"es": "Cómo funcionan las partidas, los niveles, los desbloqueos y la progresión a largo plazo.", "de": "So funktionieren Runs, Stufen, Freischaltungen und langfristiger Fortschritt.", "fr": "Fonctionnement des parties, niveaux, déblocages et de la progression à long terme.", "ja": "ラン、レベル、アンロック、長期的な進行の仕組みを解説します。", "ko": "런, 레벨, 잠금 해제와 장기 성장 방식을 설명합니다."},
+    "mechanics": {"es": "Sistemas principales, reglas, estadísticas e interacciones de juego.", "de": "Kernsysteme, Regeln, Werte und Interaktionen im Spiel.", "fr": "Systèmes principaux, règles, statistiques et interactions de jeu.", "ja": "主要システム、ルール、ステータス、ゲーム内の相互作用を解説します。", "ko": "핵심 시스템, 규칙, 능력치와 게임 상호작용을 설명합니다."},
+    "updates": {"es": "Nuevas versiones, cambios, eventos y estado actual del juego.", "de": "Neue Versionen, Änderungen, Events und der aktuelle Spielstatus.", "fr": "Nouvelles versions, changements, événements et état actuel du jeu.", "ja": "新バージョン、変更点、イベント、現在のゲーム状況をまとめます。", "ko": "새 버전, 변경 사항, 이벤트와 현재 게임 상태를 정리합니다."},
+    "enemies": {"es": "Tipos de enemigos, comportamiento, amenazas y formas de contrarrestarlos.", "de": "Gegnertypen, Verhalten, Gefahren und wirksame Gegenmaßnahmen.", "fr": "Types d'ennemis, comportements, menaces et moyens de les contrer.", "ja": "敵の種類、行動、脅威、対処方法を解説します。", "ko": "적 유형, 행동, 위협 요소와 대응 방법을 설명합니다."},
+    "floors": {"es": "Pisos, zonas, mapas, rutas y progresión en profundidad.", "de": "Ebenen, Gebiete, Karten, Routen und Fortschritt in die Tiefe.", "fr": "Étages, zones, cartes, itinéraires et progression en profondeur.", "ja": "フロア、エリア、マップ、ルート、深度進行を解説します。", "ko": "층, 지역, 맵, 이동 경로와 심층 진행을 설명합니다."},
+    "upgrades": {"es": "Mejoras, ventajas, configuraciones y crecimiento de poder.", "de": "Upgrades, Vorteile, Builds und die Entwicklung der Kampfstärke.", "fr": "Améliorations, avantages, builds et progression de puissance.", "ja": "強化、パーク、ビルド、戦力の伸ばし方を解説します。", "ko": "업그레이드, 특전, 빌드와 전투력 성장 방법을 설명합니다."},
+    "economy": {"es": "Monedas, botín, recompensas, tiendas y prioridades de gasto.", "de": "Währungen, Beute, Belohnungen, Shops und sinnvolle Ausgaben.", "fr": "Monnaies, butin, récompenses, boutiques et priorités de dépense.", "ja": "通貨、戦利品、報酬、ショップ、使い道の優先順位を解説します。", "ko": "재화, 전리품, 보상, 상점과 지출 우선순위를 설명합니다."},
+    "bosses": {"es": "Encuentros con jefes, ataques, fases y estrategias.", "de": "Bosskämpfe, Angriffe, Phasen und passende Strategien.", "fr": "Combats de boss, attaques, phases et stratégies.", "ja": "ボス戦、攻撃、フェーズ、攻略方法を解説します。", "ko": "보스 전투, 공격, 페이즈와 공략법을 설명합니다."},
+    "weapons": {"es": "Armas, daño, configuraciones y elección de equipamiento.", "de": "Waffen, Schaden, Ausrüstungen und passende Loadouts.", "fr": "Armes, dégâts, équipements et choix de loadout.", "ja": "武器、ダメージ、ロードアウト、装備選びを解説します。", "ko": "무기, 피해량, 로드아웃과 장비 선택을 설명합니다."},
+    "characters": {"es": "Personajes jugables, unidades, roles y habilidades.", "de": "Spielbare Charaktere, Einheiten, Rollen und Fähigkeiten.", "fr": "Personnages jouables, unités, rôles et compétences.", "ja": "プレイ可能なキャラクター、ユニット、役割、能力を解説します。", "ko": "플레이 가능한 캐릭터, 유닛, 역할과 능력을 설명합니다."},
+    "codes": {"es": "Códigos activos, recompensas, canje y estado de vencimiento.", "de": "Aktive Codes, Belohnungen, Einlösung und Ablaufstatus.", "fr": "Codes actifs, récompenses, utilisation et état d'expiration.", "ja": "有効なコード、報酬、引き換え方法、期限状況をまとめます。", "ko": "사용 가능한 코드, 보상, 입력 방법과 만료 상태를 정리합니다."},
+}
+
 CATEGORY_ALIASES = {
     "guides": "guide", "beginner": "guide", "beginners": "guide",
     "strategy": "guide", "strategies": "guide", "tips": "guide", "tactics": "guide",
@@ -133,10 +151,12 @@ def _text_values(value: Any) -> list[str]:
 
 def _candidate(category_id: str, evidence: list[str], source: str) -> dict[str, Any]:
     definition = CATEGORY_DEFINITIONS[category_id]
+    descriptions = {"en": definition["description"], **CATEGORY_DESCRIPTION_TRANSLATIONS[category_id]}
     return {
         "id": category_id,
         "labels": definition["labels"],
         "description": definition["description"],
+        "descriptions": descriptions,
         "source": source,
         "evidence": evidence[:8],
     }
@@ -243,6 +263,7 @@ def build_site_plan(profile: dict[str, Any], keyword_output: dict[str, Any]) -> 
             "order": len(selected) + 1,
             "labels": candidate["labels"],
             "description": candidate["description"],
+            "descriptions": candidate["descriptions"],
             "keywords": keywords,
             "status": "planned",
             "articleCount": 0,
