@@ -10,7 +10,7 @@
 - 默认语言严格为 `en/es/de/fr/ja/ko`，顺序也属于契约。
 - Basic Info 的 `game-profile.json` 定义分类候选边界；Guide Search 不能越界创建站点分类。
 - `site-plan.json` 是 SEO Scout、intake 和模板的唯一语言/分类声明源。
-- 发布质量门槛为 4–8 个分类；不为数量接纳完全不相关的主题。
+- 只发布有证据的分类，最多 8 个；不为数量合成 fallback 关键词。内容可适度放宽，但完全不相关、明确错误或单个娱乐视频衍生的主题必须排除。
 - 正常续跑先验证 checkpoint，再跳过已完成工作。只有显式 refresh/overwrite 才重复付费调用。
 - 每次外部命令都必须写独立日志，失败必须写 `manifest.json` 和 traceback。
 

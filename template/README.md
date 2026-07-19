@@ -64,6 +64,7 @@ npm run build
 - 本仓库不调用 LLM、不搜索、不翻译；上游必须提供成品。
 - `src/config/site-plan.json` 是生成文件，来源只能是 `intake/site-plan.json`。
 - `content/` 是生成投影，每次 ingest 会先清空，防止旧游戏或已删除文章残留。
-- site-plan 至少 4、最多 8 个 published 分类；每种语言必须交付相同文章树。
+- site-plan 至少包含 1 个有真实关键词证据、最多 8 个 published 分类；不为数量生成 fallback 分类，每种语言必须交付相同文章树。
+- `NEXT_PUBLIC_SITE_URL` 集中规范化：裸域名自动补 HTTPS，非法协议在构建前失败；`verify:deploy` 会检查线上 metadata，而不只检查 HTTP 200。
 - 分类标签来自 site-plan 的六语言 `labels`，模板只负责机械使用。
 - 具体游戏仓库必须提交 `intake/`；原始调研、cache 和日志位于被 Git 忽略的 `.gamewiki/`。

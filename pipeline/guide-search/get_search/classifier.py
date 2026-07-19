@@ -53,6 +53,20 @@ YOUTUBE_PHRASES = re.compile(
     re.I,
 )
 
+# YouTube often exposes useful game mechanics before those phrases appear in
+# Google Suggest.  These semantic topics are admitted only when at least two
+# distinct videos independently mention the same durable player-help intent.
+# A single entertainment title can therefore never create one of these pages.
+YOUTUBE_STABLE_TOPICS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("juking and movement guide", re.compile(r"\b(?:juke|jukes|juking|movement|breaking ankles?)\b", re.I)),
+    ("bomb passing techniques", re.compile(r"\b(?:bomb pass(?:ing)?|pass(?:ing)? the bomb|passing techniques?)\b", re.I)),
+    (
+        "map positioning guide",
+        re.compile(r"\b(?:(?:map|arena) (?:positioning|strategy|strategies|tips)|tips (?:and tricks )?(?:for|on) (?:specific )?maps?)\b", re.I),
+    ),
+)
+YOUTUBE_STABLE_TOPIC_MIN_VIDEOS = 2
+
 
 def ascii_text(value: str) -> str:
     value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
@@ -283,12 +297,17 @@ def extract_candidates(topic: str, raw: dict[str, Any]) -> tuple[list[Candidate]
                 )
 
     youtube_response = raw.get("youtube", {}).get("response") or {}
+    stable_topic_evidence: dict[str, list[tuple[str, int]]] = defaultdict(list)
     for result in first_task_results(youtube_response):
         for item in result.get("items") or []:
             if item.get("type") != "youtube_video":
                 continue
             title = canonical(str(item.get("title") or ""))
             views = int(item.get("views_count") or 0)
+            original_title = str(item.get("title") or "")
+            for topic_tail, pattern in YOUTUBE_STABLE_TOPICS:
+                if pattern.search(title):
+                    stable_topic_evidence[topic_tail].append((original_title, views))
             seen_phrases: set[str] = set()
             for match in YOUTUBE_PHRASES.finditer(title):
                 phrase = re.sub(r"\s+", " ", match.group(0)).strip()
@@ -319,6 +338,26 @@ def extract_candidates(topic: str, raw: dict[str, Any]) -> tuple[list[Candidate]
                         evidence=[str(item.get("title") or "")],
                     ),
                 )
+
+    for topic_tail, records in stable_topic_evidence.items():
+        distinct: dict[str, int] = {}
+        for title, views in records:
+            distinct[canonical(title)] = max(views, distinct.get(canonical(title), 0))
+        if len(distinct) < YOUTUBE_STABLE_TOPIC_MIN_VIDEOS:
+            continue
+        keyword = normalize_keyword(topic_tail, topic, allow_unprefixed=True)
+        if not keyword:
+            continue
+        add_candidate(
+            store,
+            Candidate(
+                keyword=keyword,
+                sources={"youtube"},
+                youtube_views=sum(distinct.values()),
+                youtube_occurrences=len(distinct),
+                evidence=[title for title, _ in records[:10]],
+            ),
+        )
 
     candidates = list(store.values())
     for candidate in candidates:

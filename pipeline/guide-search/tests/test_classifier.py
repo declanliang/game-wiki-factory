@@ -160,6 +160,40 @@ class ClassifierTests(unittest.TestCase):
         self.assertEqual(by_keyword[f"{topic} upgrades"].category, "upgrades")
         self.assertEqual(by_keyword[f"{topic} floor"].category, "floors")
 
+    def test_multi_video_mechanics_create_stable_topics_but_single_video_does_not(self):
+        topic = "timebomb duels roblox"
+        raw = {
+            "youtube": {
+                "response": response_with_result(
+                    {
+                        "items": [
+                            {
+                                "type": "youtube_video",
+                                "title": "I Tested Viral Jukes in Timebomb Duels",
+                                "views_count": 40000,
+                            },
+                            {
+                                "type": "youtube_video",
+                                "title": "Breaking Ankles in Timebomb Duels",
+                                "views_count": 70000,
+                            },
+                            {
+                                "type": "youtube_video",
+                                "title": "Passing the Bomb Like a Pro in Timebomb Duels",
+                                "views_count": 5000,
+                            },
+                        ]
+                    }
+                )
+            }
+        }
+        candidates, _ = extract_candidates(topic, raw)
+        by_keyword = {item.keyword: item for item in candidates}
+        stable = by_keyword[f"{topic} juking and movement guide"]
+        self.assertEqual(stable.youtube_occurrences, 2)
+        self.assertEqual(stable.youtube_views, 110000)
+        self.assertNotIn(f"{topic} bomb passing techniques", by_keyword)
+
     def test_selection_and_validation(self):
         topic = "animal hospital roblox"
         candidates = []

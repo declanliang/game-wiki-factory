@@ -17,7 +17,7 @@ from typing import Any
 
 SCHEMA_VERSION = 1
 FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja", "ko"]
-MINIMUM_CATEGORIES = 4
+MINIMUM_CATEGORIES = 1
 MAXIMUM_CATEGORIES = 8
 
 LANGUAGE_NAMES = {
@@ -96,6 +96,7 @@ CATEGORY_DEFINITIONS: dict[str, dict[str, Any]] = {
 
 CATEGORY_ALIASES = {
     "guides": "guide", "beginner": "guide", "beginners": "guide",
+    "strategy": "guide", "strategies": "guide", "tips": "guide", "tactics": "guide",
     "gameplay": "mechanics", "system": "mechanics", "systems": "mechanics",
     "levels": "progression", "leveling": "progression", "levelling": "progression",
     "maps": "floors", "areas": "floors", "worlds": "floors",
@@ -249,28 +250,10 @@ def build_site_plan(profile: dict[str, Any], keyword_output: dict[str, Any]) -> 
         })
         seen.add(category_id)
 
-    game_name = profile["game"]["name"]
-    for category_id, candidate in allowed.items():
-        if len(selected) >= MINIMUM_CATEGORIES:
-            break
-        if category_id in seen:
-            continue
-        selected.append({
-            "id": category_id,
-            "order": len(selected) + 1,
-            "labels": candidate["labels"],
-            "description": candidate["description"],
-            "keywords": [f"{game_name} {category_id} guide"],
-            "status": "planned",
-            "articleCount": 0,
-            "sources": [candidate["source"], "site-plan-relevant-fallback"],
-        })
-        seen.add(category_id)
-
     if len(selected) < MINIMUM_CATEGORIES:
         raise ValueError(
-            f"Basic Info profile can supply only {len(selected)} usable categories; "
-            f"at least {MINIMUM_CATEGORIES} are required."
+            "Guide Search did not deliver any evidence-backed category inside the "
+            "Basic Info profile boundary."
         )
     selected = selected[:MAXIMUM_CATEGORIES]
     return {
@@ -372,5 +355,5 @@ python gamewiki.py "{game_name}"
 
 ## 部署
 
-把本目录推送为一个独立 GitHub repo，在 Vercel 直接导入；Root Directory 留空。部署前设置 `NEXT_PUBLIC_SITE_URL=https://正式域名`，并运行 `npm run verify:deploy`。
+把本目录推送为一个独立 GitHub repo，在 Vercel 直接导入；Root Directory 留空。部署前设置 `NEXT_PUBLIC_SITE_URL=https://正式域名`（公开变量，无需 Sensitive；裸域名会自动补 HTTPS），并运行 `npm run verify:deploy`。
 """

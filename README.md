@@ -120,9 +120,10 @@ python gamewiki.py "Hellhole" --output-root D:\GameSites
 
 - 固定语言：`en/es/de/fr/ja/ko`。
 - Basic Info 生成 `game-profile.json`，定义分类语义边界。
-- Guide Search 调用 Google Suggest 主词和 a–z，并可排序/淘汰关键词，但不能越过 profile 创建无关分类。
+- Guide Search 调用 Google Suggest 主词和 a–z，并从多个视频共同支持的稳定机制中召回补充主题；单个娱乐视频不能独立创建文章。
 - `site-plan.json` 是分类、顺序、六语言标签和发布状态的唯一事实源。
-- 每站至少 4、最多 8 个 published 分类。
+- 不为分类数量合成关键词；通常争取 3–5 个可靠文章主题，证据稀少时接受更少，分类最多 8 个。
+- `strategy/tips/tactics` 映射进 `guide`，但每个不同关键词仍生成独立文章。
 - SEO Scout 在翻译前执行文不对题 QA。
 - 翻译必须保留标题、列表、表格、FAQ 和 Callout 结构；截断响应不会成为 checkpoint。
 - 六语言文章树必须完全一致。
@@ -144,7 +145,7 @@ python gamewiki.py "Hellhole" --output-root D:\GameSites
 2. 不要使用 refresh、recluster 或 overwrite，除非日志证明对应 checkpoint 无效。
 3. 如果失败，先检查 <game>/.gamewiki/manifest.json 和最新日志，修复通用代码后用同一命令续跑。
 4. 不允许为了通过 build 手工掩盖截断文章或降低相关性门槛。
-5. 完成时必须确认：至少 4 个分类、六语言文章树一致、intake 通过、TypeScript 通过、production build 通过、sitemap 全 URL 为 200、hreflang 完整。
+5. 完成时必须确认：所有分类有真实关键词证据、六语言文章树一致、intake 通过、TypeScript 通过、production build 通过、sitemap 全 URL 为 200、hreflang 完整。
 6. 报告最终网站根目录、分类、语言、文章数、最新日志和任何部署前待配置项。
 ```
 
@@ -187,6 +188,8 @@ git push -u origin main
 ```text
 NEXT_PUBLIC_SITE_URL=https://正式域名
 ```
+
+模板会把误填的裸域名自动规范为 HTTPS，并统一去掉末尾路径和斜杠；Vercel 中仍建议填写完整 `https://...`。该变量是公开 canonical origin，不需要标记为 Sensitive（若团队策略强制则可保留）。
 
 上线前运行：
 

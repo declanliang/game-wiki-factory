@@ -18,7 +18,7 @@ TOAPIS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) get-search/1.0"
 DEFAULT_CONTEXT_MODEL = "gpt-5.3-codex-official"
 DEFAULT_CLUSTER_MODEL = "gpt-5.6-terra"
 LOW_CONFIDENCE_THRESHOLD = 0.55
-CLUSTER_POLICY_VERSION = 2
+CLUSTER_POLICY_VERSION = 3
 
 FORBIDDEN_STANDALONE = re.compile(
     r"\b(reddit|discord|trello|logo|youtube|game\s*link)\b", re.IGNORECASE
@@ -385,8 +385,8 @@ def _cluster_candidate_batch(
                         "maximum_keywords": 40,
                         "maximum_categories": 8,
                         "category_minimum": (
-                            "When the candidate set contains enough same-game page intents, retain at "
-                            "least 4 distinct useful categories. Do not fill categories with unrelated terms."
+                            "Do not force a category count. Prefer 3-5 durable article topics when the "
+                            "evidence supports them, but accept fewer and never synthesize a keyword."
                         ),
                         "category_overlap": (
                             "Small overlap between categories and articles is acceptable. Do not merge "
@@ -400,8 +400,10 @@ def _cluster_candidate_batch(
                         ],
                         "youtube_only": (
                             "YouTube-only evidence is allowed. Judge the candidate by search usefulness, "
-                            "specificity, and consistency with the game context. Keep useful topics even "
-                            "when YouTube is their only source; drop only for a concrete semantic reason."
+                            "specificity, repeated support across videos, and consistency with the game "
+                            "context. Multi-video mechanics such as movement, juking, passing, or map "
+                            "positioning can support an unofficial guide even before Suggest demand appears. "
+                            "Drop one-off entertainment/challenge titles and unrelated topics."
                         ),
                         "low_confidence": (
                             f"Drop when confidence is below {LOW_CONFIDENCE_THRESHOLD}. Official/trusted "

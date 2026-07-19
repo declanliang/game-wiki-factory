@@ -1,4 +1,5 @@
 import type en from "@/locales/en.json";
+import { resolveSiteUrl } from "./site-url.mjs";
 
 /**
  * Single source of truth for deployment-level site constants.
@@ -6,7 +7,7 @@ import type en from "@/locales/en.json";
  * see getSiteName() below. Swap those, not this file, when reusing this codebase.
  */
 
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+export const SITE_URL = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
 
 export const SITE_LOGO_PATH = "/android-chrome-512x512.png";
 export const SITE_OG_IMAGE_PATH = "/images/hero.webp";

@@ -11,7 +11,7 @@
     "categoryPolicy": {"type": "object", "required": ["minimum", "maximum"]},
     "categories": {
       "type": "array",
-      "minItems": 4,
+      "minItems": 1,
       "maxItems": 8,
       "items": {
         "type": "object",

@@ -38,7 +38,7 @@ if (!fs.existsSync(sitePlanPath)) {
       fail(`site-plan.languages 必须是固定策略 ${FIXED_LANGUAGES.join(", ")}`);
     }
     const published = (sitePlan.categories || []).filter((category) => category.status === "published");
-    if (published.length < Number(sitePlan.categoryPolicy?.minimum || 4)) {
+    if (published.length < Number(sitePlan.categoryPolicy?.minimum ?? 1)) {
       fail(`site-plan 只有 ${published.length} 个 published 分类，低于最低门槛`);
     } else {
       ok(`site-plan：${published.length} 个 published 分类，语言 ${sitePlan.languages.join(", ")}`);

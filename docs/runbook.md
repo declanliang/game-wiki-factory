@@ -26,7 +26,7 @@ python gamewiki.py "GAME NAME"
 - API 限速、网络错误：直接重跑，不加 overwrite。
 - Guide Search 聚类失败：复用 `.gamewiki/planning/guide-search/raw`。
 - 某语言缺失或截断：SEO Scout 只删除并重翻无效文件。
-- QA 后少于 4 个分类：补充真实同游戏需求，不能降低相关性门槛。
+- 主题稀少：检查 Suggest 和多视频共同支持的机制主题；接受较少的可靠文章，不能合成 fallback 关键词。
 - 模板失败：修工厂 `template/` 后重跑，不能重新付费生成上游内容。
 
 ## 有成本的参数
@@ -65,6 +65,8 @@ npm run launch:site
 ```powershell
 npm run verify:deploy
 ```
+
+`NEXT_PUBLIC_SITE_URL` 推荐填写完整 `https://...`；裸域名会自动补 HTTPS。它是公开站点 origin，不需要 Sensitive。`verify:deploy` 会读取线上 HTML 并检查 title、`og:url`、图片绝对 URL、sitemap/robots origin 和 hreflang，避免把 metadata 崩溃的 HTTP 200 当成成功。
 
 ## 工厂升级已有网站
 

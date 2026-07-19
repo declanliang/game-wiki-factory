@@ -15,6 +15,7 @@
 import { execSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { resolveSiteUrl } from "../src/config/site-url.mjs";
 
 const root = process.cwd();
 let errors = 0;
@@ -96,6 +97,44 @@ function extractMetaContent(html, key) {
   return contentMatch ? contentMatch[1] : null;
 }
 
+function inspectHtmlMetadata(html, label, expectedOrigin = null) {
+  const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || "";
+  const ogUrl = extractMetaContent(html, "og:url");
+  const ogImage = extractMetaContent(html, "og:image");
+  const twitterImage = extractMetaContent(html, "twitter:image");
+  if (!title) fail(`${label}返回了 HTML，但没有非空 <title>；metadata 可能渲染失败，请检查 NEXT_PUBLIC_SITE_URL 和部署日志`);
+  else ok(`${label}<title> = ${title}`);
+  for (const [key, value] of [["og:url", ogUrl], ["og:image", ogImage], ["twitter:image", twitterImage]]) {
+    if (!value) fail(`${label}HTML 里没有找到 ${key}`);
+    else if (!/^https?:\/\//i.test(value)) fail(`${label}${key} 不是绝对 HTTP(S) URL：${value}`);
+    else if (expectedOrigin && new URL(value).origin !== expectedOrigin) {
+      fail(`${label}${key} origin 为 ${new URL(value).origin}，期望 ${expectedOrigin}`);
+    } else ok(`${label}${key} = ${value}`);
+  }
+  if (/Application error|metadata render error|An error occurred in the Server Components render/i.test(html)) {
+    fail(`${label}HTML 包含 Next.js/metadata 运行时错误标记`);
+  }
+  return { title, ogUrl, ogImage, twitterImage };
+}
+
+function inspectOriginDocument(text, label, expectedOrigin) {
+  const absoluteUrls = text.match(/https?:\/\/[^\s<"']+/gi) || [];
+  if (absoluteUrls.length === 0) {
+    fail(`${label}没有找到绝对 URL`);
+    return;
+  }
+  const bad = absoluteUrls.filter((value) => {
+    try {
+      const origin = new URL(value.replace(/[),.;]+$/, "")).origin;
+      if (["http://www.sitemaps.org", "http://www.w3.org"].includes(origin)) return false;
+      return origin !== expectedOrigin;
+    }
+    catch { return true; }
+  });
+  if (bad.length > 0) fail(`${label}包含非规范 origin：${[...new Set(bad)].slice(0, 3).join(", ")}`);
+  else ok(`${label}中的绝对 URL 全部使用 ${expectedOrigin}`);
+}
+
 function waitForServer(url, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   return new Promise((resolve, reject) => {
@@ -149,10 +188,11 @@ try {
   await waitForServer(`http://localhost:${port}/`, 30000);
 
   const sitemapRes = await fetch(`http://localhost:${port}/sitemap.xml`);
+  let sitemapXml = "";
   if (!sitemapRes.ok) {
     fail(`sitemap.xml 请求失败：HTTP ${sitemapRes.status}`);
   } else {
-    const sitemapXml = await sitemapRes.text();
+    sitemapXml = await sitemapRes.text();
     const locs = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
     let badCount = 0;
     for (const loc of locs) {
@@ -168,13 +208,13 @@ try {
 
   const homeRes = await fetch(`http://localhost:${port}/`);
   const homeHtml = await homeRes.text();
-
-  const ogImage = extractMetaContent(homeHtml, "og:image");
-  const twitterImage = extractMetaContent(homeHtml, "twitter:image");
-  for (const [label, value] of [["og:image", ogImage], ["twitter:image", twitterImage]]) {
-    if (!value) fail(`首页 HTML 里没有找到 ${label}`);
-    else if (!/^https?:\/\//.test(value)) fail(`${label} 不是绝对路径（必须带完整域名）：${value}`);
-    else ok(`${label} = ${value}`);
+  const metadata = inspectHtmlMetadata(homeHtml, "本地生产首页：");
+  if (metadata.ogUrl) {
+    const expectedOrigin = new URL(metadata.ogUrl).origin;
+    if (sitemapXml) inspectOriginDocument(sitemapXml, "本地 sitemap.xml", expectedOrigin);
+    const robotsRes = await fetch(`http://localhost:${port}/robots.txt`);
+    if (!robotsRes.ok) fail(`robots.txt 请求失败：HTTP ${robotsRes.status}`);
+    else inspectOriginDocument(await robotsRes.text(), "本地 robots.txt", expectedOrigin);
   }
 
   // Next.js's Metadata API renders this attribute as `hrefLang` (camelCase) in the actual
@@ -210,24 +250,43 @@ if (args.includes("--deploy")) {
     }
     return env;
   }
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || loadEnvLocal().NEXT_PUBLIC_SITE_URL || "";
-  if (!siteUrl) {
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL || loadEnvLocal().NEXT_PUBLIC_SITE_URL || "";
+  let siteUrl = "";
+  if (!configuredSiteUrl) {
     fail("NEXT_PUBLIC_SITE_URL 没有设置（.env.local 或部署平台环境变量）—— 部署前必须配置成真实域名，否则 sitemap/canonical/og:image 会带着 src/config/site.ts 里的占位域名上线");
-  } else if (/example\.com/i.test(siteUrl)) {
-    fail(`NEXT_PUBLIC_SITE_URL（${siteUrl}）还是模板占位域名 —— 换成真实部署域名再上线`);
-  } else if (!/^https:\/\//i.test(siteUrl)) {
-    fail(`NEXT_PUBLIC_SITE_URL（${siteUrl}）不是 https:// 开头`);
   } else {
-    ok(`NEXT_PUBLIC_SITE_URL = ${siteUrl}`);
+    try { siteUrl = resolveSiteUrl(configuredSiteUrl); }
+    catch (error) { fail(error.message); }
+  }
+  if (siteUrl && /example\.com/i.test(siteUrl)) {
+    fail(`NEXT_PUBLIC_SITE_URL（${siteUrl}）还是模板占位域名 —— 换成真实部署域名再上线`);
+  } else if (siteUrl) {
+    ok(`NEXT_PUBLIC_SITE_URL = ${siteUrl}（规范化后）`);
+    const live = {};
     for (const p of ["/", "/sitemap.xml", "/robots.txt"]) {
       try {
         const res = await fetch(`${siteUrl}${p}`);
-        if (res.status === 200) ok(`线上 ${p} 返回 200`);
+        const body = await res.text();
+        if (res.status === 200) {
+          ok(`线上 ${p} 返回 200`);
+          live[p] = body;
+        }
         else fail(`线上 ${p} 返回 ${res.status}（期望 200）—— 确认域名已经正确部署且能公网访问`);
       } catch (err) {
         fail(`线上 ${p} 请求失败：${err.message} —— 域名是否已经解析并部署完成？`);
       }
     }
+    if (live["/"]) {
+      const metadata = inspectHtmlMetadata(live["/"], "线上首页：", siteUrl);
+      const hreflangs = [...live["/"].matchAll(/rel="alternate"\s+hreflang="([^"]+)"/gi)].map((match) => match[1]);
+      if (hreflangs.length > 0) ok(`线上 hreflang 标签：${hreflangs.join(", ")}`);
+      else fail("线上首页没有 hreflang 标签；多语言 metadata 可能渲染失败");
+      if (!metadata.title || !metadata.ogUrl) {
+        fail("线上首页虽然返回 200，但 metadata 不完整；请检查 NEXT_PUBLIC_SITE_URL 和 Vercel Function 日志");
+      }
+    }
+    if (live["/sitemap.xml"]) inspectOriginDocument(live["/sitemap.xml"], "线上 sitemap.xml", siteUrl);
+    if (live["/robots.txt"]) inspectOriginDocument(live["/robots.txt"], "线上 robots.txt", siteUrl);
   }
 }
 

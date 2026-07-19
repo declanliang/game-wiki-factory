@@ -70,7 +70,7 @@ Games/
 ## 规划契约
 
 1. `game-profile.json` 由 Basic Info 根据可信游戏事实生成，定义允许的分类候选和语义边界。
-2. `site-plan.json` 把 Guide Search 关键词限制在 profile 内，记录分类顺序、六语言标签、关键词、交付数量及状态。
+2. `site-plan.json` 把 Guide Search 关键词限制在 profile 内，记录分类顺序、六语言标签、关键词、交付数量及状态。`strategy/tips/tactics` 合并到 `guide` 分类但保留独立关键词；planner 不生成无搜索证据的 fallback 关键词。
 
 SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。模板只接收 intake 中 reconcile 后的 site plan。`content/` 是投影，不是反向事实源。
 
@@ -85,4 +85,4 @@ SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。模板只
 
 ## Vercel 边界
 
-游戏目录的 `package.json` 位于仓库根，因此 Vercel Root Directory 留空。部署只运行确定性 Next.js build；所有 AI 工作在本地工厂完成。正式部署必须设置 `NEXT_PUBLIC_SITE_URL`。
+游戏目录的 `package.json` 位于仓库根，因此 Vercel Root Directory 留空。部署只运行确定性 Next.js build；所有 AI 工作在本地工厂完成。正式部署必须设置 `NEXT_PUBLIC_SITE_URL`。模板集中把裸域名规范为 HTTPS origin，并让 metadata、JSON-LD、sitemap 与 robots 共享同一值；部署验收即使遇到 HTTP 200，也会检查 title、OG URL/image 和 hreflang，识别流式 metadata 错误。
