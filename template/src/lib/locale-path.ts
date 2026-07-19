@@ -4,6 +4,6 @@
 // client bundle.
 export function localizeHref(href: string, locale: string) {
   if (/^([a-z][a-z0-9+.-]*:)?\/\//i.test(href)) return href;
-  if (locale === "en") return href;
-  return `/${locale}${href === "/" ? "" : href}`;
+  return localizedPathname(href, locale);
 }
+import { localizedPathname } from "@/config/site-path.mjs";

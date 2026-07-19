@@ -3,6 +3,7 @@ import { CONTENT_TYPES } from "@/config/navigation";
 import { SITE_URL } from "@/config/site";
 import { getAllContent } from "@/lib/content";
 import { languageAlternates, routing } from "@/i18n/routing";
+import { localizedSiteUrl } from "@/config/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Legal / info pages that always exist regardless of game — we don't know when
@@ -41,13 +42,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   return routing.locales.flatMap((locale) =>
     allEntries.map(({ path, lastModified }) => ({
-      url: `${SITE_URL}${locale === routing.defaultLocale ? "" : `/${locale}`}${path === "/" ? "" : path}`,
+      url: localizedSiteUrl(path, locale),
       ...(lastModified ? { lastModified } : {}),
       changeFrequency: path === "/" ? ("daily" as const) : listPaths.includes(path) ? ("weekly" as const) : legalPaths.includes(path) ? ("monthly" as const) : ("weekly" as const),
       priority: path === "/" ? 1 : listPaths.includes(path) ? 0.8 : legalPaths.includes(path) ? 0.3 : 0.6,
       // Sitemap hreflang must be fully-qualified (unlike the HTML <link> version,
       // which is relative) — Google ignores relative URLs here.
-      alternates: { languages: Object.fromEntries(Object.entries(languageAlternates(path)).map(([loc, href]) => [loc, `${SITE_URL}${href}`])) },
+      alternates: { languages: Object.fromEntries(Object.entries(languageAlternates(path)).map(([loc, href]) => [loc, `${SITE_URL}${href === "/" ? "" : href}`])) },
     })),
   );
 }

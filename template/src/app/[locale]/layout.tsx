@@ -9,7 +9,7 @@ import { SiteFooter, SiteHeader } from "@/components/site";
 import { JsonLd } from "@/components/site-widgets";
 import { AdSlot } from "@/components/ad-slot";
 import { Analytics } from "@/components/analytics";
-import { getSiteName, SITE_URL } from "@/config/site";
+import { getSiteName, localizedSiteUrl, SITE_URL } from "@/config/site";
 import { routing } from "@/i18n/routing";
 import { buildOpenGraph, buildSiteGraph, buildTwitter, shouldIndex } from "@/lib/seo";
 import en from "@/locales/en.json";
@@ -26,13 +26,23 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   const messages = (await getMessages({ locale })) as Messages;
   const siteName = getSiteName(messages);
-  const description = `Complete ${messages.site.name} fan wiki with codes, bosses, builds, races, guides and progression walkthroughs.`;
+  const description = messages.site.description;
+  const pageUrl = localizedSiteUrl("/", locale);
   return {
     metadataBase: new URL(SITE_URL),
     title: { default: siteName, template: "%s" },
     description,
+    manifest: "/manifest.json",
+    icons: {
+      icon: [
+        { url: "/favicon.ico" },
+        { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+        { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      ],
+      apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    },
     robots: shouldIndex() ? undefined : { index: false, follow: false },
-    openGraph: buildOpenGraph({ locale, title: siteName, description, url: SITE_URL, siteName }),
+    openGraph: buildOpenGraph({ locale, title: siteName, description, url: pageUrl, siteName }),
     twitter: buildTwitter({ title: siteName, description }),
   };
 }
@@ -41,7 +51,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   const messages = (await getMessages()) as Messages;
-  const siteGraph = buildSiteGraph(messages);
+  const siteGraph = buildSiteGraph(messages, locale);
 
   return (
     <html lang={locale} className={`${inter.variable}`} suppressHydrationWarning>

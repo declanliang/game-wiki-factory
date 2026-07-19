@@ -43,6 +43,9 @@ class ProjectContractTests(unittest.TestCase):
         self.assertIn("floors", ids)
         self.assertIn("upgrades", ids)
         self.assertIn("economy", ids)
+        for candidate in profile["categoryCandidates"]:
+            self.assertEqual(list(candidate["descriptions"]), FIXED_LANGUAGES)
+            self.assertTrue(all(candidate["descriptions"].values()))
 
     def test_site_plan_maps_strategy_to_guide_without_synthetic_fallbacks(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -60,6 +63,7 @@ class ProjectContractTests(unittest.TestCase):
             plan["categories"][0]["keywords"],
             ["hellhole guide", "hellhole tips and tricks"],
         )
+        self.assertEqual(list(plan["categories"][0]["descriptions"]), FIXED_LANGUAGES)
         self.assertNotIn(
             "site-plan-relevant-fallback",
             [source for item in plan["categories"] for source in item["sources"]],

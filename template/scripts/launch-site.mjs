@@ -35,8 +35,6 @@ step("站点身份 + 首页文案（机械字段 + 结构化 intake）", "npm ru
 step("素材处理（hero/favicon/manifest/主题色）", "npm run process:assets");
 step("文章接入 content/", "npm run ingest:articles");
 step("同步内容分类到导航", "npm run sync:categories");
-step("生成首页精选攻略", "npm run generate:featured");
-
 const plan = JSON.parse(fs.readFileSync(path.join(root, "intake", "site-plan.json"), "utf-8"));
 const locales = plan.languages.filter((locale) => locale !== "en");
 if (locales.length > 0) {
@@ -45,6 +43,8 @@ if (locales.length > 0) {
 } else {
   console.log("\n（只有 en，跳过 sync:locales / apply:locales）");
 }
+
+step("生成六语言首页精选攻略", "npm run generate:featured");
 
 step("全站验证", `npm run verify:site${args.includes("--skip-build") ? " -- --skip-build" : ""}`);
 

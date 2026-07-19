@@ -111,6 +111,43 @@
     "noCodesAvailable": "No active codes right now. Check back soon!",
     "activeCodesList": []
   },
+  "legal": {
+    "about": {
+      "title": "About",
+      "description": "Learn how the independent __GAME_NAME__ Wiki helps players find practical guides and game information.",
+      "paragraphs": [
+        "__GAME_NAME__ Wiki is an independent fan-built guide hub for new and experienced players.",
+        "We organize practical game information into clear categories and update the site as useful new topics become available."
+      ]
+    },
+    "copyright": {
+      "title": "Copyright",
+      "description": "Copyright and ownership information for the independent __GAME_NAME__ fan wiki.",
+      "paragraphs": [
+        "__GAME_NAME__ and related media belong to their respective owners.",
+        "This site is a non-official fan wiki created for informational and guide purposes.",
+        "Rights holders may contact the site operator to request a review of material displayed here."
+      ]
+    },
+    "privacyPolicy": {
+      "title": "Privacy Policy",
+      "description": "Read how the __GAME_NAME__ fan wiki and its hosting, analytics, and advertising services may process technical data.",
+      "paragraphs": [
+        "This fan wiki provides informational guides for __GAME_NAME__. We do not request account credentials, game passwords, or private payment information.",
+        "Analytics, advertising, and hosting providers may process standard technical information such as device type, browser, approximate region, and visited pages.",
+        "External links may lead to the official game site or community services. Those services are governed by their own privacy policies."
+      ]
+    },
+    "termsOfService": {
+      "title": "Terms of Service",
+      "description": "Terms for using the independent __GAME_NAME__ fan wiki and its informational game guides.",
+      "paragraphs": [
+        "This site is an independent fan-made guide hub. Content is provided for informational and entertainment purposes only.",
+        "Game systems and other details may change without notice. Verify important information in the game or through official channels.",
+        "By using this site, you agree not to misuse it, attempt unauthorized access, or present this fan wiki as an official __GAME_NAME__ property."
+      ]
+    }
+  },
   "footer": {
     "aboutTitle": "__GAME_NAME__ Wiki",
     "about": "__GAME_NAME__ Wiki is an independent fan-made guide covering everything about __GAME_NAME__.",

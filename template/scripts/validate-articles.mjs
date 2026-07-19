@@ -95,6 +95,8 @@ let checked = 0;
 // key would silently overwrite the first one at ingest time (both write to the same
 // content/<locale>/<category>/<slug>.mdx), so this has to be caught before that happens.
 const seenSlugs = new Map();
+const seenTitles = new Map();
+const seenDescriptions = new Map();
 
 for (const locale of localeDirs) {
   for (const file of walkMdx(path.join(articlesDir, locale))) {
@@ -119,6 +121,20 @@ for (const locale of localeDirs) {
       return !m || !m[2].trim();
     });
     if (missing.length > 0) fail(`${rel}：metadata 缺少字段（或值为空）：${missing.join(", ")}`);
+
+    const title = metaBody.match(/title\s*:\s*(["'`])(.*?)\1/s)?.[2]?.trim() || "";
+    const description = metaBody.match(/description\s*:\s*(["'`])(.*?)\1/s)?.[2]?.trim() || "";
+    for (const [label, value, seen] of [["title", title, seenTitles], ["description", description, seenDescriptions]]) {
+      if (!value) continue;
+      const key = `${locale}:${value.toLocaleLowerCase(locale)}`;
+      if (seen.has(key)) fail(`${rel} 与 ${seen.get(key)} 使用了重复 ${label}`);
+      else seen.set(key, rel);
+    }
+    const cjk = ["ja", "ko", "zh"].includes(locale);
+    const titleLimit = cjk ? 36 : locale === "en" ? 60 : 65;
+    const descriptionLimit = cjk ? 90 : locale === "en" ? 160 : 165;
+    if (title.length > titleLimit) warn(`${rel}：title 有 ${title.length} 个字符，超过 ${locale} 建议上限 ${titleLimit}`);
+    if (description.length > descriptionLimit) warn(`${rel}：description 有 ${description.length} 个字符，超过 ${locale} 建议上限 ${descriptionLimit}`);
 
     const categoryMatch = metaBody.match(/category:\s*(["'`])(.+?)\1/);
     if (categoryMatch) {

@@ -35,6 +35,7 @@ const TOKEN_VALUES = tokenValues(env);
 
 const plan = JSON.parse(fs.readFileSync(path.join(root, "intake", "site-plan.json"), "utf-8"));
 const locales = plan.languages.filter((locale) => locale !== "en");
+const enMessages = JSON.parse(fs.readFileSync(path.join(root, "src", "locales", "en.json"), "utf-8"));
 
 if (locales.length === 0) {
   console.log("没有非英文的 content/<locale>/ 目录 —— 无需合并多语言内容。");
@@ -58,6 +59,22 @@ for (const locale of locales) {
 
   const structured = JSON.parse(fs.readFileSync(structuredPath, "utf-8"));
   applyStructuredContent(target, structured);
+
+  // Identity, route and optional commerce fields are locale-invariant and are
+  // intentionally absent from site-content.<locale>.json. Materialize them
+  // explicitly instead of relying on an English runtime fallback.
+  target.site.name = GAME_NAME;
+  target.site.shortName = GAME_NAME;
+  target.site.playUrl = env.OFFICIAL_GAME_URL;
+  target.site.price = enMessages.site.price;
+  target.site.priceCurrency = enMessages.site.priceCurrency;
+  target.home.hero.title = GAME_NAME;
+  target.home.hero.secondaryCtaHref = env.OFFICIAL_GAME_URL;
+  target.home.hero.videoId = env.YOUTUBE_VIDEO_ID || "";
+  target.home.finalCta.secondaryHref = env.OFFICIAL_GAME_URL;
+  if (env.DISCORD_URL) target.footer.officialDiscordHref = env.DISCORD_URL;
+  if (env.YOUTUBE_CHANNEL_URL) target.footer.officialYoutubeHref = env.YOUTUBE_CHANNEL_URL;
+  if (env.FANDOM_URL) target.footer.communityToolHref = env.FANDOM_URL;
 
   const substituted = substituteTokens(target, TOKEN_VALUES);
   fs.writeFileSync(localePath, `${JSON.stringify(substituted, null, 2)}\n`);

@@ -1,5 +1,6 @@
 import type en from "@/locales/en.json";
 import { resolveSiteUrl } from "./site-url.mjs";
+import { absoluteLocalizedUrl } from "./site-path.mjs";
 
 /**
  * Single source of truth for deployment-level site constants.
@@ -14,6 +15,10 @@ export const SITE_OG_IMAGE_PATH = "/images/hero.webp";
 
 export const SITE_LOGO_URL = `${SITE_URL}${SITE_LOGO_PATH}`;
 export const SITE_OG_IMAGE_URL = `${SITE_URL}${SITE_OG_IMAGE_PATH}`;
+
+export function localizedSiteUrl(pathname: string, locale: string): string {
+  return absoluteLocalizedUrl(SITE_URL, pathname, locale);
+}
 
 type Messages = typeof en;
 

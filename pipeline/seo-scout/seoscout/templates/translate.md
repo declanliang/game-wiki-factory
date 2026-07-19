@@ -12,10 +12,10 @@
 
 目标语言：$language_name ($lang_code)
 
-标题（英文原文，请翻译为 $language_name）：
+标题（英文原文，请翻译为简洁、自然的 $language_name SERP 标题；西语/德语/法语不超过 65 字符，日语/韩语不超过 36 字符）：
 $title
 
-描述（英文原文，请翻译为 $language_name，SEO 摘要，最长 155 字符）：
+描述（英文原文，请翻译为 $language_name 的准确 SEO 摘要；西语/德语/法语不超过 165 字符，日语/韩语不超过 90 字符）：
 $description
 
 正文（英文原文，请翻译为 $language_name）：

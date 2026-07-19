@@ -266,29 +266,8 @@ export async function getContent(contentType: string, slugSegments: string[], la
       faqItems: getFaqItemsFromFile(mdxPath),
     };
   } catch {
-    // Fallback 到英文
-    if (language !== routing.defaultLocale) {
-      try {
-        const enContentDir = path.join(CONTENT_ROOT, routing.defaultLocale, contentType);
-        const enRealSlug = findFileBySlug(enContentDir, currentSlug) || currentSlug;
-        const enMdxPath = path.join(enContentDir, `${enRealSlug}.mdx`);
-        const { default: MDXContent, metadata } = await import(
-          `../../content/${routing.defaultLocale}/${contentType}/${enRealSlug}.mdx`
-        );
-        return {
-          slug: currentSlug,
-          segments: slugSegments,
-          contentType,
-          locale: routing.defaultLocale,
-          metadata: metadata as ContentMetadata,
-          MDXContent,
-          headings: getHeadingsFromFile(enMdxPath),
-          faqItems: getFaqItemsFromFile(enMdxPath),
-        };
-      } catch {
-        return null;
-      }
-    }
+    // Locale completeness is validated before build. Never serve English body
+    // content under a non-English URL if a file is missing or invalid.
     return null;
   }
 }
@@ -307,23 +286,17 @@ export interface NavGroup {
   links: Array<{ label: string; href: string; badge?: string }>;
 }
 
-// 分组标题映射：slug → 人类可读标题（默认英文）
-// key 必须和 navigation.ts 的 NAVIGATION_CONFIG key 一致；缺失时自动 fallback 成 slug 转 Title Case
-const GROUP_TITLES: Record<string, string> = Object.fromEntries(
-  SITE_PLAN_CATEGORIES.map((category) => [category.id, category.labels.en || category.id]),
-);
-
 // 各语言的分组标题映射，key 为 locale，值同上（slug → 该语言标题）
 const GROUP_TITLES_BY_LOCALE: Record<string, Record<string, string>> = Object.fromEntries(
   routing.locales.map((locale) => [
     locale,
     Object.fromEntries(
-      SITE_PLAN_CATEGORIES.map((category) => [category.id, category.labels[locale] || category.labels.en || category.id]),
+      SITE_PLAN_CATEGORIES.map((category) => [category.id, category.labels[locale]]),
     ),
   ]),
 );
 
-// locale → "Overview" 翻译（缺失时 fallback 英文 "Overview"）
+// locale → "Overview" translation; every fixed locale is required.
 const OVERVIEW_LABEL_BY_LOCALE: Record<string, string> = {
   en: "Overview", es: "Resumen", de: "Übersicht", fr: "Aperçu", ja: "概要", ko: "개요",
 };
@@ -355,7 +328,7 @@ export function getDynamicNavigation(language: Locale = "en"): NavGroup[] {
 
     const links: NavGroup["links"] = [];
     // 添加 Overview 入口（按 locale 翻译）
-    const overviewLabel = OVERVIEW_LABEL_BY_LOCALE[language] || "Overview";
+    const overviewLabel = OVERVIEW_LABEL_BY_LOCALE[language];
     links.push({ label: overviewLabel, href: `/${groupSlug}` });
 
     for (const segments of slugPaths) {
@@ -382,9 +355,9 @@ export function getDynamicNavigation(language: Locale = "en"): NavGroup[] {
       links.push({ label: title, href: `/${groupSlug}/${articleSlug}`, badge });
     }
 
-    // 优先使用 locale 特定标题，否则回退到英文默认
-    const localTitles = GROUP_TITLES_BY_LOCALE[language] || {};
-    const groupTitle = localTitles[groupSlug] || GROUP_TITLES[groupSlug] || groupSlug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    // Site-plan validation guarantees a locale-specific title.
+    const localTitles = GROUP_TITLES_BY_LOCALE[language];
+    const groupTitle = localTitles[groupSlug];
 
     groups.push({
       title: groupTitle,

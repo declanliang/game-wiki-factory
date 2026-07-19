@@ -1,10 +1,10 @@
-import { LegalPage } from "@/components/legal-page";
+import { buildLegalMetadata, LegalPage } from "@/components/legal-page";
+import type { Locale } from "@/i18n/routing";
 
-export default function AboutPage() {
-  return (
-    <LegalPage title="About">
-      <p>{"__GAME_NAME__"} Wiki is an independent fan-built guide hub covering everything about {"__GAME_NAME__"}, for new and veteran players alike.</p>
-      <p>The layout, navigation, article cards, and detail format are built from a reusable game wiki template.</p>
-    </LegalPage>
-  );
+export async function generateMetadata({ params }: { params: Promise<{ locale: Locale }> }) {
+  return buildLegalMetadata((await params).locale, "about");
+}
+
+export default async function AboutPage({ params }: { params: Promise<{ locale: Locale }> }) {
+  return <LegalPage locale={(await params).locale} pageKey="about" />;
 }
