@@ -1,0 +1,62 @@
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import { hasLocale } from "next-intl";
+import { getMessages } from "next-intl/server";
+import { NextIntlClientProvider } from "next-intl";
+import { notFound } from "next/navigation";
+import { ThemeProvider } from "next-themes";
+import { SiteFooter, SiteHeader } from "@/components/site";
+import { JsonLd } from "@/components/site-widgets";
+import { AdSlot } from "@/components/ad-slot";
+import { Analytics } from "@/components/analytics";
+import { getSiteName, SITE_URL } from "@/config/site";
+import { routing } from "@/i18n/routing";
+import { buildOpenGraph, buildSiteGraph, buildTwitter, shouldIndex } from "@/lib/seo";
+import en from "@/locales/en.json";
+
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+
+type Messages = typeof en;
+
+export function generateStaticParams() {
+  return routing.locales.map((locale) => ({ locale }));
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const messages = (await getMessages({ locale })) as Messages;
+  const siteName = getSiteName(messages);
+  const description = `Complete ${messages.site.name} fan wiki with codes, bosses, builds, races, guides and progression walkthroughs.`;
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: { default: siteName, template: "%s" },
+    description,
+    robots: shouldIndex() ? undefined : { index: false, follow: false },
+    openGraph: buildOpenGraph({ locale, title: siteName, description, url: SITE_URL, siteName }),
+    twitter: buildTwitter({ title: siteName, description }),
+  };
+}
+
+export default async function LocaleLayout({ children, params }: { children: React.ReactNode; params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  if (!hasLocale(routing.locales, locale)) notFound();
+  const messages = (await getMessages()) as Messages;
+  const siteGraph = buildSiteGraph(messages);
+
+  return (
+    <html lang={locale} className={`${inter.variable}`} suppressHydrationWarning>
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+          <NextIntlClientProvider messages={messages}>
+            <JsonLd data={siteGraph} />
+            <SiteHeader locale={locale} />
+            {children}
+            <SiteFooter locale={locale} />
+            <AdSlot format="socialBar" className="sticky bottom-0 z-40 w-full bg-background" />
+            <Analytics />
+          </NextIntlClientProvider>
+        </ThemeProvider>
+      </body>
+    </html>
+  );
+}

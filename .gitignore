@@ -1,0 +1,14 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+runs/
+.gamewiki/
+
+# Local dependency/build outputs inside the bundled template.
+template/node_modules/
+template/.next/
+template/.vercel/
+template/*.tsbuildinfo
+template/next-env.d.ts

@@ -1,0 +1,130 @@
+{
+  "site": {
+    "name": "__GAME_NAME__",
+    "shortName": "__GAME_NAME__",
+    "tagline": "Fan-Made Community Wiki",
+    "description": "__SITE_DESCRIPTION — 150 characters or so, SEO-facing__",
+    "legalNotice": "Non-official fan wiki. Made by players, for players.",
+    "playUrl": "__OFFICIAL_GAME_URL__",
+    "genre": [],
+    "gamePlatform": [],
+    "datePublished": "",
+    "price": "",
+    "priceCurrency": "",
+    "developer": ""
+  },
+  "nav": {
+    "menu": "Menu",
+    "toggleTheme": "Toggle theme",
+    "playCta": "Play Now"
+  },
+  "home": {
+    "meta": {
+      "title": "__GAME_NAME__ Wiki — __Short value prop__",
+      "description": "__Homepage-specific SEO description, distinct from site.description__"
+    },
+    "hero": {
+      "eyebrow": "Fan-Made Guide",
+      "title": "__GAME_NAME__",
+      "description": "__One or two sentences describing the core gameplay loop__",
+      "stats": [
+        { "value": "__e.g. Jul 2026__", "label": "Updated" },
+        { "value": "__e.g. 1M+__", "label": "Visits" },
+        { "value": "__e.g. 30__", "label": "Player Servers" },
+        { "value": "__e.g. two or three words__", "label": "Core Mechanic" }
+      ],
+      "primaryCta": "Start Beginner Guide",
+      "primaryCtaHref": "/guide",
+      "secondaryCta": "Play Now",
+      "secondaryCtaHref": "__OFFICIAL_GAME_URL__",
+      "videoLabel": "Beginner video guide",
+      "videoId": ""
+    },
+    "updates": {
+      "title": "Latest Updates",
+      "browse": "Browse All Guides",
+      "browseHref": "/guide"
+    },
+    "categories": {
+      "title": "Browse by Category",
+      "description": ""
+    },
+    "aboutGame": {
+      "title": "What is __GAME_NAME__?",
+      "paragraphs": [
+        "__First paragraph — what the game is, who made it, core premise. Use **bold** to highlight the game name / developer / key terms.__",
+        "__Second paragraph — core loop, what players actually do.__"
+      ],
+      "stats": [
+        { "label": "Developer", "value": "" },
+        { "label": "Platform", "value": "" },
+        { "label": "Genre", "value": "" }
+      ],
+      "cta": "Explore All Guides",
+      "ctaHref": "/guide"
+    },
+    "featured": {
+      "title": "Featured __GAME_NAME__ Guides",
+      "viewAllHref": "/guide",
+      "viewAllLabel": "View All Guides",
+      "items": []
+    },
+    "liveTools": {
+      "title": "Live Tools & Tracking",
+      "items": []
+    },
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "description": "Quick answers to the most common questions about __GAME_NAME__.",
+      "items": [
+        { "question": "__e.g. What is GAME_NAME?__", "answer": "__One or two sentences, can include one [label](/category/slug) link__" }
+      ]
+    },
+    "finalCta": {
+      "title": "Ready to Play __GAME_NAME__?",
+      "description": "__Closing pitch for the wiki__",
+      "primary": "Read the Beginner Guide",
+      "primaryHref": "/guide",
+      "secondary": "Play Now",
+      "secondaryHref": "__OFFICIAL_GAME_URL__"
+    }
+  },
+  "shared": {
+    "wikiNavigation": "Wiki Navigation",
+    "activeCodes": "Code Status",
+    "updated": "Updated",
+    "viewAllCodes": "View code status",
+    "playOnRoblox": "Play Now",
+    "inThisSection": "In this section",
+    "tableOfContents": "Table of Contents",
+    "nextSteps": "Next Steps",
+    "needHelp": "Need Help?",
+    "relatedReading": "Related Reading",
+    "relatedGuides": "Related Guides",
+    "readMore": "Read more",
+    "quickGuide": "What This Guide Covers",
+    "quickFacts": "Quick Facts",
+    "viewAllInCategory": "View all {category}",
+    "officialMedia": "Official media",
+    "home": "Home",
+    "noGuidesAvailable": "No guides available yet. Check back soon!",
+    "noCodesAvailable": "No active codes right now. Check back soon!",
+    "activeCodesList": []
+  },
+  "footer": {
+    "aboutTitle": "__GAME_NAME__ Wiki",
+    "about": "__GAME_NAME__ Wiki is an independent fan-made guide covering everything about __GAME_NAME__.",
+    "guides": "Guides",
+    "legal": "Legal",
+    "copyright": "© __YEAR__ __GAME_NAME__ Wiki",
+    "description": "__One-line game description for footer/meta reuse__",
+    "officialDiscord": "__GAME_NAME__ Discord",
+    "officialDiscordHref": "https://discord.gg/REPLACE-WITH-REAL-INVITE",
+    "officialYoutube": "Official YouTube",
+    "officialYoutubeHref": "https://www.youtube.com/@REPLACE-WITH-REAL-CHANNEL",
+    "communityTool": "Community Wiki (Fandom)",
+    "communityToolHref": "https://REPLACE-WITH-REAL-FANDOM-URL",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service"
+  }
+}

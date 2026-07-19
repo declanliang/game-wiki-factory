@@ -1,0 +1,234 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* --nav-theme(-light) is fixed and NOT meant to be overridden per-site anymore.
+     It used to be a per-game input (`themeColor` in site-content.json) — dropped
+     after a real launch shipped an HSL triple with lightness ~18% in dark mode,
+     which is nearly invisible against a 5%-lightness background: icons and badges
+     effectively disappeared, and nobody could tell until the site was generated
+     and opened. Contrast bugs like that are exactly the class of thing this
+     pipeline is supposed to make impossible without a human staring at rendered
+     pixels. A single violet/cyan pair (real values, pulled from a live site built
+     on the same variable convention — https://www.animeastral.wiki/) is used
+     unchanged in both :root and .dark: one number that's already proven to read
+     clearly on both a near-white and a near-black background, so there's no
+     separate light/dark tuning step to get wrong per game. */
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 12%;
+    --primary: var(--nav-theme);
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 95%;
+    --secondary-foreground: 0 0% 20%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 40%;
+    --accent: 0 0% 93%;
+    --accent-foreground: 0 0% 12%;
+    --destructive: 8 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 88%;
+    --input: 0 0% 88%;
+    --ring: var(--nav-theme);
+    --radius: 0.75rem;
+    --nav-theme: 258 90% 66%;
+    --nav-theme-light: 188 86% 53%;
+    --chart-1: var(--nav-theme);
+    --chart-2: 175 32% 42%;
+    --chart-3: 221 30% 42%;
+    --chart-4: 38 62% 42%;
+    --chart-5: 0 0% 45%;
+    /* Optional <Callout type="..."> in article MDX (see src/mdx-components.tsx) */
+    --callout-info-bg: 217 91% 97%;
+    --callout-info-border: 217 91% 85%;
+    --callout-info-text: 217 91% 30%;
+    --callout-tip-bg: 142 76% 97%;
+    --callout-tip-border: 142 76% 85%;
+    --callout-tip-text: 142 76% 30%;
+    --callout-warning-bg: 45 93% 97%;
+    --callout-warning-border: 45 93% 85%;
+    --callout-warning-text: 45 93% 30%;
+    --callout-success-bg: 152 76% 97%;
+    --callout-success-border: 152 76% 85%;
+    --callout-success-text: 152 76% 30%;
+  }
+
+  .dark {
+    --background: 0 0% 5%;
+    --foreground: 0 0% 88%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 88%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 88%;
+    --primary: 0 0% 92%;
+    --primary-foreground: 0 0% 8%;
+    --secondary: 0 0% 12%;
+    --secondary-foreground: 0 0% 88%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 0 0% 56%;
+    --accent: 0 0% 15%;
+    --accent-foreground: 0 0% 92%;
+    --destructive: 8 70% 45%;
+    --destructive-foreground: 0 0% 96%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: var(--nav-theme);
+    --nav-theme: 258 90% 66%;
+    --nav-theme-light: 188 86% 53%;
+    /* Lower saturation + lightness than the light-mode set on purpose — the light-mode
+       values (91-93% saturation) ported directly to a dark background read as a loud,
+       near-neon solid color block instead of a soft tinted panel. Text stays bright for
+       contrast; only bg/border are toned down. */
+    --callout-info-bg: 217 45% 16%;
+    --callout-info-border: 217 50% 36%;
+    --callout-info-text: 217 85% 78%;
+    --callout-tip-bg: 142 35% 15%;
+    --callout-tip-border: 142 40% 33%;
+    --callout-tip-text: 142 65% 72%;
+    --callout-warning-bg: 45 45% 16%;
+    --callout-warning-border: 45 55% 38%;
+    --callout-warning-text: 45 85% 75%;
+    --callout-success-bg: 152 35% 15%;
+    --callout-success-border: 152 40% 33%;
+    --callout-success-text: 152 65% 72%;
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+  html { scroll-behavior: smooth; }
+  body { @apply bg-background text-foreground; }
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 18% 12%, hsl(var(--nav-theme) / 0.12), transparent 32rem),
+      radial-gradient(circle at 85% 8%, hsl(175 32% 47% / 0.08), transparent 28rem);
+    z-index: -1;
+  }
+}
+
+@layer utilities {
+  /* Article body (`<div class="prose prose-lg">` wrapping <item.MDXContent />, see
+     [locale]/[...slug]/page.tsx) is styled by @tailwindcss/typography, not hand-rolled
+     CSS — a previous attempt at hand-rolling this duplicated/fought with per-tag
+     component classes in mdx-components.tsx (e.g. two different h2 border rules).
+     These custom properties are typography's own extension point: because they
+     reference `hsl(var(--x))` rather than baked-in values, the same `.prose` class
+     reads correctly in both :root and .dark automatically — no `prose-invert`
+     variant needed. Anything typography doesn't cover (step badges, callouts, the
+     blockquote treatment) is added below as plain rules scoped under `.prose`. */
+  .prose {
+    --tw-prose-body: hsl(var(--muted-foreground));
+    --tw-prose-headings: hsl(var(--foreground));
+    --tw-prose-lead: hsl(var(--muted-foreground));
+    --tw-prose-links: hsl(var(--nav-theme));
+    --tw-prose-bold: hsl(var(--foreground));
+    --tw-prose-counters: hsl(var(--nav-theme));
+    --tw-prose-bullets: hsl(var(--nav-theme));
+    --tw-prose-hr: hsl(var(--border));
+    --tw-prose-quotes: hsl(var(--foreground));
+    --tw-prose-quote-borders: hsl(var(--nav-theme));
+    --tw-prose-captions: hsl(var(--muted-foreground));
+    --tw-prose-code: hsl(var(--foreground));
+    --tw-prose-pre-code: hsl(var(--foreground));
+    --tw-prose-pre-bg: hsl(var(--card));
+    --tw-prose-th-borders: hsl(var(--border));
+    --tw-prose-td-borders: hsl(var(--border));
+  }
+
+  .prose :where(a) { text-decoration-color: hsl(var(--nav-theme) / 0.4); }
+
+  /* Section headings get a visible divider — without a sidebar TOC anymore, this is
+     the main way a long article's structure reads at a glance while scrolling. */
+  .prose :where(h2) { border-bottom: 1px solid hsl(var(--border)); padding-bottom: 0.5em; }
+  /* Extra top separation so h3 doubles as a clear "new question" break in FAQ
+     sections (content authors write FAQs as ### Question, not a special component). */
+  .prose :where(h3) { margin-top: 2.2em; }
+
+  /* Numbered-step badges for every <ol> — not gated behind a dedicated "Steps" MDX
+     component, because content is generated upstream and can't be relied on to opt
+     into one. A plain `1. **Title:** body` markdown list gets the same treatment. */
+  .prose ol { list-style: none; padding-left: 0; counter-reset: steps; }
+  .prose ol > li { counter-increment: steps; position: relative; padding-left: 3.25rem; }
+  .prose ol > li::before {
+    content: counter(steps);
+    position: absolute;
+    left: 0;
+    top: 0.05em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 9999px;
+    background: hsl(var(--nav-theme));
+    color: white;
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+
+  /* Highlighted box instead of a plain quote-style left border. */
+  .prose blockquote {
+    border-left: none;
+    border-radius: 0.75rem;
+    border: 1px solid hsl(var(--nav-theme-light));
+    background: hsl(var(--nav-theme) / 0.08);
+    padding: 1.1em 1.4em;
+    font-style: normal;
+  }
+  .prose blockquote :where(p)::before,
+  .prose blockquote :where(p)::after {
+    content: none;
+  }
+
+  /* Inline code gets a background chip; fenced code blocks (already inside <pre>,
+     which has its own background via --tw-prose-pre-bg) are left alone. */
+  .prose :where(code):not(:where(pre code)) {
+    background: hsl(var(--muted));
+    padding: 0.15em 0.4em;
+    border-radius: 0.35em;
+    font-size: 0.9em;
+  }
+  .prose :where(code):not(:where(pre code))::before,
+  .prose :where(code):not(:where(pre code))::after {
+    content: none;
+  }
+
+  .prose img { border-radius: 0.75rem; border: 1px solid hsl(var(--border)); }
+
+  /* Typography's own table defaults give `thead th` a little padding but give
+     `tbody td` none at all (confirmed by reading the compiled CSS — not a guess),
+     so body-row text sits flush against the cell edge. Same padding on both. */
+  .prose :where(th, td) { padding: 0.85rem 1.25rem; }
+
+  /* Optional <Callout type="info|tip|warning|success"> — see src/mdx-components.tsx */
+  .callout { display: flex; gap: 0.75rem; align-items: flex-start; margin: 1.75em 0; padding: 1.1em 1.4em; border-radius: 0.75rem; border-width: 1px; }
+  .callout-icon { flex-shrink: 0; margin-top: 0.15em; width: 1.25rem; height: 1.25rem; }
+  .callout-info { background: hsl(var(--callout-info-bg)); border-color: hsl(var(--callout-info-border)); color: hsl(var(--callout-info-text)); }
+  .callout-tip { background: hsl(var(--callout-tip-bg)); border-color: hsl(var(--callout-tip-border)); color: hsl(var(--callout-tip-text)); }
+  .callout-warning { background: hsl(var(--callout-warning-bg)); border-color: hsl(var(--callout-warning-border)); color: hsl(var(--callout-warning-text)); }
+  .callout-success { background: hsl(var(--callout-success-bg)); border-color: hsl(var(--callout-success-border)); color: hsl(var(--callout-success-text)); }
+}
+
+/* Trending Now auto-scroll carousel */
+@keyframes auto-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-auto-scroll {
+  animation: auto-scroll 40s linear infinite;
+}
+
+.animate-auto-scroll:hover {
+  animation-play-state: paused;
+}

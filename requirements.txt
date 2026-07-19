@@ -1,0 +1,2 @@
+-e ./pipeline/basic-info
+-e ./pipeline/seo-scout

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "site-plan.schema.json",
+  "title": "Game Wiki Site Plan",
+  "type": "object",
+  "required": ["schemaVersion", "game", "languages", "categoryPolicy", "categories"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "game": {"type": "object", "required": ["name", "slug", "platform"]},
+    "languages": {"const": ["en", "es", "de", "fr", "ja", "ko"]},
+    "categoryPolicy": {"type": "object", "required": ["minimum", "maximum"]},
+    "categories": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["id", "order", "labels", "description", "keywords", "status", "articleCount"]
+      }
+    }
+  }
+}
