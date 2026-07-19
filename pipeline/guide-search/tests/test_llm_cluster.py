@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import urllib.error
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
@@ -9,12 +10,33 @@ from get_search.classifier import Candidate
 from get_search.llm_cluster import (
     LLMCall,
     _responses_text_and_annotations,
+    _request_toapis,
     apply_cluster_decisions,
     cluster_candidates,
 )
 
 
 class LLMClusterTests(unittest.TestCase):
+    def test_toapis_request_retries_transient_ssl_url_error(self) -> None:
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return False
+
+            def read(self):
+                return b'{"ok": true}'
+
+        with patch("get_search.llm_cluster.time.sleep"), patch(
+            "get_search.llm_cluster.urllib.request.urlopen",
+            side_effect=[urllib.error.URLError("SSL EOF"), Response()],
+        ) as urlopen:
+            result = _request_toapis("secret", "https://example.invalid", {"x": 1})
+
+        self.assertEqual(result, {"ok": True})
+        self.assertEqual(urlopen.call_count, 2)
+
     def test_cluster_batches_every_candidate_and_reuses_checkpoints(self) -> None:
         candidates = [
             self.candidate(f"hellhole topic {index}", {"autocomplete"}, 100 - index)

@@ -14,11 +14,18 @@ from typing import Dict, List, Optional, Tuple
 from .config import Config
 
 
+QUOTA_ERROR_MARKERS = (
+    "insufficient_user_quota",
+    "用户额度不足",
+    "预扣费额度失败",
+)
+
+
 class LLMClient:
     """Async LLM API client with retry, stats, and batch support."""
 
     def __init__(self):
-        self.api_keys = Config.LLM_API_KEYS or [Config.LLM_API_KEY]
+        self.api_keys = list(dict.fromkeys(Config.LLM_API_KEYS or [Config.LLM_API_KEY]))
         self.base_url = Config.LLM_API_BASE_URL.rstrip('/')
         self.api_url = f"{self.base_url}/chat/completions"
         self.model = Config.LLM_MODEL
@@ -31,6 +38,7 @@ class LLMClient:
         self.retry_delay = Config.LLM_RETRY_DELAY
 
         self._key_index = 0
+        self._exhausted_keys: set[str] = set()
 
         self.stats = {
             'total_requests': 0,
@@ -45,9 +53,15 @@ class LLMClient:
 
     def _next_key(self) -> str:
         """轮询取下一个 key。并发请求各自推进游标，天然把任务打散到不同 key 上。"""
-        key = self.api_keys[self._key_index % len(self.api_keys)]
-        self._key_index += 1
-        return key
+        for _ in range(len(self.api_keys)):
+            key = self.api_keys[self._key_index % len(self.api_keys)]
+            self._key_index += 1
+            if key not in self._exhausted_keys:
+                return key
+        raise RuntimeError("All configured LLM API keys have insufficient quota")
+
+    def _has_available_key(self) -> bool:
+        return any(key not in self._exhausted_keys for key in self.api_keys)
 
     def _headers(self, api_key: str) -> Dict:
         return {
@@ -74,8 +88,14 @@ class LLMClient:
         active_prompt = prompt
         completion_limit = max_tokens or self.max_tokens
 
-        for attempt in range(self.retry_attempts):
-            api_key = self._next_key()
+        attempt_limit = max(self.retry_attempts, len(self.api_keys))
+        for attempt in range(attempt_limit):
+            try:
+                api_key = self._next_key()
+            except RuntimeError as exc:
+                print(f"  ❌ {label}: {exc}")
+                self.stats['failed_requests'] += 1
+                return None
             try:
                 payload = {
                     "model": self.model,
@@ -117,8 +137,8 @@ class LLMClient:
                             self.stats['total_tokens'] += data['usage'].get('total_tokens', 0)
 
                         if not content or not content.strip():
-                            print(f"  ⚠️  Empty response for {label} (attempt {attempt+1}/{self.retry_attempts})")
-                            if attempt < self.retry_attempts - 1:
+                            print(f"  ⚠️  Empty response for {label} (attempt {attempt+1}/{attempt_limit})")
+                            if attempt < attempt_limit - 1:
                                 await asyncio.sleep(self.retry_delay * (attempt + 1))
                                 continue
                             self.stats['failed_requests'] += 1
@@ -128,9 +148,9 @@ class LLMClient:
                             print(
                                 f"  ⚠️  Incomplete response for {label}: "
                                 f"finish_reason={finish_reason} "
-                                f"(attempt {attempt+1}/{self.retry_attempts})"
+                                f"(attempt {attempt+1}/{attempt_limit})"
                             )
-                            if attempt < self.retry_attempts - 1:
+                            if attempt < attempt_limit - 1:
                                 if finish_reason == 'length':
                                     retry_instruction = length_retry_instruction or (
                                         "The previous response was truncated. Regenerate the complete "
@@ -159,16 +179,29 @@ class LLMClient:
 
                     else:
                         err = await resp.text()
+                        if resp.status in {402, 403} and any(
+                            marker in err for marker in QUOTA_ERROR_MARKERS
+                        ):
+                            self._exhausted_keys.add(api_key)
+                            slot = self.api_keys.index(api_key) + 1
+                            print(
+                                f"  ❌ LLM key slot {slot} has insufficient quota "
+                                f"for {label}; disabling it for this run"
+                            )
+                            if self._has_available_key() and attempt < attempt_limit - 1:
+                                continue
+                            self.stats['failed_requests'] += 1
+                            return None
                         print(f"  ❌ API {resp.status} for {label}: {err[:300]}")
-                        if attempt < self.retry_attempts - 1:
+                        if attempt < attempt_limit - 1:
                             await asyncio.sleep(self.retry_delay * (attempt + 1))
                             continue
                         self.stats['failed_requests'] += 1
                         return None
 
             except asyncio.TimeoutError:
-                print(f"  ⏱️  Timeout for {label} (attempt {attempt+1}/{self.retry_attempts})")
-                if attempt < self.retry_attempts - 1:
+                print(f"  ⏱️  Timeout for {label} (attempt {attempt+1}/{attempt_limit})")
+                if attempt < attempt_limit - 1:
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
                     continue
                 self.stats['failed_requests'] += 1
@@ -176,7 +209,7 @@ class LLMClient:
 
             except Exception as e:
                 print(f"  ❌ Exception for {label}: {e}")
-                if attempt < self.retry_attempts - 1:
+                if attempt < attempt_limit - 1:
                     await asyncio.sleep(self.retry_delay * (attempt + 1))
                     continue
                 self.stats['failed_requests'] += 1
@@ -229,6 +262,16 @@ class LLMClient:
 
                 completed = i + len(batch)
                 print(f"  ✅ {completed}/{len(prompts)} done")
+
+                if not self._has_available_key():
+                    remaining = prompts[completed:]
+                    results.extend((meta, None) for _prompt, meta in remaining)
+                    if remaining:
+                        print(
+                            f"  ⛔ All LLM key slots are out of quota; "
+                            f"skipping {len(remaining)} remaining request(s)"
+                        )
+                    break
 
                 if i + batch_size < len(prompts):
                     await asyncio.sleep(1)

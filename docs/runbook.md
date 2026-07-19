@@ -25,9 +25,11 @@ python gamewiki.py "GAME NAME"
 - 默认直接重跑同一命令；所有阶段先验证 checkpoint。
 - API 限速、网络错误：直接重跑，不加 overwrite。
 - Guide Search 聚类失败：复用 `.gamewiki/planning/guide-search/raw`。
+- Guide Search 的 ToAPIs 请求遇到 SSL EOF、429 或常见 5xx/52x：自动指数退避重试，已完成的聚类 batch checkpoint 不会重做。
 - 某语言缺失或截断：SEO Scout 只删除并重翻无效文件。
 - 英文生成出现 `finish_reason=length`：客户端会以 10,000-token 上限和无表格紧凑提示词重试；仍失败会返回非零并把 Articles stage 标记为 failed。不要使用 overwrite。
 - 翻译正文完整但 SERP 标题/描述略超限：流水线会本地压缩元数据后重新执行完整性校验，不重翻正文。
+- LLM 返回余额不足：当前 key slot 会被禁用；所有 key 都无额度时立即停止剩余批次并保留已有文章。充值后不加 overwrite 续跑。
 - 主题稀少：检查 Suggest 和多视频共同支持的机制主题；接受较少的可靠文章，不能合成 fallback 关键词。
 - 模板失败：修工厂 `template/` 后重跑，不能重新付费生成上游内容。
 

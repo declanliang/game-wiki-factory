@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import hashlib
 import re
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -19,6 +20,8 @@ DEFAULT_CONTEXT_MODEL = "gpt-5.3-codex-official"
 DEFAULT_CLUSTER_MODEL = "gpt-5.6-terra"
 LOW_CONFIDENCE_THRESHOLD = 0.55
 CLUSTER_POLICY_VERSION = 3
+TOAPIS_RETRY_ATTEMPTS = 3
+TOAPIS_RETRYABLE_HTTP = {408, 425, 429, 500, 502, 503, 504, 520, 522, 524}
 
 FORBIDDEN_STANDALONE = re.compile(
     r"\b(reddit|discord|trello|logo|youtube|game\s*link)\b", re.IGNORECASE
@@ -69,23 +72,47 @@ def _request_toapis(
     payload: dict[str, Any],
     timeout_seconds: int = 240,
 ) -> dict[str, Any]:
-    request = urllib.request.Request(
-        url,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": TOAPIS_USER_AGENT,
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            raw = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")[:2000]
-        raise RuntimeError(f"ToAPIs HTTP {exc.code}: {detail}") from exc
+    encoded_payload = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    last_error: Exception | None = None
+    raw: Any = None
+    for attempt in range(1, TOAPIS_RETRY_ATTEMPTS + 1):
+        request = urllib.request.Request(
+            url,
+            data=encoded_payload,
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": TOAPIS_USER_AGENT,
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+                raw = json.loads(response.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")[:2000]
+            if exc.code not in TOAPIS_RETRYABLE_HTTP:
+                raise RuntimeError(f"ToAPIs HTTP {exc.code}: {detail}") from exc
+            last_error = RuntimeError(f"ToAPIs HTTP {exc.code}: {detail}")
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as exc:
+            last_error = exc
+
+        if attempt < TOAPIS_RETRY_ATTEMPTS:
+            delay = 2 ** (attempt - 1)
+            print(
+                f"[warning] ToAPIs transient request failure "
+                f"({attempt}/{TOAPIS_RETRY_ATTEMPTS}): {last_error}; "
+                f"retrying in {delay}s"
+            )
+            time.sleep(delay)
+    else:
+        raise RuntimeError(
+            f"ToAPIs request failed after {TOAPIS_RETRY_ATTEMPTS} attempts: "
+            f"{last_error}"
+        ) from last_error
+
     if not isinstance(raw, dict):
         raise RuntimeError("ToAPIs returned a non-object response")
     return raw

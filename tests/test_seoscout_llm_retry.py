@@ -15,10 +15,10 @@ from seoscout.core.llm_client import LLMClient
 
 
 class _FakeResponse:
-    status = 200
-
-    def __init__(self, payload):
+    def __init__(self, payload, status=200, text=""):
         self.payload = payload
+        self.status = status
+        self._text = text
 
     async def __aenter__(self):
         return self
@@ -29,6 +29,9 @@ class _FakeResponse:
     async def json(self):
         return self.payload
 
+    async def text(self):
+        return self._text
+
 
 class _FakeSession:
     def __init__(self, responses):
@@ -37,7 +40,8 @@ class _FakeSession:
 
     def post(self, _url, *, json, headers, timeout):
         self.payloads.append(json)
-        return _FakeResponse(next(self.responses))
+        response = next(self.responses)
+        return response if isinstance(response, _FakeResponse) else _FakeResponse(response)
 
 
 def _response(content: str, finish_reason: str):
@@ -84,6 +88,25 @@ class LLMRetryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(session.payloads[0]["messages"][1]["content"], "original prompt")
         self.assertIn("RETRY AFTER TRUNCATION", session.payloads[1]["messages"][1]["content"])
         self.assertIn("Do not use Markdown tables", session.payloads[1]["messages"][1]["content"])
+
+    async def test_quota_error_disables_key_and_avoids_future_requests(self):
+        Config.LLM_API_KEYS = ["quota-key"]
+        client = LLMClient()
+        session = _FakeSession([
+            _FakeResponse(
+                {},
+                status=403,
+                text='{"error":{"code":"insufficient_user_quota"}}',
+            )
+        ])
+
+        with redirect_stdout(StringIO()):
+            first = await client.generate_single(session, "prompt", {"keyword": "first"})
+            second = await client.generate_single(session, "prompt", {"keyword": "second"})
+
+        self.assertIsNone(first)
+        self.assertIsNone(second)
+        self.assertEqual(len(session.payloads), 1)
 
 
 if __name__ == "__main__":
