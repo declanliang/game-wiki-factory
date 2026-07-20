@@ -200,7 +200,7 @@ class YouTube:
 
     # 过滤词里这些词不带辨识度（几乎每个 Roblox 游戏标题都有），
     # 用来判断相关性时忽略掉，避免"必须完整匹配整个短语"的过严过滤
-    _GENERIC_FILTER_WORDS = {"roblox", "game", "games", "the", "a", "an", "of", "in", "on", "and", "for"}
+    _GENERIC_FILTER_WORDS = {"roblox", "steam", "game", "games", "the", "a", "an", "of", "in", "on", "and", "for"}
 
     def _significant_words(self, filter_keyword: str) -> List[str]:
         """从过滤词里提取有辨识度的词（去掉通用词和过短的词）"""

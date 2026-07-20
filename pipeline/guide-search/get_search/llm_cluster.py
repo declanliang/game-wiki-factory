@@ -333,8 +333,8 @@ def research_game_context(
 ) -> LLMCall:
     focus = [item.keyword for item in candidates[:80]]
     instructions = (
-        "You research Roblox game terminology for SEO clustering. You must use web search. "
-        "Prefer Roblox game pages, creator/community sources, and reliable recent sources. "
+        "You research game terminology for SEO clustering. You must use web search. "
+        "Prefer official platform pages, creator/community sources, and reliable recent sources. "
         "Do not use competitor wikis as evidence. Never invent names, dates, mechanics, or URLs. "
         "Separate the game's real concepts from generic video-title language. Return only one JSON "
         "object matching the supplied schema, without Markdown fences or commentary."
@@ -389,9 +389,9 @@ def _cluster_candidate_batch(
             "role": "system",
             "content": (
                 "You are the final editorial keyword clustering gate for an information-rich "
-                "unofficial Roblox game guide site. "
+                "unofficial game guide site. "
                 "Decide every supplied candidate exactly once. Ground semantic judgments in the supplied "
-                "game context and evidence. Treat trusted_basic_info from the upstream Roblox identity "
+                "game context and evidence. Treat trusted_basic_info from the upstream platform identity "
                 "pipeline as authoritative game-specific evidence. Never create a keyword that is not in "
                 "the candidate list. Strictly drop terms about another game or an unrelated meaning of the "
                 "same name. Keep same-game topics that can support a useful guide page even when search "

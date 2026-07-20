@@ -6,13 +6,14 @@ from typing import Any
 from .util import utc_now
 
 
-SYSTEM_JSON = """You are a meticulous game research and website configuration system. Return only JSON matching the supplied schema. Never invent URLs, codes, dates, counts, mechanics, or community consensus. Missing information must be null or omitted only where the schema permits it. Roblox API facts supplied by the user are authoritative and must not be changed."""
+SYSTEM_JSON = """You are a meticulous game research and website configuration system. Return only JSON matching the supplied schema. Never invent URLs, codes, dates, counts, mechanics, or community consensus. Missing information must be null or omitted only where the schema permits it. Official platform API facts supplied by the user are authoritative and must not be changed."""
 
 
 def research_prompt(facts: dict[str, Any]) -> str:
-    return f"""Research external official resources for this Roblox game as of {utc_now()[:10]}.
+    platform = facts.get("identity", {}).get("platform", "game platform")
+    return f"""Research external official resources for this {platform} game as of {utc_now()[:10]}.
 
-Authoritative Roblox facts:
+Authoritative platform facts:
 {json.dumps(facts, ensure_ascii=False, indent=2)}
 
 Find only these missing fields:
@@ -24,16 +25,16 @@ Find only these missing fields:
 6. Return moduleIdeas as an empty array in this task; module research runs separately.
 
 Rules:
-- Prefer Roblox, the developer's owned pages, official social accounts, official video descriptions and official announcements.
+- Prefer the official platform page/API, the developer's owned pages, official social accounts, official video descriptions and official announcements.
 - Do not use competitor wiki, Fandom, wiki.gg, fextralife or generic aggregation pages as proof or frontend references.
 - A URL must have appeared in an actual search result/page. Never construct a social URL from an assumed username.
-- Do not re-research or change Place ID, Universe ID, creator, visits, favorites or player count.
+- Do not re-research or change platform IDs, creator/developer, official release data, reviews, visits, favorites or player counts.
 - Set partial=true if important requested areas remain unresolved.
     """
 
 
 def language_market_prompt(facts: dict[str, Any]) -> str:
-    return f"""Research the language-market demand for this specific Roblox game as of {utc_now()[:10]}.
+    return f"""Research the language-market demand for this specific game as of {utc_now()[:10]}.
 
 VERIFIED GAME CONTEXT:
 {json.dumps(facts, ensure_ascii=False, indent=2)}
@@ -51,9 +52,9 @@ Required investigation:
 Decision rules:
 - English and Spanish are always included as the monetization/coverage fallback. Other candidates must pass the evidence threshold.
 - Recommend include only when there is official localized support, or at least two independent game-specific sources from different publishers/domains.
-- A localized Roblox website route such as /pt/games/... only localizes Roblox's interface; it is not proof that the game itself has official localization or demand. Do not set officialSupport=true from that alone.
-- A single page, generic Roblox/anime popularity, search snippets without accessible pages, duplicated syndication, or obvious machine-translated SEO spam is insufficient.
-- Do not infer popularity from a country name, a creator name, or the existence of a language on Roblox.
+- A localized platform store route only localizes the store interface; it is not proof that the game itself has official localization or demand. Do not set officialSupport=true from that alone.
+- A single page, generic platform/genre popularity, search snippets without accessible pages, duplicated syndication, or obvious machine-translated SEO spam is insufficient.
+- Do not infer popularity from a country name, a creator name, or the existence of a language on the platform.
 - sourceUrls must be pages actually found during this task. Never invent or construct URLs.
 - Never investigate or recommend Chinese. Do not investigate Portuguese, Vietnamese, Filipino/Tagalog, Russian, Turkish, Indonesian, Thai, Arabic, Polish or other out-of-scope languages even if some organic discussion exists; the business policy prioritizes higher-value ad markets.
 - Keep the final recommended scope practical: no more than 4 included languages total, ranked implicitly by confidence; all non-default candidates that lack strong evidence should be exclude.
@@ -82,7 +83,7 @@ Requirements:
 - A guide item may include a lowercase category slug only when that category is supported by the supplied Basic Info evidence. Do not create hrefs or article slugs.
 - Sidebar always has 2 entries. Show real verified codes as Active; third-party supported codes as Unverified; fill remaining slots with code='Unavailable', reward='No verified active code found', status='Unavailable'.
 - English is language rank 1. Output 1-4 languages total, exclude Chinese, do not translate the brand name. Unsupported languages are low-confidence inference.
-- CTA play link must be the canonical Roblox URL. Other link fields are copied from facts or null.
+- CTA play link must be the canonical official platform URL. Other link fields are copied from facts or null.
 - Light and dark theme colors should use the icon palette when suitable and be distinct.
 - faviconPrompt describes a centered, simple, no-text 512x512 PNG icon inspired by the game's verified visual identity; do not copy third-party logos.
 - Do not add claims that are absent from FACTS/EVIDENCE.
@@ -106,7 +107,7 @@ Requirements:
 - Keep all other localized strings within the min/max lengths encoded in the supplied JSON Schema.
 - For Spanish, prefer established game phrasing such as "unidades invocadas", "subir de nivel", "jugar en equipo" and "jugadores por servidor"; avoid literal calques such as "los invocados", "júntate en modos" or "servidores de jugadores".
 - Values whose key is id or href, ends in Href, or is category are immutable identifiers: copy them byte-for-byte.
-- Do not translate URLs, route paths, category identifiers, redeem codes, or brand/proper names such as Roblox.
+- Do not translate URLs, route paths, category identifiers, redeem codes, or platform/proper names such as Roblox or Steam.
 - Keep Markdown ** emphasis and internal-link syntax intact while translating visible link text.
 - Do not leave English prose in the result. Proper names and immutable identifiers are the only expected English-looking values.
 - Return JSON only and match the supplied schema exactly.
@@ -154,7 +155,7 @@ Prefer concise idiomatic grammar over telegraphic wording. For Spanish, use natu
 
 
 def modules_prompt(facts: dict[str, Any], evidence: dict[str, Any]) -> str:
-    return f"""Create 4-8 English homepage Explore modules for this Roblox game. Research only when the supplied facts do not contain enough detail.
+    return f"""Create 4-8 English homepage Explore modules for this game. Research only when the supplied facts do not contain enough detail.
 
 FACTS:
 {json.dumps(facts, ensure_ascii=False, indent=2)}
@@ -167,7 +168,7 @@ Rules:
 - Module names start with the canonical game name.
 - displayType is exactly code-cards, step-by-step, tier-grid, or card-list.
 - Each module has 2-4 useful highlights and at least one real accessible reference.
-- References must not include competitor sites, Fandom, wiki.gg, fextralife, or aggregation wikis. Prefer Roblox, creator-owned pages, official social pages/videos and authoritative platform documentation.
+- References must not include competitor sites, Fandom, wiki.gg, fextralife, or aggregation wikis. Prefer official platform pages, creator-owned pages, official social pages/videos and authoritative platform documentation.
 - Codes module may honestly say no verified code exists. Never invent codes.
 - Tier lists are allowed only with versioned, cited evidence; otherwise omit them or mark editorial-draft and clearly phrase details as topics to evaluate, not rankings.
 - Generic beginner steps may be editorial-draft, but specific mechanics/items must be supported by the facts or references.

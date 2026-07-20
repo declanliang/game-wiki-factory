@@ -164,17 +164,37 @@ STRUCTURAL_LINE_PATTERNS = {
 }
 
 
-def _compact_serp_field(value: str, limit: int, lang_code: str) -> str:
+def _compact_serp_field(
+    value: str, limit: int, lang_code: str, *, prefer_sentence: bool = False
+) -> str:
     """Shorten over-limit translated metadata without retranslating the body."""
     value = value.strip()
     if len(value) <= limit:
         return value
+    if prefer_sentence:
+        prefix = value[:limit]
+        sentence_ends = [match.end() for match in re.finditer(r"[.!?。！？]", prefix)]
+        # A concise complete sentence is preferable to appending a fragment
+        # merely to consume more of the SERP description allowance.
+        usable = [end for end in sentence_ends if end >= max(30, int(limit * 0.35))]
+        if usable:
+            return prefix[:usable[-1]].strip()
     if lang_code in CJK_LANGUAGES:
-        return value[:limit].rstrip(" ,.;:!?、。，：；！？-–—")
+        candidate = value[: max(1, limit - 1)].rstrip(" ,.;:!?、。，：；！？-–—")
+        return candidate + ("…" if prefer_sentence else "")
     candidate = value[:limit + 1].rsplit(" ", 1)[0]
     if len(candidate) < max(20, int(limit * 0.6)):
         candidate = value[:limit]
-    return candidate.rstrip(" ,.;:!?-–—")
+    candidate = candidate.rstrip(" ,.;:!?-–—&")
+    if not prefer_sentence:
+        candidate = re.sub(
+            r"\s+(?:and|or|with|for|to|und|oder|mit|für|y|o|con|para|et|ou|avec|pour)$",
+            "",
+            candidate,
+            flags=re.I,
+        ).rstrip(" ,.;:!?-–—&")
+        return candidate
+    return candidate[: max(1, limit - 1)].rstrip(" ,.;:!?-–—&") + "…"
 
 
 def _compact_overlong_metadata(raw_content: str, lang_code: str) -> str | None:
@@ -194,7 +214,7 @@ def _compact_overlong_metadata(raw_content: str, lang_code: str) -> str | None:
     description_limit = 90 if is_cjk else 165
     compact_title = _compact_serp_field(title, title_limit, lang_code)
     compact_description = _compact_serp_field(
-        description, description_limit, lang_code
+        description, description_limit, lang_code, prefer_sentence=True
     )
     if compact_title == title and compact_description == description:
         return None

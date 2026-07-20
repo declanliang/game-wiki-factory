@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from PIL import Image
+from PIL import Image, ImageOps
 
 from .util import dump_json, utc_now
 
@@ -54,14 +54,15 @@ def build_assets(facts: dict[str, Any], assets_dir: Path) -> tuple[dict[str, Any
             image = Image.open(io.BytesIO(body)).convert("RGBA")
             image.save(favicon_dir / "source-icon.png", format="PNG")
             palette = _dominant_hsl(image)
+            square = ImageOps.fit(image, (512, 512), method=Image.Resampling.LANCZOS)
             sizes = {
                 "favicon-16x16.png": 16, "favicon-32x32.png": 32,
                 "apple-touch-icon.png": 180, "android-chrome-192x192.png": 192,
                 "android-chrome-512x512.png": 512,
             }
             for name, size in sizes.items():
-                image.resize((size, size), Image.Resampling.LANCZOS).save(favicon_dir / name, "PNG")
-            image.resize((64, 64), Image.Resampling.LANCZOS).save(
+                square.resize((size, size), Image.Resampling.LANCZOS).save(favicon_dir / name, "PNG")
+            square.resize((64, 64), Image.Resampling.LANCZOS).save(
                 favicon_dir / "favicon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64)]
             )
             manifest = {

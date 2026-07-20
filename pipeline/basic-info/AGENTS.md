@@ -4,7 +4,7 @@
 
 ## 项目目标
 
-只输入 Roblox 游戏名，输出可供通用 Wiki 网站模板使用的首页配置、模块、来源证据和图片资产。
+只输入 Roblox 或 Steam 游戏名，输出可供通用 Wiki 网站模板使用的首页配置、模块、来源证据和图片资产。
 
 当前范围只包括原始课程文档的“## 一、首页数据采集”，不包括内页 SEO 文章流程。
 
@@ -30,7 +30,8 @@ python -m gamewiki_automation "Anime Expeditions"
 - 不把 Tavily 重新加入运行链。
 - 不把 OpenRouter 重新加入运行链；主模型 API 是 ToAPIs Responses API。
 - 联网必须使用支持 `web_search_preview` 的 `TOAPIS_WEB_MODEL`，默认 `gpt-5.3-codex-official`。
-- 不允许 LLM 覆盖 Roblox API 已确认的身份和动态事实。
+- 不允许 LLM 覆盖 Roblox 或 Steam 官方 API 已确认的身份和动态事实。
+- Roblox 使用 Place/Universe，Steam 使用 App ID；平台字段不可混用。Steam 手柄支持不可推导为 Deck Verified/Playable。
 - 不允许虚构 URL、兑换码、数值、日期、玩法或社区共识。
 - 不允许将普通 HTTP 200 直接等同于“官方所有权已验证”。
 - 第三方代码必须保持 `claimed-active` / `Unverified`。
@@ -50,6 +51,7 @@ python -m gamewiki_automation "Anime Expeditions"
 |`config.py`|`.env` 与默认配置|
 |`http.py`|重试和 HTTP 缓存|
 |`roblox.py`|Discover、身份评分、Roblox 官方事实|
+|`steam.py`|Steam Store 搜索、App ID 身份与 Steam 官方事实|
 |`llm.py`|ToAPIs Responses、Perplexity 降级、JSON 修复与模型缓存|
 |`prompts.py`|外部事实、语言市场、首页和模块 Prompt|
 |`schemas.py`|研究、首页和模块运行时 Schema|

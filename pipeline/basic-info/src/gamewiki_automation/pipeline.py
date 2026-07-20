@@ -13,7 +13,8 @@ from .llm import LlmClient
 from .media import build_assets
 from .prompts import SYSTEM_JSON, homepage_prompt, localized_site_content_prompt, localized_site_content_revision_prompt, localized_value_revision_prompt, modules_prompt, research_prompt
 from .report import render_basic_info
-from .roblox import RobloxClient
+from .roblox import IdentityError, RobloxClient
+from .steam import SteamClient, steam_app_id
 from .schemas import DEFAULT_LANGUAGE_CODES, HOMEPAGE_SCHEMA, MODULES_SCHEMA, MONETIZATION_LANGUAGE_CODES, RESEARCH_SCHEMA, TEMPLATE_SITE_CONTENT_SCHEMA
 from .template_contract import build_site_content, build_site_identity, publish_template_package, validate_localized_site_content, validate_template_contract
 from .util import dump_json, load_json, safe_public_url, slugify, utc_now
@@ -25,9 +26,16 @@ class Pipeline:
         self.settings = settings
         self.http = CachedHttpClient(settings.cache_dir, timeout=45, refresh=settings.refresh)
         self.roblox = RobloxClient(self.http)
+        self.steam = SteamClient(self.http)
         self.llm = LlmClient(settings, self.http)
 
-    def run(self, game_name: str) -> tuple[Path, dict[str, Any]]:
+    def run(
+        self,
+        game_name: str,
+        *,
+        platform: str = "auto",
+        official_url: str | None = None,
+    ) -> tuple[Path, dict[str, Any]]:
         started = time.monotonic()
         provisional_dir = self.settings.output_dir / slugify(game_name)
         previous_rejected: list[dict[str, Any]] = []
@@ -40,24 +48,65 @@ class Pipeline:
         raw_dir = provisional_dir / "raw"
         raw_dir.mkdir(parents=True, exist_ok=True)
 
-        selected, candidates = self.roblox.select_identity(game_name)
-        dump_json(raw_dir / "identity.json", {"query": game_name, "selected": selected, "candidates": candidates, "retrievedAt": utc_now()})
-        facts, evidence, roblox_raw = self.roblox.collect(game_name, selected)
-        current_rejected = facts.get("identity", {}).setdefault("rejectedCandidates", [])
-        known_place_ids = {str(item.get("placeId")) for item in current_rejected}
-        selected_place_id = str(facts.get("identity", {}).get("placeId"))
-        for candidate in previous_rejected:
-            place_id = str(candidate.get("placeId"))
-            if place_id and place_id != selected_place_id and place_id not in known_place_ids:
-                current_rejected.append(candidate)
-                known_place_ids.add(place_id)
+        resolved_platform = platform.casefold()
+        if official_url:
+            if steam_app_id(official_url):
+                resolved_platform = "steam"
+            elif "roblox.com/games/" in official_url.casefold():
+                resolved_platform = "roblox"
+            else:
+                raise IdentityError("Official URL must be a supported Roblox game or Steam app URL")
+        identity_errors: list[str] = []
+        selected: dict[str, Any] | None = None
+        candidates: list[dict[str, Any]] = []
+        clients = (
+            [("roblox", self.roblox), ("steam", self.steam)]
+            if resolved_platform == "auto"
+            else [(resolved_platform, self.steam if resolved_platform == "steam" else self.roblox)]
+        )
+        try:
+            for candidate_platform, client in clients:
+                try:
+                    if candidate_platform == "steam":
+                        selected, candidates = client.select_identity(game_name, official_url)
+                    else:
+                        selected, candidates = client.select_identity(game_name, official_url)
+                    resolved_platform = candidate_platform
+                    break
+                except IdentityError as exc:
+                    identity_errors.append(f"{candidate_platform}: {exc}")
+                    candidates.extend({**item, "platform": candidate_platform} for item in exc.candidates)
+            if selected is None:
+                raise IdentityError("; ".join(identity_errors), candidates)
+        except IdentityError as exc:
+            dump_json(raw_dir / "identity.json", {
+                "query": game_name,
+                "selected": None,
+                "candidates": exc.candidates,
+                "error": str(exc),
+                "retrievedAt": utc_now(),
+            })
+            raise
+        dump_json(raw_dir / "identity.json", {"query": game_name, "platform": resolved_platform, "selected": selected, "candidates": candidates, "retrievedAt": utc_now()})
+        if resolved_platform == "steam":
+            facts, evidence, platform_raw = self.steam.collect(game_name, selected)
+        else:
+            facts, evidence, platform_raw = self.roblox.collect(game_name, selected)
+            current_rejected = facts.get("identity", {}).setdefault("rejectedCandidates", [])
+            known_place_ids = {str(item.get("placeId")) for item in current_rejected}
+            selected_place_id = str(facts.get("identity", {}).get("placeId"))
+            for candidate in previous_rejected:
+                place_id = str(candidate.get("placeId"))
+                if place_id and place_id != selected_place_id and place_id not in known_place_ids:
+                    current_rejected.append(candidate)
+                    known_place_ids.add(place_id)
         output_dir = self.settings.output_dir / facts["identity"]["slug"]
         if output_dir != provisional_dir:
             output_dir.mkdir(parents=True, exist_ok=True)
             raw_dir = output_dir / "raw"
             raw_dir.mkdir(exist_ok=True)
             dump_json(raw_dir / "identity.json", {"query": game_name, "selected": selected, "candidates": candidates, "retrievedAt": utc_now()})
-        dump_json(raw_dir / "roblox.json", roblox_raw)
+        dump_json(raw_dir / f"{resolved_platform}.json", platform_raw)
 
         research, research_meta = self.llm.generate(
             "external_research", SYSTEM_JSON, research_prompt(_research_facts(facts)), RESEARCH_SCHEMA, web=True, ttl=7 * 86400
@@ -277,8 +326,8 @@ class Pipeline:
         facts["researchNotes"] = research.get("notes", [])
         existing_rejected = facts["identity"].get("rejectedCandidates", [])
         creator_rejected = self._creator_link_candidates(
-            facts["officialLinks"].get("website"), facts["identity"]["placeId"]
-        )
+            facts["officialLinks"].get("website"), facts["identity"].get("placeId", "")
+        ) if facts.get("identity", {}).get("platform") == "Roblox" else []
         merged_rejected: list[dict[str, Any]] = []
         seen_place_ids: set[str] = set()
         for candidate in [*existing_rejected, *creator_rejected]:
@@ -479,8 +528,10 @@ def _research_facts(facts: dict[str, Any]) -> dict[str, Any]:
         "developer": copy.deepcopy(facts.get("developer", {})),
         "game": copy.deepcopy(facts.get("game", {})),
         "officialLinks": {
+            "steam": facts.get("officialLinks", {}).get("steam"),
             "roblox": facts.get("officialLinks", {}).get("roblox"),
             "robloxGroup": facts.get("officialLinks", {}).get("robloxGroup"),
+            "website": facts.get("officialLinks", {}).get("website"),
         },
     }
 
@@ -490,7 +541,7 @@ def _language_research_facts(facts: dict[str, Any]) -> dict[str, Any]:
     return {
         "identity": {
             key: facts.get("identity", {}).get(key)
-            for key in ("canonicalName", "canonicalUrl", "placeId", "universeId")
+            for key in ("canonicalName", "canonicalUrl", "platform", "appId", "placeId", "universeId")
         },
         "developer": copy.deepcopy(facts.get("developer", {})),
         "officialDescription": facts.get("game", {}).get("officialDescription", ""),

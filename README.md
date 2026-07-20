@@ -1,6 +1,6 @@
 # Game Wiki Factory
 
-输入一个 Roblox 游戏名，自动生成一个可直接推送 GitHub、部署 Vercel 的多语言攻略站。
+输入一个 Roblox 或 Steam 游戏名，自动生成一个可直接推送 GitHub、部署 Vercel 的多语言攻略站。当前产品范围只覆盖这两个平台。
 
 这个仓库是唯一的“网站工厂”源码仓库，包含 Basic Info、Guide Search、SEO Scout、确定性规划契约和 Next.js 模板。具体游戏不会进入本仓库；默认生成到工厂同级目录，例如 `C:\Users\liang\Documents\Games\hellhole`。
 
@@ -10,6 +10,15 @@
 cd C:\Users\liang\Documents\Games\game-wiki-factory
 python gamewiki.py "GAME NAME"
 ```
+
+同名游戏或 Steam 游戏建议显式指定平台。Steam 最好同时提供官方商店 URL，以 App ID 确定身份：
+
+```powershell
+python gamewiki.py "Funnel Runners" --platform steam --official-url "https://store.steampowered.com/app/3712080/Funnel_Runners/"
+python gamewiki.py "Hellhole" --platform roblox
+```
+
+不指定 `--platform` 时会先尝试 Roblox、再尝试 Steam；身份存在歧义时流水线会停止，不会猜测。
 
 第一次执行创建网站；同一命令再次执行会验证并复用 checkpoint。普通续跑不要加 refresh/overwrite 参数。
 
@@ -141,7 +150,7 @@ python gamewiki.py resume <game-slug>
 - Basic Info 生成 `game-profile.json`，定义分类语义边界。
 - Basic Info 还可生成 2–4 个证据支持的 `home.guideSections`，为首页补充核心玩法、入门路径、成长和关键系统；模板只会把其中属于已发布 `site-plan` 分类的条目解析成链接。
 - Guide Search 调用 Google Suggest 主词和 a–z，并从多个视频共同支持的稳定机制中召回补充主题；单个娱乐视频不能独立创建文章。
-- 首页视频优先使用 Basic Info 已确认的 trailer；没有时只复用 Guide Search 已缓存的 YouTube 结果，选择标题完整匹配游戏名、明确为 Roblox、时长 2–60 分钟的最高排名长视频。选中结果只填充视频 ID，不把第三方频道冒充官方频道，也不新增 API 调用。
+- 首页视频优先使用 Basic Info 已确认的 trailer；没有时只复用 Guide Search 已缓存的 YouTube 结果，选择标题完整匹配游戏名、平台语义一致、时长 2–60 分钟的最高排名长视频。选中结果只填充视频 ID，不把第三方频道冒充官方频道，也不新增 API 调用。
 - `site-plan.json` 是分类、顺序、六语言标签、六语言分类描述和发布状态的唯一事实源。
 - 不为分类数量合成关键词；通常争取 3–5 个可靠文章主题，证据稀少时接受更少，分类最多 8 个。
 - `strategy/tips/tactics` 映射进 `guide`，但每个不同关键词仍生成独立文章。
@@ -158,9 +167,10 @@ python gamewiki.py resume <game-slug>
 
 ```text
 请在 C:\Users\liang\Documents\Games\game-wiki-factory 中，
-为 Roblox 游戏“GAME NAME”创建或续跑游戏 Wiki。
+为 PLATFORM（Roblox 或 Steam）游戏“GAME NAME”创建或续跑游戏 Wiki。
 
-执行：python gamewiki.py "GAME NAME"
+执行：python gamewiki.py "GAME NAME" --platform PLATFORM
+如果是 Steam 且已知商店页，再加：--official-url "STEAM URL"
 目标目录：C:\Users\liang\Documents\Games\<game-slug>
 
 要求：

@@ -240,6 +240,20 @@ class OrchestratorTests(unittest.TestCase):
         self.assertIsNotNone(selected)
         self.assertEqual(selected["videoId"], "exactVideo1")
 
+    def test_steam_featured_video_does_not_require_roblox_in_title(self) -> None:
+        raw = {"response": {"tasks": [{"result": [{"items": [{
+            "type": "youtube_video", "video_id": "steamVideo1",
+            "title": "Funnel Runners Official Release Trailer",
+            "description": "Co-op survival gameplay", "is_shorts": False,
+            "is_live": False, "duration_time_seconds": 180,
+            "rank_absolute": 1, "views_count": 10000,
+        }]}]}]}}
+
+        selected = orchestrator.select_featured_youtube_video(raw, "Funnel Runners", "Steam")
+
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected["videoId"], "steamVideo1")
+
     def test_featured_video_reconciliation_reuses_cached_youtube_without_changing_channel_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

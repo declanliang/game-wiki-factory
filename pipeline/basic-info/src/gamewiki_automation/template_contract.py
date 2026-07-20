@@ -48,7 +48,7 @@ def build_site_identity(facts: dict[str, Any]) -> dict[str, Any]:
     links = facts.get("officialLinks", {})
     return {
         "GAME_NAME": identity.get("canonicalName", ""),
-        "OFFICIAL_GAME_URL": identity.get("canonicalUrl") or links.get("roblox") or "",
+        "OFFICIAL_GAME_URL": identity.get("canonicalUrl") or links.get("steam") or links.get("roblox") or "",
         "DISCORD_URL": links.get("discord") or "",
         "YOUTUBE_CHANNEL_URL": links.get("youtube") or "",
         # Community wikis are not collected as official evidence; this optional value stays empty.
@@ -61,18 +61,19 @@ def build_site_identity(facts: dict[str, Any]) -> dict[str, Any]:
 def build_site_content(facts: dict[str, Any], homepage: dict[str, Any]) -> dict[str, Any]:
     """Convert internal research output to the current two-key template intake format."""
     name = facts["identity"]["canonicalName"]
+    platform = facts["identity"].get("platform") or "Game"
     game = facts.get("game", {})
     developer = facts.get("developer", {}).get("name") or ""
     home = homepage.get("home", {})
     genres = _genres(facts, homepage)
     created_date = _date_only(game.get("createdAt"))
-    updated_label = _month_year(game.get("updatedAt"))
+    updated_label = _month_year(game.get("updatedAt") or game.get("createdAt"))
     about_paragraphs = list(home.get("aboutGame", {}).get("paragraphs", []))[:3]
     site: dict[str, Any] = {
         "tagline": home.get("hero", {}).get("eyebrow") or "Fan-Made Community Wiki",
         "description": homepage.get("metadata", {}).get("description", ""),
-        "legalNotice": "Unofficial fan-made wiki. Not affiliated with Roblox or the game developer.",
-        "gamePlatform": ["Roblox"],
+        "legalNotice": f"Unofficial fan-made wiki. Not affiliated with {platform} or the game developer.",
+        "gamePlatform": [platform],
     }
     if genres:
         site["genre"] = genres
@@ -80,11 +81,15 @@ def build_site_content(facts: dict[str, Any], homepage: dict[str, Any]) -> dict[
         site["datePublished"] = created_date
     if developer:
         site["developer"] = developer
-    # Roblox API's price field is an evidence-backed access price when available.
+    # Platform API price is evidence-backed when available.
     price = game.get("price")
     if isinstance(price, (int, float)):
-        site["price"] = "Free" if price == 0 else f"{price:g} Robux"
-        site["priceCurrency"] = ""
+        if platform == "Steam":
+            site["price"] = "Free" if price == 0 else f"{price:.2f}"
+            site["priceCurrency"] = game.get("priceCurrency") or ""
+        else:
+            site["price"] = "Free" if price == 0 else f"{price:g} Robux"
+            site["priceCurrency"] = ""
 
     content: dict[str, Any] = {
         "site": site,
@@ -103,7 +108,7 @@ def build_site_content(facts: dict[str, Any], homepage: dict[str, Any]) -> dict[
                 "paragraphs": about_paragraphs,
                 "stats": [item for item in [
                     {"label": "Developer", "value": developer} if developer else None,
-                    {"label": "Platform", "value": "Roblox"},
+                    {"label": "Platform", "value": platform},
                     {"label": "Genre", "value": " / ".join(genres)} if genres else None,
                 ] if item],
             },
@@ -465,7 +470,7 @@ def _supported_active_codes(facts: dict[str, Any]) -> list[dict[str, Any]]:
 def _genres(facts: dict[str, Any], homepage: dict[str, Any]) -> list[str]:
     game = facts.get("game", {})
     result: list[str] = []
-    for value in [game.get("genreL1"), game.get("genreL2")]:
+    for value in [*(game.get("genres") or []), game.get("genreL1"), game.get("genreL2")]:
         if value and value.casefold() != "all" and value not in result:
             result.append(value)
     searchable = " ".join([game.get("officialDescription", "")] + [f"{item.get('name', '')} {item.get('value', '')}" for item in facts.get("gameplayFacts", [])]).casefold()
@@ -491,6 +496,18 @@ def _genres(facts: dict[str, Any], homepage: dict[str, Any]) -> list[str]:
 def _hero_stats(facts: dict[str, Any], genres: list[str], updated_label: str) -> list[dict[str, str]]:
     game = facts.get("game", {})
     dynamic = facts.get("dynamicStats", {})
+    platform = facts.get("identity", {}).get("platform")
+    if platform == "Steam":
+        candidates = [
+            {"value": updated_label, "label": "Released"} if updated_label else None,
+            {"value": compact_number(dynamic.get("reviewCount")), "label": "Steam Reviews"} if dynamic.get("reviewCount") else None,
+            {"value": str(game.get("maxPlayers")), "label": "Co-op Players"} if game.get("maxPlayers") else None,
+            {"value": "Early Access", "label": "Release Status"} if game.get("isEarlyAccess") else None,
+            {"value": genres[0], "label": "Genre"} if genres else None,
+            {"value": f"{dynamic.get('approvalPercent')}%", "label": "Positive Reviews"} if dynamic.get("approvalPercent") is not None else None,
+            {"value": str(game.get("achievements")), "label": "Achievements"} if game.get("achievements") else None,
+        ]
+        return [item for item in candidates if item][:4]
     candidates = [
         {"value": updated_label, "label": "Updated"} if updated_label else None,
         {"value": compact_number(dynamic.get("visits")), "label": "Visits"} if dynamic.get("visits") else None,
@@ -506,14 +523,15 @@ def _faq_items(facts: dict[str, Any], paragraphs: list[str], genres: list[str]) 
     name = facts["identity"]["canonicalName"]
     developer = facts.get("developer", {}).get("name") or "the game developer"
     game = facts.get("game", {})
+    platform = facts.get("identity", {}).get("platform") or "the official platform"
     items = [
-        {"question": f"What is {name}?", "answer": _plain(paragraphs[0]) if paragraphs else f"{name} is a Roblox experience."},
+        {"question": f"What is {name}?", "answer": _plain(paragraphs[0]) if paragraphs else f"{name} is a game available on {platform}."},
         {"question": f"Who developed {name}?", "answer": f"{name} is developed by {developer}."},
-        {"question": f"Where can I play {name}?", "answer": f"You can play {name} on Roblox through its official experience page."},
-        {"question": f"When was {name} published?", "answer": f"{name} was first published on Roblox on {_date_only(game.get('createdAt'))}."},
+        {"question": f"Where can I play {name}?", "answer": f"You can play {name} through its official {platform} page."},
+        {"question": f"When was {name} published?", "answer": f"{name} was released on {platform} on {_date_only(game.get('createdAt'))}."},
     ]
     if game.get("maxPlayers"):
-        items.append({"question": f"How many players can join {name}?", "answer": f"The official Roblox configuration allows up to {game['maxPlayers']} players in a server."})
+        items.append({"question": f"How many players can join {name}?", "answer": f"The official description supports up to {game['maxPlayers']} players in one co-op session."})
     elif genres:
         items.append({"question": f"What genre is {name}?", "answer": f"{name} is categorized as {' / '.join(genres)}."})
     return items[:6]
@@ -610,7 +628,7 @@ def _is_immutable_locale_path(path: str) -> bool:
 def _is_translatable_prose(path: str, value: str, game_name: str) -> bool:
     if _is_immutable_locale_path(path) or not re.search(r"[A-Za-z]{3}", value):
         return False
-    if value in {game_name, "Roblox", "USD", "Free"} or re.fullmatch(r"\d[\d.,+% -]*", value):
+    if value in {game_name, "Roblox", "Steam", "USD", "Free"} or re.fullmatch(r"\d[\d.,+% -]*", value):
         return False
     key = path.rsplit(".", 1)[-1]
     if key in {"datePublished", "priceCurrency", "developer"}:

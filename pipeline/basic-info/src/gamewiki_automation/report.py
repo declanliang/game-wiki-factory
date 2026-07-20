@@ -9,27 +9,33 @@ def render_basic_info(facts: dict[str, Any], evidence: dict[str, Any], homepage:
     identity = facts["identity"]
     links = facts["officialLinks"]
     stats = facts["dynamicStats"]
+    platform = identity.get("platform") or "Platform"
     home = homepage["home"]
     lines = [
         f"# {identity['canonicalName']} 首页基础信息",
         "",
-        f"> 自动采集状态：**{validation['status']}** · Roblox 数据时间：{stats['retrievedAt']}",
+        f"> 自动采集状态：**{validation['status']}** · {platform} 数据时间：{stats['retrievedAt']}",
         "",
         "## 1. 游戏身份与官方链接",
         "",
-        f"- Roblox：[Play {identity['currentRobloxName']}]({identity['canonicalUrl']})",
-        f"- Place ID：`{identity['placeId']}`",
-        f"- Universe ID：`{identity['universeId']}`",
+        f"- {platform}：[Play {identity.get('currentPlatformName') or identity.get('currentRobloxName') or identity['canonicalName']}]({identity['canonicalUrl']})",
         f"- Developer：{facts['developer'].get('name') or 'Unknown'}",
     ]
+    if identity.get("appId"):
+        lines.append(f"- Steam App ID：`{identity['appId']}`")
+    if identity.get("placeId"):
+        lines.append(f"- Place ID：`{identity['placeId']}`")
+    if identity.get("universeId"):
+        lines.append(f"- Universe ID：`{identity['universeId']}`")
     for label, key in [("Developer page", "robloxGroup"), ("Website", "website"), ("Discord", "discord"), ("YouTube", "youtube"), ("Trailer", "trailer"), ("X", "x"), ("TikTok", "tiktok"), ("Reddit", "reddit")]:
         if links.get(key):
             lines.append(f"- {label}：[{links[key]}]({links[key]})")
     lines += [
-        "", "## 2. Roblox 官方数据", "",
+        "", f"## 2. {platform} 官方数据", "",
         f"- Players online：{compact_number(stats.get('playing'))}",
         f"- Visits：{compact_number(stats.get('visits'))}",
         f"- Favorites：{compact_number(stats.get('favorites'))}",
+        f"- Reviews：{compact_number(stats.get('reviewCount'))}",
         f"- Approval：{stats.get('approvalPercent')}%" if stats.get("approvalPercent") is not None else "- Approval：Unknown",
         f"- Max players：{facts['game'].get('maxPlayers') or 'Unknown'}",
         f"- Created：{facts['game'].get('createdAt') or 'Unknown'}",

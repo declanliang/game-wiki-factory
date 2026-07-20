@@ -29,9 +29,10 @@ Games/
 ## 数据流
 
 ```text
-游戏名
+游戏名 + 可选 platform / official URL
   → pipeline/basic-info
-      官方身份、事实、首页、hero/favicon、固定六语言、category candidates
+      平台解析器 → Roblox adapter 或 Steam adapter
+      官方身份、规范事实、首页、hero/favicon、固定六语言、category candidates
   → pipeline/guide-search
       Google Suggest 主词+a–z、DataForSEO、搜索意图、语义聚类与淘汰审计
   → planner / project_contract.py
@@ -43,6 +44,16 @@ Games/
   → template scripts
       content/locales/navigation/assets → TypeScript → Next build → HTTP/SEO verification
 ```
+
+## 平台边界
+
+Roblox 与 Steam 共用 Basic Info 之后的全部契约：`facts.json` / `evidence.json`、固定语言、Guide Search、site plan、SEO Scout、intake、模板和验收流程都相同。只有必须依赖平台官方数据模型的部分分支：
+
+- Roblox adapter 负责 Place/Universe、创建者、访问量、服务器人数和 Roblox 媒体。
+- Steam adapter 负责 App ID、开发商、发行日期、价格、评价、商店功能、系统要求和 Steam 媒体。
+- 搜索查询携带平台名用于消歧，首页 hero stats 根据平台事实做确定性映射。
+
+这使平台差异停留在输入适配层，而不是复制两套文章或网站流水线。当前不支持其他商店或主机平台；扩展时必须新增 adapter 并继续输出同一规范事实契约。
 
 ## 两个项目内区域
 

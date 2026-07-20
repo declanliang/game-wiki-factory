@@ -51,9 +51,10 @@ def seo_project_name(game_name: str) -> str:
     return game_name.replace(" ", "_").lower()
 
 
-def keyword_topic(game_name: str) -> str:
-    """Disambiguate generic Roblox game names at collection time."""
-    return game_name if "roblox" in game_name.casefold().split() else f"{game_name} Roblox"
+def keyword_topic(game_name: str, platform: str = "Roblox") -> str:
+    """Add the verified platform as search-time disambiguation context."""
+    platform_name = platform.strip().title()
+    return game_name if platform_name.casefold() in game_name.casefold().split() else f"{game_name} {platform_name}"
 
 
 def read_json(path: Path) -> dict:
@@ -290,21 +291,25 @@ def validate_basic_output(path: Path) -> tuple[Path, dict, list[str]]:
 
 def build_trusted_keyword_context(intake: Path, identity: dict) -> dict:
     """Expose verified upstream game facts to keyword disambiguation and clustering."""
+    site_content = read_json(intake / "site-content.json")
+    platforms = site_content.get("site", {}).get("gamePlatform") or []
+    platform = platforms[0] if platforms else "Game"
     return {
         "source": "auto-basic-info",
         "evidence_policy": (
-            "Treat this Roblox identity and site content as trusted same-game evidence. "
+            f"Treat this {platform} identity and site content as trusted same-game evidence. "
             "It may support unofficial guide topics even when external search demand is sparse."
         ),
         "identity": {
             "game_name": identity.get("GAME_NAME"),
             "official_game_url": identity.get("OFFICIAL_GAME_URL"),
+            "platform": platform,
         },
-        "site_content": read_json(intake / "site-content.json"),
+        "site_content": site_content,
     }
 
 
-def bridge_keywords(raw_keywords: dict, identity: dict) -> dict:
+def bridge_keywords(raw_keywords: dict, identity: dict, platform: str = "Roblox") -> dict:
     categories = raw_keywords.get("categories")
     if not isinstance(categories, list) or not categories:
         raise PipelineError("get-search keywords.json has no categories.")
@@ -338,7 +343,7 @@ def bridge_keywords(raw_keywords: dict, identity: dict) -> dict:
     ]
     return {
         "game_name": game_name,
-        "filter_keyword": f"Roblox {game_name}",
+        "filter_keyword": f"{platform} {game_name}",
         "languages": languages,
         "categories": normalized_categories,
     }
@@ -409,7 +414,7 @@ def _video_title_tokens(value: str) -> set[str]:
     return tokens
 
 
-def select_featured_youtube_video(raw: dict, game_name: str) -> dict | None:
+def select_featured_youtube_video(raw: dict, game_name: str, platform: str = "Roblox") -> dict | None:
     """Pick one exact-game, long-form video from the cached Guide Search response."""
     game_tokens = _video_title_tokens(game_name)
     if not game_tokens:
@@ -436,7 +441,7 @@ def select_featured_youtube_video(raw: dict, game_name: str) -> dict | None:
                 if not game_tokens.issubset(title_tokens):
                     continue
                 title_and_description = f"{title} {item.get('description') or ''}".casefold()
-                if "roblox" not in title_and_description:
+                if platform.casefold() == "roblox" and "roblox" not in title_and_description:
                     continue
                 candidates.append(item)
     if not candidates:
@@ -456,11 +461,11 @@ def select_featured_youtube_video(raw: dict, game_name: str) -> dict | None:
         "url": selected.get("url") or f"https://www.youtube.com/watch?v={selected['video_id']}",
         "durationSeconds": selected.get("duration_time_seconds"),
         "source": "guide-search/raw/youtube.json",
-        "selectionReason": "Top-ranked long-form result whose title contains the complete normalized game name and identifies Roblox.",
+        "selectionReason": f"Top-ranked long-form result whose title contains the complete normalized game name and matches the {platform} identity.",
     }
 
 
-def reconcile_featured_video(intake_dir: Path, keyword_run_dir: Path, planning_dir: Path) -> dict | None:
+def reconcile_featured_video(intake_dir: Path, keyword_run_dir: Path, planning_dir: Path, platform: str = "Roblox") -> dict | None:
     """Fill an empty homepage video slot from already-paid, cached YouTube research."""
     identity_path = intake_dir / "site-identity.json"
     identity = read_json(identity_path)
@@ -475,7 +480,7 @@ def reconcile_featured_video(intake_dir: Path, keyword_run_dir: Path, planning_d
         youtube_path = keyword_run_dir / "raw" / "youtube.json"
         if not youtube_path.is_file():
             return None
-        selection = select_featured_youtube_video(read_json(youtube_path), str(identity.get("GAME_NAME") or ""))
+        selection = select_featured_youtube_video(read_json(youtube_path), str(identity.get("GAME_NAME") or ""), platform)
         if not selection:
             return None
         identity["YOUTUBE_VIDEO_ID"] = selection["videoId"]
@@ -580,7 +585,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run homepage research, keyword research, article generation, and Wiki site assembly."
     )
-    parser.add_argument("game", help='Roblox game name, for example "ANIME PARADOX X"')
+    parser.add_argument("game", help='Roblox or Steam game name, for example "Funnel Runners"')
+    parser.add_argument("--platform", choices=["auto", "roblox", "steam"], default="auto")
+    parser.add_argument("--official-url", help="Optional Roblox game or Steam app URL for deterministic identity selection.")
     parser.add_argument("--template-dir", type=Path, default=ROOT / "template")
     parser.add_argument("--seo-scout-dir", type=Path, default=ROOT / "pipeline" / "seo-scout")
     parser.add_argument(
@@ -622,7 +629,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     started = datetime.now(timezone.utc)
     slug = slugify(args.game)
-    search_topic = keyword_topic(args.game)
+    search_topic = args.game
     search_slug = slugify(search_topic)
     project_dir = (
         args.run_dir.expanduser().resolve()
@@ -717,7 +724,12 @@ def main(argv: list[str] | None = None) -> int:
                 raise PipelineError("--skip-basic needs --basic-output or an existing local output.")
             record("basic", "reused", output=str(basic_output))
         else:
-            command = [python, "-m", "gamewiki_automation", args.game, "--output-dir", str(basic_root)]
+            command = [
+                python, "-m", "gamewiki_automation", args.game,
+                "--output-dir", str(basic_root), "--platform", args.platform,
+            ]
+            if args.official_url:
+                command.extend(["--official-url", args.official_url])
             if args.refresh_basic:
                 command.append("--refresh")
             basic_env = dict(env)
@@ -739,6 +751,13 @@ def main(argv: list[str] | None = None) -> int:
             record("basic", "generated", output=str(basic_output))
 
         basic_intake, identity, languages = validate_basic_output(basic_output)
+        basic_site_content = read_json(basic_intake / "site-content.json")
+        platform_values = basic_site_content.get("site", {}).get("gamePlatform") or []
+        resolved_platform = str(platform_values[0] if platform_values else "Roblox")
+        search_topic = keyword_topic(args.game, resolved_platform)
+        search_slug = slugify(search_topic)
+        manifest["platform"] = resolved_platform
+        manifest["keywordTopic"] = search_topic
         canonical_name = str(identity["GAME_NAME"])
         manifest["canonicalGameName"] = canonical_name
         manifest["languages"] = languages
@@ -878,7 +897,7 @@ def main(argv: list[str] | None = None) -> int:
         copy_directory_contents(basic_intake, intake_dir)
         shutil.copytree(articles_dir, intake_dir / "articles")
         shutil.copy2(site_plan_path, intake_dir / "site-plan.json")
-        featured_video = reconcile_featured_video(intake_dir, keyword_run_dir, planning_dir)
+        featured_video = reconcile_featured_video(intake_dir, keyword_run_dir, planning_dir, resolved_platform)
         record(
             "featuredVideo",
             "selected" if featured_video else "unavailable",

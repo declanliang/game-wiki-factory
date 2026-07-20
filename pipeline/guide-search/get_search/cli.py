@@ -10,8 +10,8 @@ from .pipeline import run_pipeline
 
 
 def parser() -> argparse.ArgumentParser:
-    result = argparse.ArgumentParser(description="Collect and classify Roblox game keywords.")
-    result.add_argument("topic", nargs="?", help="Game topic, for example: animal hospital roblox")
+    result = argparse.ArgumentParser(description="Collect and classify Roblox or Steam game keywords.")
+    result.add_argument("topic", nargs="?", help="Game topic, for example: funnel runners steam")
     result.add_argument("--location", default="United States")
     result.add_argument("--language", default="en")
     result.add_argument("--labs-limit", type=int, default=200)

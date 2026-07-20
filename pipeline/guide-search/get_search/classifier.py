@@ -174,7 +174,7 @@ def normalize_keyword(raw: str, topic: str, allow_unprefixed: bool = False) -> s
         tail = re.sub(rf"\b{re.escape(topic_key)}\b", " ", value, count=1)
         tail = re.sub(r"\s+", " ", tail).strip()
     else:
-        platform_tokens = {"roblox"}
+        platform_tokens = {"roblox", "steam"}
         core_tokens = [token for token in topic_key.split() if token not in platform_tokens]
         core = " ".join(core_tokens)
         platform = next((token for token in topic_key.split() if token in platform_tokens), None)
@@ -190,7 +190,7 @@ def normalize_keyword(raw: str, topic: str, allow_unprefixed: bool = False) -> s
             tail = value
         else:
             return None
-    if not tail or tail in {"roblox", "game", "wiki", "official"}:
+    if not tail or tail in {"roblox", "steam", "game", "wiki", "official"}:
         return None
     tail = re.sub(r"\bwiki\b", "", tail)
     tail = re.sub(r"\s+", " ", tail).strip()
@@ -302,8 +302,9 @@ def extract_candidates(topic: str, raw: dict[str, Any]) -> tuple[list[Candidate]
     topic_tokens = {
         token[:-1] if token.endswith("s") and len(token) > 4 else token
         for token in canonical(topic).split()
-        if token not in {"roblox", "game", "the", "a", "an"}
+        if token not in {"roblox", "steam", "game", "the", "a", "an"}
     }
+    platform_token = next((token for token in canonical(topic).split() if token in {"roblox", "steam"}), None)
     for result in first_task_results(youtube_response):
         for item in result.get("items") or []:
             if item.get("type") != "youtube_video":
@@ -315,7 +316,9 @@ def extract_candidates(topic: str, raw: dict[str, Any]) -> tuple[list[Candidate]
                 token[:-1] if token.endswith("s") and len(token) > 4 else token
                 for token in title.split()
             }
-            if topic_tokens and topic_tokens.issubset(title_tokens) and "roblox" in title_tokens:
+            if topic_tokens and topic_tokens.issubset(title_tokens) and (
+                platform_token != "roblox" or "roblox" in title_tokens
+            ):
                 same_game_videos[title] = (original_title, views)
             for topic_tail, pattern in YOUTUBE_STABLE_TOPICS:
                 if pattern.search(title):
@@ -326,7 +329,7 @@ def extract_candidates(topic: str, raw: dict[str, Any]) -> tuple[list[Candidate]
                 if not phrase or phrase in seen_phrases:
                     continue
                 seen_phrases.add(phrase)
-                if re.search(r"\b(tiktok|youtube|shorts?|video|gameplay|roblox|reaction)\b", phrase):
+                if re.search(r"\b(tiktok|youtube|shorts?|video|gameplay|roblox|steam|reaction)\b", phrase):
                     continue
                 if phrase.startswith("best ") and not re.search(
                     r"\b(unit|units|team|teams|trait|traits|mythic|starter|character|characters|meta|evolution)\b",
@@ -423,7 +426,7 @@ def select_keywords(candidates: list[Candidate], maximum: int = 40) -> list[Cand
             if codes_used:
                 continue
             codes_used = True
-        weak = re.sub(r"\b(a|an|the|for|in|on|roblox)\b", "", canonical(candidate.keyword))
+        weak = re.sub(r"\b(a|an|the|for|in|on|roblox|steam)\b", "", canonical(candidate.keyword))
         weak = re.sub(r"\b([a-z]+)ies\b", r"\1y", weak)
         weak = re.sub(r"\b([a-z]+)s\b", r"\1", weak)
         weak = re.sub(r"\s+", " ", weak).strip()

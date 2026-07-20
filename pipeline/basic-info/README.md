@@ -1,8 +1,8 @@
-# Roblox 游戏基础配置自动化
+# Roblox / Steam 游戏基础配置自动化
 
-输入一个 Roblox 游戏名，自动生成 Wiki 首页所需的事实、文案、模块、来源证据、Hero 图片和 favicon 图标包。
+输入一个 Roblox 或 Steam 游戏名，自动生成 Wiki 首页所需的事实、文案、模块、来源证据、Hero 图片和 favicon 图标包。
 
-项目已经用 Anime Expeditions、Anime Paradox X 与 PursuitCore 完整跑通。当前只支持 Roblox。
+项目已经用多个 Roblox 游戏和 Steam 游戏 Funnel Runners 完整跑通。当前产品范围只支持 Roblox 与 Steam。
 
 本模块位于 `game-wiki-factory/pipeline/basic-info/`。通常由根目录 `python gamewiki.py "GAME NAME"` 调用；只有开发或单独调试 Basic Info 时才直接进入本目录。
 
@@ -36,6 +36,13 @@ PERPLEXITY_API_KEY=你的 Perplexity Key
 
 ```powershell
 python -m gamewiki_automation "Anime Expeditions"
+```
+
+平台明确时建议显式指定；Steam 最好同时给官方商店页：
+
+```powershell
+python -m gamewiki_automation "Anime Expeditions" --platform roblox
+python -m gamewiki_automation "Funnel Runners" --platform steam --official-url "https://store.steampowered.com/app/3712080/Funnel_Runners/"
 ```
 
 一次处理多个游戏：
@@ -102,13 +109,11 @@ python -m gamewiki_automation.template_contract output\anime-expeditions
 ## 工作流程
 
 ```text
-游戏名
+游戏名 + platform + 可选 official URL
   ↓
-Roblox Discover 搜索候选
-  ↓
-Place / Universe 身份确认
-  ↓
-Roblox API 官方事实与缩略图
+平台适配器
+  ├─ Roblox Discover → Place / Universe → Roblox 官方事实与缩略图
+  └─ Steam Store → App ID → Steam 官方事实与媒体
   ↓
 ToAPIs Responses API + web_search_preview 联网研究外部官方资源
   ↓（失败时才用 Perplexity）
@@ -135,7 +140,8 @@ Schema + 业务规则验证
 
 关键边界：
 
-- Roblox API 已确认的 Place、Universe、创建者和动态数据不能被模型覆盖。
+- 平台官方 API 已确认的身份、开发者和动态事实不能被模型覆盖。
+- Steam 的完整手柄支持不等于 Steam Deck Verified/Playable；未提供官方等级时只能标记为未确认。
 - 首页文案只能使用已进入 `facts.json` / `evidence.json` 的内容。
 - 有至少一个来源支持的第三方兑换码可以进入 `liveTools`，但必须明确显示为 `Community-reported active`；无来源、`unknown` 或过期兑换码不会输出。
 - Fandom、wiki.gg、fextralife 和竞对 Wiki 不能进入前台 references。
@@ -215,6 +221,7 @@ python -m unittest discover -s tests -v
 当前测试覆盖：
 
 - Roblox 候选评分和身份选择
+- Steam 官方 URL/App ID 解析与规范事实映射
 - JSON 清理与三套 Schema
 - ToAPIs Responses 混合输出解析、联网工具和本地 Schema 校验
 - 缓存上下文稳定性
@@ -245,11 +252,11 @@ python -m unittest discover -s tests -v
 
 项目可以使用，但不等于所有数据都可以无人审核上线。当前主要限制包括：
 
-- 游戏身份发现依赖 Roblox Discover 页面与 Jina Reader 可用性。
+- Roblox 游戏身份发现依赖 Roblox Discover 页面与 Jina Reader 可用性；Steam 身份发现依赖 Steam Store API。
 - ToAPIs Responses API 的联网探针和响应解析已经实测；完整双样本产物仍是迁移前生成、迁移后离线回归验证。
 - “官方社群”仍包含模型判断；HTTP 可访问不等于账号所有权百分之百确认。
 - 费用只有结果上限保护，没有真正的请求中途美元硬熔断。
-- favicon 默认由 Roblox 官方图标转换，不是重新设计的 AI 品牌图标。
+- favicon 默认由平台官方图像裁切转换，不是重新设计的 AI 品牌图标。
 - 已通过模板真实 `check-intake.mjs + apply-content.mjs` 的隔离导入测试，但还没有执行完整 `launch:site + build + 页面截图`。
 
 完整问题、影响和建议见 [已知问题](docs/KNOWN_ISSUES.md)。

@@ -170,6 +170,8 @@ def build_game_profile(basic_output: Path) -> dict[str, Any]:
     site_content = read_json(intake / "site-content.json")
     facts_path = output / "facts.json"
     facts = read_json(facts_path) if facts_path.is_file() else {}
+    platforms = site_content.get("site", {}).get("gamePlatform") or []
+    platform = str(platforms[0] if platforms else facts.get("identity", {}).get("platform") or "Game")
     corpus = "\n".join(_text_values({"facts": facts, "siteContent": site_content})).casefold()
 
     dynamic: list[dict[str, Any]] = []
@@ -219,7 +221,7 @@ def build_game_profile(basic_output: Path) -> dict[str, Any]:
         "game": {
             "name": identity["GAME_NAME"],
             "slug": re.sub(r"[^a-z0-9]+", "-", identity["GAME_NAME"].casefold()).strip("-"),
-            "platform": "Roblox",
+            "platform": platform,
             "officialUrl": identity.get("OFFICIAL_GAME_URL"),
             "summary": site_content.get("site", {}).get("description", ""),
         },
@@ -290,9 +292,10 @@ def build_site_plan(profile: dict[str, Any], keyword_output: dict[str, Any]) -> 
 
 def build_seo_keywords(site_plan: dict[str, Any]) -> dict[str, Any]:
     game_name = site_plan["game"]["name"]
+    platform = site_plan["game"].get("platform") or "Game"
     return {
         "game_name": game_name,
-        "filter_keyword": f"Roblox {game_name}",
+        "filter_keyword": f"{platform} {game_name}",
         "languages": [locale for locale in site_plan["languages"] if locale != "en"],
         "trusted_context": {
             "game": site_plan["game"],

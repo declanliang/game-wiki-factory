@@ -11,7 +11,8 @@ from jsonschema import Draft202012Validator
 from gamewiki_automation.config import Settings
 from gamewiki_automation.llm import LlmClient, _provider_schema, _responses_text, _web_search_calls
 from gamewiki_automation.pipeline import Pipeline, _generation_evidence, _generation_facts, _module_facts, _normalize_modules, _research_facts, _select_language_codes
-from gamewiki_automation.roblox import RobloxClient
+from gamewiki_automation.roblox import IdentityError, RobloxClient, roblox_place_id
+from gamewiki_automation.steam import SteamClient, steam_app_id
 from gamewiki_automation.schemas import HOMEPAGE_SCHEMA, LANGUAGE_MARKET_SCHEMA, MODULES_SCHEMA, RESEARCH_SCHEMA, TEMPLATE_SITE_CONTENT_SCHEMA, TEMPLATE_SITE_IDENTITY_SCHEMA
 from gamewiki_automation.template_contract import build_site_content, export_existing_output, validate_localized_site_content, validate_template_contract
 from gamewiki_automation.util import clean_json_text, dump_json, normalized_name, slugify
@@ -58,6 +59,32 @@ class FakeToApisHttp:
         }
 
 
+class FakeSteamHttp:
+    def get_json(self, url, **_kwargs):
+        if "appdetails" in url:
+            return {"3712080": {"success": True, "data": {
+                "name": "Funnel Runners",
+                "short_description": "Survive escalating tornadoes with up to 7 friends.",
+                "about_the_game": "<p>Repair your van and escape.</p>",
+                "developers": ["Supernova Studios LLC"],
+                "genres": [{"description": "Early Access"}, {"description": "Action"}],
+                "categories": [{"description": "Online Co-op"}],
+                "price_overview": {"final": 1349, "currency": "USD", "final_formatted": "$13.49"},
+                "release_date": {"coming_soon": False, "date": "Jul 16, 2026"},
+                "platforms": {"windows": True, "mac": False, "linux": False},
+                "controller_support": "full",
+                "header_image": "https://cdn.example/header.jpg",
+                "screenshots": [{"path_full": "https://cdn.example/screenshot.jpg"}],
+                "movies": [],
+            }}}
+        if "appreviews" in url:
+            return {"query_summary": {
+                "total_reviews": 100, "total_positive": 84,
+                "review_score_desc": "Very Positive",
+            }}
+        raise AssertionError(url)
+
+
 class CoreTests(unittest.TestCase):
     def test_research_merge_preserves_rejected_identity_candidates(self):
         pipeline = Pipeline.__new__(Pipeline)
@@ -91,6 +118,50 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(selected["placeId"], "84515722934860")
         self.assertGreaterEqual(selected["matchScore"], 0.9)
         self.assertEqual(len(candidates), 2)
+
+    def test_roblox_official_url_bypasses_ambiguous_discover_results(self):
+        class OfficialUrlHttp(FakeHttp):
+            def get_json(self, url, **_kwargs):
+                if "universes/v1/places/84515722934860" in url:
+                    return {"universeId": 7613921865}
+                return super().get_json(url, **_kwargs)
+
+        url = "https://www.roblox.com/games/84515722934860/Anime-Expeditions"
+        self.assertEqual(roblox_place_id(url), "84515722934860")
+        selected, candidates = RobloxClient(OfficialUrlHttp()).select_identity("Anime Expeditions", url)
+        self.assertEqual(selected["placeId"], "84515722934860")
+        self.assertEqual(candidates[0]["source"], "explicit-official-url")
+
+    def test_identity_rejects_character_similar_but_different_noun(self):
+        class SimilarWrongHttp(FakeHttp):
+            def get_json(self, url, **_kwargs):
+                if "universeIds=" in url:
+                    return {"data": [
+                        {"id": 7613921865, "name": "Build a Bunker", "description": "wrong game", "visits": 100, "creator": {"name": "Studio"}},
+                        {"id": 456, "name": "Build a Bunker!", "description": "also wrong", "visits": 10, "creator": {"name": "Other"}},
+                    ]}
+                raise AssertionError(url)
+
+        with self.assertRaises(IdentityError) as caught:
+            RobloxClient(SimilarWrongHttp()).select_identity("Build a Bucket")
+        self.assertEqual(len(caught.exception.candidates), 2)
+        self.assertLess(caught.exception.candidates[0]["tokenCoverage"], 1.0)
+
+    def test_steam_official_url_selects_and_normalizes_platform_facts(self):
+        url = "https://store.steampowered.com/app/3712080/Funnel_Runners/"
+        self.assertEqual(steam_app_id(url), "3712080")
+        client = SteamClient(FakeSteamHttp())
+        selected, candidates = client.select_identity("Funnel Runners", url)
+        facts, evidence, raw = client.collect("Funnel Runners", selected)
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(facts["identity"]["platform"], "Steam")
+        self.assertEqual(facts["identity"]["appId"], "3712080")
+        self.assertEqual(facts["game"]["maxPlayers"], 8)
+        self.assertEqual(facts["game"]["price"], 13.49)
+        self.assertEqual(facts["dynamicStats"]["approvalPercent"], 84.0)
+        self.assertEqual(evidence["sources"][0]["publisher"], "Steam")
+        self.assertEqual(raw["appDetails"]["controller_support"], "full")
 
     def test_provider_schema_removes_format_without_mutating_local_schema(self):
         compatible = _provider_schema(HOMEPAGE_SCHEMA)

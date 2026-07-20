@@ -7,6 +7,15 @@ cd C:\Users\liang\Documents\Games\game-wiki-factory
 python gamewiki.py "GAME NAME"
 ```
 
+平台明确时优先显式传入，Steam 官方 URL 可消除同名应用歧义：
+
+```powershell
+python gamewiki.py "Funnel Runners" --platform steam --official-url "https://store.steampowered.com/app/3712080/Funnel_Runners/"
+python gamewiki.py "Hellhole" --platform roblox
+```
+
+`auto` 模式会依次尝试 Roblox 和 Steam。平台身份不确定属于阻断错误，应补充官方 URL 或显式平台，不要调低身份阈值。
+
 默认网站目录是 `..\<game-slug>`。同一命令自动续跑。
 
 并发执行：
@@ -59,6 +68,7 @@ Vercel 导入完成后，`.gamewiki/publish.json` 的 Vercel stage 会是 `await
 - 翻译正文完整但 SERP 标题/描述略超限：流水线会本地压缩元数据后重新执行完整性校验，不重翻正文。
 - LLM 返回余额不足：当前 key slot 会被禁用；所有 key 都无额度时立即停止剩余批次并保留已有文章。充值后不加 overwrite 续跑。
 - 主题稀少：检查 Suggest 和多视频共同支持的机制主题；接受较少的可靠文章，不能合成 fallback 关键词。
+- Steam Deck：`full controller support` 不等于 Deck Verified/Playable；没有官方兼容性等级时只能写“未确认”和谨慎测试建议。
 - 模板失败：修工厂 `template/` 后重跑，不能重新付费生成上游内容。
 
 ## 有成本的参数

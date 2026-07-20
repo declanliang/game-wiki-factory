@@ -28,8 +28,14 @@ def validate_package(facts: dict[str, Any], evidence: dict[str, Any], homepage: 
     errors.extend(template_errors)
     warnings: list[dict[str, str]] = []
     identity = facts.get("identity", {})
-    if not identity.get("placeId") or not identity.get("universeId") or identity.get("matchConfidence", 0) < 0.72:
-        errors.append({"code": "IDENTITY_UNCERTAIN", "field": "facts.identity", "message": "Roblox identity is incomplete or below confidence threshold."})
+    platform = identity.get("platform")
+    required_platform_ids = (
+        [identity.get("appId")]
+        if platform == "Steam"
+        else [identity.get("placeId"), identity.get("universeId")]
+    )
+    if not all(required_platform_ids) or not identity.get("canonicalUrl") or identity.get("matchConfidence", 0) < 0.72:
+        errors.append({"code": "IDENTITY_UNCERTAIN", "field": "facts.identity", "message": f"{platform or 'Platform'} identity is incomplete or below confidence threshold."})
     if not facts.get("officialLinks", {}).get("discord"):
         warnings.append({"code": "MISSING_OFFICIAL_DISCORD", "field": "facts.officialLinks.discord", "message": "No verifiable official Discord was found."})
     if not facts.get("officialLinks", {}).get("trailer"):
@@ -53,7 +59,7 @@ def validate_package(facts: dict[str, Any], evidence: dict[str, Any], homepage: 
     source_ids = {s.get("id") for s in sources}
     claims_with_sources = sum(bool(set(c.get("sourceIds", [])) & source_ids) for c in claims)
     official_sources = sum(s.get("sourceType") in {"official-api", "official-platform", "official-creator", "official-social"} for s in sources)
-    required_checks = [identity.get("placeId"), identity.get("universeId"), identity.get("canonicalUrl"), facts.get("developer", {}).get("name"), homepage.get("home"), modules.get("modules")]
+    required_checks = [*required_platform_ids, identity.get("canonicalUrl"), facts.get("developer", {}).get("name"), homepage.get("home"), modules.get("modules")]
     cost = _cost_summary(calls)
     status = "fail" if errors else "warning" if warnings else "pass"
     return {

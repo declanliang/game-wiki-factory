@@ -11,6 +11,7 @@ sys.path.insert(0, str(SEO_SCOUT_ROOT))
 from seoscout.translate import (
     _build_mdx,
     _compact_overlong_metadata,
+    _compact_serp_field,
     _process_llm_response,
     validate_translation_against_source,
 )
@@ -45,6 +46,19 @@ def translated_mdx(body: str) -> str:
 
 
 class TranslationCompletenessTests(unittest.TestCase):
+    def test_serp_compaction_does_not_leave_dangling_connector_or_sentence(self) -> None:
+        title = _compact_serp_field(
+            "Funnel Runners Steam Price: Deals, Value, & More Details", 45, "en"
+        )
+        description = _compact_serp_field(
+            "A complete first sentence about the game. A second sentence that becomes far too long for the selected metadata limit and must be shortened safely.",
+            70,
+            "en",
+            prefer_sentence=True,
+        )
+        self.assertFalse(title.endswith("&"))
+        self.assertEqual(description, "A complete first sentence about the game.")
+
     def test_compacts_overlong_metadata_without_retranslating_body(self) -> None:
         title = "Codes Roblox Build an ASMR Tower : Votre guide des cadeaux gratuits"
         description = "Résumé français suffisamment précis pour décrire les codes, les récompenses et la procédure de réclamation dans le jeu."

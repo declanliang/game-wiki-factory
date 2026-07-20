@@ -2,9 +2,9 @@
 
 ## 最小背景
 
-这是一个混合确定性代码和 LLM 判断的 Roblox 攻略站工厂。AI 的职责不是手工逐步复制文件，而是运行统一入口、读取 manifest/log、修复通用问题并续跑。
+这是一个混合确定性代码和 LLM 判断的 Roblox / Steam 攻略站工厂。AI 的职责不是手工逐步复制文件，而是运行统一入口、读取 manifest/log、修复通用问题并续跑。
 
-业务目标是为具体 Roblox 游戏生成信息型 Wiki，通过广告 CPM 获取收入。网站的核心价值是搜集、筛选和组织有效游戏信息；允许少量不影响玩家安全的事实误差，但明确错误、明显属于其他游戏或纯粹由单个娱乐视频推断出的内容必须排除。首页深度、视频、清晰排版和站内链接用于改善用户体验、增加浏览页数与停留时间。广告接入不属于当前工厂范围。
+业务目标是为具体 Roblox 或 Steam 游戏生成信息型 Wiki，通过广告 CPM 获取收入。网站的核心价值是搜集、筛选和组织有效游戏信息；允许少量不影响玩家安全的事实误差，但明确错误、明显属于其他游戏或纯粹由单个娱乐视频推断出的内容必须排除。首页深度、视频、清晰排版和站内链接用于改善用户体验、增加浏览页数与停留时间。广告接入不属于当前工厂范围。
 
 首页数据所有权：Basic Info 提供事实和深度文案；Guide Search 的缓存 YouTube 结果只可补一个严格匹配游戏的长视频；site-plan 决定可发布分类；现有文章提供具体内链。模板不得反向发明事实、分类或文章。
 
@@ -12,9 +12,10 @@
 
 ```text
 请在 C:\Users\liang\Documents\Games\game-wiki-factory 中，
-为 Roblox 游戏“GAME NAME”创建或续跑游戏 Wiki。
+为 PLATFORM（Roblox 或 Steam）游戏“GAME NAME”创建或续跑游戏 Wiki。
 
-执行：python gamewiki.py "GAME NAME"
+执行：python gamewiki.py "GAME NAME" --platform PLATFORM
+Steam 已知商店页时追加：--official-url "STEAM URL"
 目标目录：C:\Users\liang\Documents\Games\<game-slug>
 
 约束：
@@ -23,6 +24,7 @@
 - 失败先读目标 `.gamewiki/manifest.json` 和最新日志。
 - 优先修复工厂中的通用代码，再用同一命令续跑。
 - 不打印或提交任何 .env/API key。
+- 先确认 platform；Steam 身份使用 App ID，Roblox 身份使用 Place/Universe，不能混用事实字段。
 - 所有游戏 GitHub 仓库只能是 Private；发布器不得创建 Public repo。
 - Vercel 只导入项目，不填写环境变量；正式域名和 NEXT_PUBLIC_SITE_URL 由用户手动配置。
 - 不接纳完全无关关键词，不为凑数量降低门槛。
