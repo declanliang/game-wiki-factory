@@ -2,6 +2,28 @@
 
 这是 `game-wiki-factory` 内置的干净 Next.js Wiki 模板。编排器把模板同步到 `Games/<game-slug>/` 根目录；该目录本身就是可推送 GitHub、可部署 Vercel 的网站项目。
 
+模板同时支持 Roblox 与 Steam。平台差异已经由上游 Basic Info 转换为统一 intake 契约；模板不调用 Roblox/Steam API，也不根据平台自行猜测事实。
+
+## 从工厂生成 Roblox / Steam 网站
+
+命令必须在 `game-wiki-factory` 根目录执行，而不是在本模板或已经生成的网站目录中执行：
+
+```powershell
+cd C:\Users\liang\Documents\Games\game-wiki-factory
+python gamewiki.py "Roblox Game" --platform roblox
+python gamewiki.py "Steam Game" --platform steam --official-url "https://store.steampowered.com/app/<app-id>/<slug>/"
+```
+
+Steam 游戏建议始终提供官方商店 URL。游戏名可能重名、改名或与 DLC/Demo 相似，App ID 才是稳定身份。普通续跑重复同一条命令即可，默认复用 checkpoint；不要为了重试添加 `--refresh-basic`、`--recluster-keywords` 或 `--overwrite-articles`。
+
+Steam 数据注意事项：
+
+- 价格、评价数量和 Early Access 状态是采集时快照，未来可能变化。
+- `full controller support` 不代表 Steam Deck Verified 或 Playable；没有官方等级时只能表述为未确认。
+- Windows 系统要求不能自动推导 Linux/SteamOS 兼容性或具体帧率。
+- Steam 官方 trailer、截图和 header 可作为媒体来源；第三方 YouTube 视频不得冒充官方频道。
+- 网站部署只消费 `intake/`，Vercel 不需要 Steam、搜索或 LLM API key。
+
 ## 唯一输入契约
 
 ```text
@@ -62,6 +84,7 @@ npm run build
 ## 设计边界
 
 - 本仓库不调用 LLM、不搜索、不翻译；上游必须提供成品。
+- 平台来自 `site-content.json` 的 `site.gamePlatform`；模板不得把 Steam 强制写成 Roblox，反之亦然。
 - `src/config/site-plan.json` 是生成文件，来源只能是 `intake/site-plan.json`。
 - `content/` 是生成投影，每次 ingest 会先清空，防止旧游戏或已删除文章残留。
 - site-plan 至少包含 1 个有真实关键词证据、最多 8 个 published 分类；不为数量生成 fallback 分类，每种语言必须交付相同文章树。

@@ -20,6 +20,15 @@ python gamewiki.py "Hellhole" --platform roblox
 
 不指定 `--platform` 时会先尝试 Roblox、再尝试 Steam；身份存在歧义时流水线会停止，不会猜测。
 
+### Steam 命令行特别注意
+
+- 推荐同时传 `--platform steam` 和完整的 Steam Store App URL；稳定身份是 URL 中的数字 App ID，不是标题或 slug。
+- 在 factory 根目录执行命令。生成结果仍位于同级 `Games/<game-slug>/`，该目录就是 Next.js/Vercel 项目根。
+- 失败后用完全相同的命令续跑。默认会复用已完成的搜索、生成和翻译，不会重复付费。
+- `--refresh-basic`、`--recluster-keywords`、`--overwrite-articles` 都可能产生新 API 费用，只有日志证明 checkpoint 无效时才使用。
+- Steam 价格、评价和 Early Access 是采集快照；完整手柄支持不能写成 Steam Deck Verified/Playable。
+- 如果只有游戏名而没有官方 URL，可以使用 `auto`，但同名游戏、Demo、DLC 或名称过于通用时应停止并补充官方 URL。
+
 第一次执行创建网站；同一命令再次执行会验证并复用 checkpoint。普通续跑不要加 refresh/overwrite 参数。
 
 同时处理两到三个游戏：
