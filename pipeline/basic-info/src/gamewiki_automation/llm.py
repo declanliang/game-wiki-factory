@@ -144,7 +144,15 @@ class LlmClient:
         }
         response = self._post_toapis(payload)
         data = clean_json_text(_responses_text(response))
-        self._validate(task + " repair", data, schema)
+        try:
+            self._validate(task + " repair", data, schema)
+        except LlmError:
+            # Models occasionally preserve every requested fact but miss a
+            # localized maxLength by a few characters even after repair.
+            # Deterministically compact only over-limit strings; all other
+            # schema errors still fail the validation below.
+            data = _compact_schema_strings(data, schema)
+            self._validate(task + " repair", data, schema)
         return data, response
 
     def _perplexity(self, task: str, system: str, prompt: str, schema: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -222,6 +230,38 @@ def _usage_cost(usage: dict[str, Any]) -> float | int | None:
 def _sum_optional(*values: Any) -> float | int | None:
     numeric = [value for value in values if isinstance(value, (int, float))]
     return sum(numeric) if numeric else None
+
+
+def _compact_schema_strings(value: Any, schema: dict[str, Any], root: dict[str, Any] | None = None) -> Any:
+    """Compact only strings exceeding JSON Schema maxLength constraints."""
+    root = root or schema
+    if "$ref" in schema:
+        ref = str(schema["$ref"])
+        if ref.startswith("#/"):
+            resolved: Any = root
+            for part in ref[2:].split("/"):
+                resolved = resolved[part.replace("~1", "/").replace("~0", "~")]
+            schema = resolved
+    if isinstance(value, str):
+        limit = schema.get("maxLength")
+        if not isinstance(limit, int) or len(value) <= limit:
+            return value
+        if limit <= 1:
+            return value[:limit]
+        prefix = value[: limit - 1].rstrip(" ,.;:!?、。，：；！？-–—&")
+        if " " in prefix and len(prefix) >= max(20, int(limit * 0.7)):
+            prefix = prefix.rsplit(" ", 1)[0].rstrip(" ,.;:!?-–—&")
+        return prefix[: limit - 1] + "…"
+    if isinstance(value, dict):
+        properties = schema.get("properties") or {}
+        return {
+            key: _compact_schema_strings(child, properties.get(key, {}), root)
+            for key, child in value.items()
+        }
+    if isinstance(value, list):
+        item_schema = schema.get("items") or {}
+        return [_compact_schema_strings(child, item_schema, root) for child in value]
+    return value
 
 
 def _provider_schema(schema: dict[str, Any]) -> dict[str, Any]:

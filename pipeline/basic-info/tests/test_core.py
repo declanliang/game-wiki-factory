@@ -9,7 +9,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator
 
 from gamewiki_automation.config import Settings
-from gamewiki_automation.llm import LlmClient, _provider_schema, _responses_text, _web_search_calls
+from gamewiki_automation.llm import LlmClient, _compact_schema_strings, _provider_schema, _responses_text, _web_search_calls
 from gamewiki_automation.pipeline import Pipeline, _generation_evidence, _generation_facts, _module_facts, _normalize_modules, _research_facts, _select_language_codes
 from gamewiki_automation.roblox import IdentityError, RobloxClient, roblox_place_id
 from gamewiki_automation.steam import SteamClient, steam_app_id
@@ -168,6 +168,23 @@ class CoreTests(unittest.TestCase):
         serialized = json.dumps(compatible)
         self.assertNotIn('"format"', serialized)
         self.assertIn('"format"', json.dumps(HOMEPAGE_SCHEMA))
+
+    def test_schema_string_compaction_repairs_only_overlong_localized_values(self):
+        schema = {
+            "type": "object",
+            "properties": {
+                "description": {"type": "string", "minLength": 10, "maxLength": 30},
+                "label": {"type": "string", "maxLength": 20},
+            },
+        }
+        source = {
+            "description": "Eine ausführliche lokalisierte Beschreibung mit zu vielen Zeichen.",
+            "label": "Unchanged",
+        }
+        compacted = _compact_schema_strings(source, schema)
+        self.assertLessEqual(len(compacted["description"]), 30)
+        self.assertTrue(compacted["description"].endswith("…"))
+        self.assertEqual(compacted["label"], "Unchanged")
 
     def test_toapis_responses_mixed_output_and_web_tool(self):
         response = {"output": [{"type": "reasoning"}, {"type": "web_search_call"}, {"type": "message", "content": [{"type": "output_text", "text": "answer"}]}]}
