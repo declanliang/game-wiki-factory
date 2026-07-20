@@ -100,6 +100,24 @@ BODY_DELIM_RE = re.compile(r'^BODY:[ \t]*\n', re.MULTILINE)
 BULLET_PREFIX_RE = re.compile(r'^[-*•]\s*')
 
 
+def _compact_serp_text(value: str, limit: int) -> str:
+    """Shorten SERP metadata at a word boundary without changing its claim.
+
+    Models routinely miss a requested character limit by only a handful of
+    characters.  Re-generating the entire article for that mechanical issue
+    is expensive and can introduce new factual changes, so metadata is
+    compacted deterministically before validation.
+    """
+    if len(value) <= limit:
+        return value
+    shortened = value[:limit].rsplit(None, 1)[0].rstrip(" ,;:-")
+    if not shortened:
+        shortened = value[:limit]
+    if value[-1:] in ".!?" and shortened[-1:] not in ".!?":
+        shortened = shortened[:limit - 1].rstrip(" ,;:-") + "."
+    return shortened
+
+
 def _parse_llm_output(content: str) -> tuple:
     """Parse the model's TITLE:/DESCRIPTION:/QUICKGUIDE:/BODY: contract.
 
@@ -139,17 +157,15 @@ def _parse_llm_output(content: str) -> tuple:
     if not body_m:
         raise ValueError("No 'BODY:' marker found after DESCRIPTION")
 
-    title = title_m.group(1).strip()
-    description = desc_m.group(1).strip()
+    title = _compact_serp_text(title_m.group(1).strip(), 60)
+    description = _compact_serp_text(desc_m.group(1).strip(), 160)
     body = content[body_m.end():].strip()
 
     if not title:
         raise ValueError("TITLE is empty")
-    if len(title) > 60:
-        raise ValueError(f"TITLE is too long ({len(title)} chars; maximum 60)")
     if not description:
         raise ValueError("DESCRIPTION is empty")
-    if len(description) < 110 or len(description) > 160:
+    if len(description) < 110:
         raise ValueError(
             f"DESCRIPTION length is {len(description)} chars; expected 110-160"
         )

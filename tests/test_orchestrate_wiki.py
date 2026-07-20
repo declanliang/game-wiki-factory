@@ -11,6 +11,17 @@ import orchestrate_wiki as orchestrator
 
 
 class OrchestratorTests(unittest.TestCase):
+    def test_replace_directory_is_noop_when_source_is_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            checkpoint = Path(temporary) / "articles"
+            checkpoint.mkdir()
+            marker = checkpoint / "kept.mdx"
+            marker.write_text("checkpoint", encoding="utf-8")
+
+            orchestrator.replace_directory(checkpoint, checkpoint)
+
+            self.assertEqual(marker.read_text(encoding="utf-8"), "checkpoint")
+
     def test_factory_defaults_use_bundled_modules_and_sibling_output(self) -> None:
         args = orchestrator.build_parser().parse_args(["Test Game"])
         self.assertEqual(args.template_dir, orchestrator.ROOT / "template")

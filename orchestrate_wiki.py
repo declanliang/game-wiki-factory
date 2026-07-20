@@ -435,6 +435,8 @@ def replace_directory(source: Path, destination: Path) -> None:
     """Materialize a checkpoint exactly, removing only the known destination."""
     if not source.is_dir():
         raise PipelineError(f"Source directory does not exist: {source}")
+    if source.resolve() == destination.resolve():
+        return
     if destination.exists():
         shutil.rmtree(destination)
     shutil.copytree(source, destination)
