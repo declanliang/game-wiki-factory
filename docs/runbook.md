@@ -24,6 +24,8 @@ python gamewiki.py "Hellhole" --platform roblox
 python gamewiki.py run-many "Game A" "Game B" --jobs 2 --llm-concurrency 6 --llm-per-key 2 --build-concurrency 1
 ```
 
+同名或易混淆游戏应使用 `--games-file` 的 TSV 格式：`游戏名<TAB>roblox|steam<TAB>官方 URL`。这样每个并发子进程都使用独立官方身份，仍由同一监督器限流。
+
 `--jobs` 控制游戏进程数；其余参数分别限制全局 LLM、每个 key 和全局构建许可。默认 `2/6/2/1` 是本次双游戏实测后采用的稳健值；提高前先观察 429/5xx、内存和总耗时。状态、日志和续跑不需要寻找具体文件：
 
 ```powershell

@@ -106,6 +106,27 @@ def _run_child(game: str, env: dict[str, str], log_path: Path, passthrough: list
     return {"game": game, "slug": slugify(game), "status": "complete" if code == 0 else "failed", "exitCode": code, "startedAt": started, "finishedAt": _now(), "log": str(log_path)}
 
 
+def _parse_game_spec(line: str) -> dict[str, object]:
+    """Parse a backward-compatible name or name/platform/official-URL TSV row."""
+    fields = [field.strip() for field in line.split("\t")]
+    if len(fields) == 1 and fields[0]:
+        return {"game": fields[0], "args": []}
+    if len(fields) != 3 or not all(fields):
+        raise ValueError(
+            "games-file rows must be GAME NAME or GAME NAME<TAB>PLATFORM<TAB>OFFICIAL_URL"
+        )
+    game, platform, official_url = fields
+    platform = platform.casefold()
+    if platform not in {"roblox", "steam"}:
+        raise ValueError(f"unsupported platform {platform!r} for {game!r}")
+    return {
+        "game": game,
+        "platform": platform,
+        "officialUrl": official_url,
+        "args": ["--platform", platform, "--official-url", official_url],
+    }
+
+
 def run_many(argv: list[str]) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -121,11 +142,20 @@ def run_many(argv: list[str]) -> int:
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--publish", action="store_true")
     args = parser.parse_args(argv)
-    games = list(args.games)
+    tasks: list[dict[str, object]] = [{"game": game, "args": []} for game in args.games]
     if args.games_file:
-        games.extend(line.strip() for line in args.games_file.read_text(encoding="utf-8-sig").splitlines() if line.strip() and not line.lstrip().startswith("#"))
-    games = list(dict.fromkeys(games))
-    if not games:
+        for line in args.games_file.read_text(encoding="utf-8-sig").splitlines():
+            if line.strip() and not line.lstrip().startswith("#"):
+                try:
+                    tasks.append(_parse_game_spec(line))
+                except ValueError as exc:
+                    parser.error(str(exc))
+    unique_tasks: dict[str, dict[str, object]] = {}
+    for task in tasks:
+        unique_tasks.setdefault(str(task["game"]), task)
+    tasks = list(unique_tasks.values())
+    games = [str(task["game"]) for task in tasks]
+    if not tasks:
         parser.error("provide at least one game or --games-file")
     if args.jobs < 1 or args.llm_concurrency < 1 or args.llm_per_key < 1 or args.build_concurrency < 1:
         parser.error("all concurrency values must be positive")
@@ -139,7 +169,15 @@ def run_many(argv: list[str]) -> int:
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     manifest_path = run_dir / "manifest.json"
-    manifest = {"schemaVersion": 1, "runId": run_id, "status": "running", "startedAt": _now(), "games": games, "results": []}
+    manifest = {
+        "schemaVersion": 1, "runId": run_id, "status": "running",
+        "startedAt": _now(), "games": games,
+        "taskSpecs": [
+            {key: value for key, value in task.items() if key != "args"}
+            for task in tasks
+        ],
+        "results": [],
+    }
     write_json(manifest_path, manifest)
     events_path = run_dir / "events.jsonl"
     events_path.write_text(json.dumps({"event": "run.started", "at": manifest["startedAt"], "runId": run_id, "games": games}, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -149,7 +187,8 @@ def run_many(argv: list[str]) -> int:
     try:
         with ThreadPoolExecutor(max_workers=min(args.jobs, len(games))) as pool:
             futures = {}
-            for game in games:
+            for task in tasks:
+                game = str(task["game"])
                 env = dict(os.environ)
                 env.update({
                     "GAMEWIKI_PERMIT_URL": f"http://127.0.0.1:{server.server_port}",
@@ -157,7 +196,11 @@ def run_many(argv: list[str]) -> int:
                     "GAMEWIKI_VERIFY_PORT": str(_free_port()),
                     "PYTHONUNBUFFERED": "1",
                 })
-                future = pool.submit(_run_child, game, env, run_dir / "logs" / f"{slugify(game)}.log", passthrough)
+                future = pool.submit(
+                    _run_child, game, env,
+                    run_dir / "logs" / f"{slugify(game)}.log",
+                    [*passthrough, *[str(item) for item in task.get("args", [])]],
+                )
                 futures[future] = game
             for future in as_completed(futures):
                 result = future.result()

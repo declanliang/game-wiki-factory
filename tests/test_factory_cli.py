@@ -4,10 +4,20 @@ import threading
 import time
 import unittest
 
-from factory_cli import PermitState
+from factory_cli import PermitState, _parse_game_spec
 
 
 class PermitStateTests(unittest.TestCase):
+    def test_batch_tsv_preserves_per_game_platform_and_official_url(self) -> None:
+        url = "https://www.roblox.com/games/106763540857326/Blox-Monsters"
+        task = _parse_game_spec(f"Blox Monsters\troblox\t{url}")
+        self.assertEqual(task["game"], "Blox Monsters")
+        self.assertEqual(task["platform"], "roblox")
+        self.assertEqual(task["args"], ["--platform", "roblox", "--official-url", url])
+
+    def test_batch_plain_name_remains_backward_compatible(self) -> None:
+        self.assertEqual(_parse_game_spec("Hellhole"), {"game": "Hellhole", "args": []})
+
     def test_per_key_limit_is_global_and_release_unblocks_waiter(self) -> None:
         state = PermitState(llm_limit=2, per_key_limit=1, build_limit=1)
         first = state.acquire(["llm", "llm-key-1"])

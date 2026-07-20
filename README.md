@@ -37,6 +37,19 @@ python gamewiki.py "Hellhole" --platform roblox
 python gamewiki.py run-many "Game A" "Game B" --jobs 2
 ```
 
+批量任务需要为每个游戏固定官方身份时，使用 UTF-8 TSV 清单；每行是 `游戏名<TAB>平台<TAB>官方 URL`：
+
+```text
+Blox Monsters	roblox	https://www.roblox.com/games/106763540857326/Blox-Monsters
+Funnel Runners	steam	https://store.steampowered.com/app/3712080/Funnel_Runners/
+```
+
+```powershell
+python gamewiki.py run-many --games-file .\games.tsv --jobs 2 --publish
+```
+
+旧的一行一个游戏名格式仍然支持。TSV 模式会把每个 URL 传入对应子进程，同时继续共享 LLM/key/build 并发限制。
+
 该命令为每个游戏启动隔离进程，并在所有进程之间统一限制 LLM 总并发、单 key 并发和 Next.js 构建并发。增加 `LLM_API_KEY_2`、`LLM_API_KEY_3` 后会自动按编号发现，不要求编号连续。
 
 ## 工厂目录
