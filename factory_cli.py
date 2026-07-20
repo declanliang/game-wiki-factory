@@ -270,4 +270,8 @@ COMMANDS = {"run-many": run_many, "status": status, "logs": logs, "resume": resu
 
 
 def dispatch(command: str, argv: list[str]) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure:
+            reconfigure(encoding="utf-8", errors="replace")
     return COMMANDS[command](argv)

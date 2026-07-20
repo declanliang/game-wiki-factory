@@ -3,11 +3,16 @@ from __future__ import annotations
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
-from factory_cli import PermitState, _parse_game_spec
+from factory_cli import PermitState, _parse_game_spec, dispatch
 
 
 class PermitStateTests(unittest.TestCase):
+    def test_dispatch_keeps_status_output_utf8_safe(self) -> None:
+        with patch("factory_cli.COMMANDS", {"fake": lambda argv: 0}):
+            self.assertEqual(dispatch("fake", []), 0)
+
     def test_batch_tsv_preserves_per_game_platform_and_official_url(self) -> None:
         url = "https://www.roblox.com/games/106763540857326/Blox-Monsters"
         task = _parse_game_spec(f"Blox Monsters\troblox\t{url}")
