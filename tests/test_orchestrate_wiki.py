@@ -254,6 +254,13 @@ class OrchestratorTests(unittest.TestCase):
         self.assertIsNotNone(selected)
         self.assertEqual(selected["videoId"], "steamVideo1")
 
+    def test_featured_video_gracefully_skips_null_provider_response(self) -> None:
+        self.assertIsNone(
+            orchestrator.select_featured_youtube_video(
+                {"response": None}, "Blox Monsters", "Roblox"
+            )
+        )
+
     def test_featured_video_reconciliation_reuses_cached_youtube_without_changing_channel_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

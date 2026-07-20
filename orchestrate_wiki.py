@@ -420,7 +420,10 @@ def select_featured_youtube_video(raw: dict, game_name: str, platform: str = "Ro
     if not game_tokens:
         return None
     candidates: list[dict] = []
-    tasks = raw.get("response", {}).get("tasks", [])
+    response = raw.get("response")
+    if not isinstance(response, dict):
+        return None
+    tasks = response.get("tasks", [])
     for task in tasks if isinstance(tasks, list) else []:
         for result in task.get("result", []) if isinstance(task, dict) else []:
             for item in result.get("items", []) if isinstance(result, dict) else []:
