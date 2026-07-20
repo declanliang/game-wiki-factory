@@ -141,6 +141,7 @@ python gamewiki.py resume <game-slug>
 - Basic Info 生成 `game-profile.json`，定义分类语义边界。
 - Basic Info 还可生成 2–4 个证据支持的 `home.guideSections`，为首页补充核心玩法、入门路径、成长和关键系统；模板只会把其中属于已发布 `site-plan` 分类的条目解析成链接。
 - Guide Search 调用 Google Suggest 主词和 a–z，并从多个视频共同支持的稳定机制中召回补充主题；单个娱乐视频不能独立创建文章。
+- 首页视频优先使用 Basic Info 已确认的 trailer；没有时只复用 Guide Search 已缓存的 YouTube 结果，选择标题完整匹配游戏名、明确为 Roblox、时长 2–60 分钟的最高排名长视频。选中结果只填充视频 ID，不把第三方频道冒充官方频道，也不新增 API 调用。
 - `site-plan.json` 是分类、顺序、六语言标签、六语言分类描述和发布状态的唯一事实源。
 - 不为分类数量合成关键词；通常争取 3–5 个可靠文章主题，证据稀少时接受更少，分类最多 8 个。
 - `strategy/tips/tactics` 映射进 `guide`，但每个不同关键词仍生成独立文章。
@@ -169,6 +170,8 @@ python gamewiki.py resume <game-slug>
 4. 不允许为了通过 build 手工掩盖截断文章或降低相关性门槛。
 5. 完成时必须确认：所有分类有真实关键词证据、六语言文章树一致、intake 通过、TypeScript 通过、production build 通过、sitemap loc/hreflang 全部直接 200、self-canonical 与 hreflang 完整。
 6. 报告最终网站根目录、分类、语言、文章数、最新日志和任何部署前待配置项。
+7. 只有用户明确要求发布时才创建外部资源；GitHub repo 必须且只能是 Private。
+8. Vercel 只创建/导入项目，不填写环境变量；报告需要用户手动配置的正式域名和 NEXT_PUBLIC_SITE_URL。
 ```
 
 AI 接手前还应阅读：
@@ -203,7 +206,9 @@ python gamewiki.py publish <game-slug>
 
 也可以在生成命令后直接发布：`python gamewiki.py "GAME NAME" --publish`；批量生产使用 `python gamewiki.py run-many "Game A" "Game B" --jobs 2 --publish`。
 
-发布命令要求项目流水线状态为 `complete`，先检查敏感文件，再幂等创建/更新 GitHub repo，并创建或复用同名 Vercel 项目。GitHub 使用 `FACTORY_GITHUB_TOKEN`（或 `GH_TOKEN`）；Vercel 优先使用 `VERCEL_TOKEN`，本地未设置 token 时可复用已登录的 Vercel CLI。发布器会设置生产环境的 `NEXT_PUBLIC_SITE_URL` 并重新部署，避免 canonical/sitemap 保留 `example.com`。只推 GitHub 时加 `--skip-vercel`。回执写入 `.gamewiki/publish.json`，不含 token。
+发布命令要求项目流水线状态为 `complete`，先检查敏感文件，再幂等创建/更新 GitHub repo，并创建或复用同名 Vercel 项目。**游戏 GitHub 仓库只能是 Private**：创建固定使用私有模式，已有仓库也会在推送前后验证 `PRIVATE` 可见性，不提供 Public 开关。GitHub 使用 `FACTORY_GITHUB_TOKEN`（或 `GH_TOKEN`）；Vercel 优先使用 `VERCEL_TOKEN`，本地未设置 token 时可复用已登录的 Vercel CLI。
+
+发布器不会填写或修改 Vercel 环境变量，也不会把默认 `*.vercel.app` 当成正式域名。Vercel 回执状态为 `awaiting_domain_configuration`；项目导入后，由站点负责人绑定正式域名并手动填写 `NEXT_PUBLIC_SITE_URL=https://正式域名`，再执行 `npm run verify:deploy`。只推 GitHub 时加 `--skip-vercel`。回执写入 `.gamewiki/publish.json`，不含 token。
 
 仓库内的 `.github/workflows/generate-and-publish.yml` 支持手动输入游戏名 JSON 数组，并以最多 3 个矩阵任务并发生成、建仓和导入 Vercel。
 

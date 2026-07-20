@@ -79,9 +79,16 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
     });
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-[90rem] px-5 py-10 sm:px-8 lg:px-12">
       {messages.home.faq.items.length > 0 && <JsonLd data={faqPage} />}
-      <HomePageClient home={messages.home} quickFactsLabel={messages.shared.quickFacts} locale={locale} recentArticles={recentArticles} categories={categories} />
+      <HomePageClient
+        home={messages.home}
+        quickFactsLabel={messages.shared.quickFacts}
+        videoLabels={messages.shared.homeVideo}
+        locale={locale}
+        recentArticles={recentArticles}
+        categories={categories}
+      />
     </main>
   );
 }

@@ -270,7 +270,6 @@ Publishing is allowed only when the project manifest is complete and local produ
 ```text
 FACTORY_GITHUB_TOKEN       token/App user token capable of creating repositories
 GITHUB_OWNER               destination user or organization
-GITHUB_REPO_VISIBILITY     public|private (default private)
 VERCEL_TOKEN               Vercel access token
 VERCEL_TEAM_ID             optional team ID
 VERCEL_GIT_PROVIDER        github
@@ -285,13 +284,13 @@ VERCEL_GIT_PROVIDER        github
 1. Validate manifest, intake, clean secret scan, production build receipt.
 2. Produce the commit allowlist; exclude `.gamewiki`, `.env*`, logs, caches, `node_modules`, `.next`.
 3. Look up `<owner>/<slug>`.
-4. Create it when absent; otherwise verify ownership and reuse it.
+4. Create it as Private when absent; otherwise verify ownership, force/verify `PRIVATE`, and reuse it. Public repositories are not a supported state.
 5. Initialize/update local Git, commit only when content changed, and push `main`.
 6. Look up a Vercel project named `<slug>`.
 7. Create it when absent with `gitRepository.type=github`, repository full name, Next.js framework, and empty root directory.
-8. Set `NEXT_PUBLIC_SITE_URL` to the configured custom origin or the stable production `https://<slug>.vercel.app` origin.
-9. Trigger/wait for production deployment.
-10. Run remote `verify:deploy` against the actual production URL.
+8. Do not create, update, or infer Vercel environment variables.
+9. Record Vercel as `awaiting_domain_configuration` and tell the operator to bind the final domain and set `NEXT_PUBLIC_SITE_URL` manually.
+10. After manual domain configuration, run remote `verify:deploy` against the actual production URL.
 11. Write `.gamewiki/publish.json` with non-secret IDs, URLs, commit SHA, status, and timestamps.
 
 Re-running publish updates the same repository and Vercel project. Name collisions owned by another account fail safely.
@@ -301,7 +300,7 @@ Re-running publish updates the same repository and Vercel project. Name collisio
 Add `.github/workflows/generate-and-publish.yml` to the Factory repository:
 
 - trigger: `workflow_dispatch`;
-- inputs: JSON game-name array, `max_parallel`, `publish`, visibility, optional site-origin map;
+- inputs: JSON game-name array, `max_parallel`, and whether to import into Vercel; repository visibility is not configurable and is always Private;
 - matrix job with bounded `max-parallel`;
 - tests before paid generation;
 - generate, build, publish, verify;

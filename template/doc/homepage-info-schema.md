@@ -35,6 +35,8 @@
 
 **关于"找不到"的字段**：`OFFICIAL_GAME_URL`/`DISCORD_URL`/`YOUTUBE_CHANNEL_URL`/`FANDOM_URL` 这 4 个字段，`check:intake` 会校验值是不是真的 `http(s)` 链接——**不是的话（包括"未找到"/"N/A"这类说明文字）会被直接当成"没有这个链接"丢弃，并打印一条警告**。所以找不到就填空字符串 `""` 或者不写这个 key，不要写文字说明，写了也不会生效，只是多一条警告。
 
+工厂在 Basic Info 没有提供视频时，可从 Guide Search 已缓存结果中补一个严格同游戏的长视频。第三方视频只填 `YOUTUBE_VIDEO_ID`；`YOUTUBE_CHANNEL_URL` 仍只允许官方频道，不能因为嵌入了某位创作者的视频就把其频道标为官方。选择依据保存在 `.gamewiki/planning/featured-video.json`。
+
 **示例：**
 ```json
 {

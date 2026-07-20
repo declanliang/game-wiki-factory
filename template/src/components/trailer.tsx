@@ -1,47 +1,70 @@
-// Trailer video modal — needs client-side interactivity (onClick, direct DOM access for the
-// <dialog> element), so it's kept in its own "use client" file, separate from site.tsx (which
-// touches Node's `fs` via getDynamicNavigation and must never be imported by a client component).
 "use client";
 
 import Image from "next/image";
-import { Play } from "lucide-react";
+import { ExternalLink, Play } from "lucide-react";
+import { useState } from "react";
 
-export function TrailerCard({ videoId, gameName }: { videoId: string; gameName?: string }) {
+type VideoLabels = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  play: string;
+  watchOnYouTube: string;
+};
+
+export function TrailerButton({ videoId, gameName, labels }: { videoId: string; gameName: string; labels: VideoLabels }) {
+  const [playing, setPlaying] = useState(false);
+  const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
   return (
-    <div className="group relative cursor-pointer overflow-hidden rounded-2xl border border-border shadow-lg transition-all duration-200">
-      <div className="relative aspect-video w-full">
-        <Image src="/images/hero-trailer-thumbnail.jpg" alt={gameName ? `${gameName} Official Trailer` : "Official Trailer"} fill sizes="(min-width: 640px) 640px, 100vw" priority className="object-cover transition-all duration-200 group-hover:brightness-80" />
+    <section className="mx-auto max-w-5xl" aria-labelledby="homepage-video-title">
+      <div className="mb-7 text-center">
+        <p className="text-xs font-bold uppercase tracking-[0.28em] text-[hsl(var(--nav-theme))]">{labels.eyebrow}</p>
+        <h2 id="homepage-video-title" className="mt-3 text-3xl font-bold tracking-tight text-foreground sm:text-5xl">{labels.title}</h2>
+        <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">{labels.description}</p>
       </div>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="flex size-20 items-center justify-center rounded-full bg-primary/10 backdrop-blur-md transition-transform duration-200 group-hover:scale-105 sm:size-24">
-          <div className="flex size-14 items-center justify-center rounded-full bg-gradient-to-b from-primary/30 to-primary shadow-md transition-transform duration-200 group-hover:scale-110 sm:size-16">
-            <Play className="size-6 fill-white text-white sm:size-7" style={{ filter: "drop-shadow(rgba(0,0,0,0.07) 0 4px 3px) drop-shadow(rgba(0,0,0,0.06) 0 2px 2px)" }} />
-          </div>
+
+      <div className="overflow-hidden rounded-[1.75rem] border border-border bg-card/70 shadow-2xl shadow-black/10">
+        <div className="relative aspect-video w-full bg-black">
+          {playing ? (
+            <iframe
+              className="absolute inset-0 h-full w-full"
+              src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`}
+              title={`${gameName} gameplay video`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPlaying(true)}
+              className="group absolute inset-0 w-full overflow-hidden text-white"
+              aria-label={`${labels.play}: ${gameName}`}
+            >
+              <Image
+                src="/images/hero-trailer-thumbnail.jpg"
+                alt={`${gameName} gameplay video thumbnail`}
+                fill
+                sizes="(min-width: 1024px) 960px, 100vw"
+                className="object-cover transition duration-500 group-hover:scale-[1.015] group-hover:brightness-75"
+              />
+              <span className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-black/10" />
+              <span className="absolute inset-0 grid place-items-center">
+                <span className="grid h-20 w-20 place-items-center rounded-full border border-white/25 bg-black/45 shadow-2xl backdrop-blur-md transition duration-300 group-hover:scale-110 group-hover:bg-[hsl(var(--nav-theme))]">
+                  <Play className="ml-1 h-8 w-8 fill-current" />
+                </span>
+              </span>
+              <span className="absolute bottom-5 left-5 rounded-full border border-white/20 bg-black/55 px-4 py-2 text-sm font-semibold backdrop-blur-md">{labels.play}</span>
+            </button>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-4 px-5 py-4 sm:px-7">
+          <p className="min-w-0 truncate text-sm font-medium text-muted-foreground">{gameName}</p>
+          <a href={videoUrl} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-[hsl(var(--nav-theme))] hover:underline">
+            {labels.watchOnYouTube}<ExternalLink className="h-4 w-4" />
+          </a>
         </div>
       </div>
-      <span className="absolute bottom-2.5 right-2.5 rounded-md bg-black/70 px-2 py-0.5 text-[11px] text-white">YouTube</span>
-    </div>
-  );
-}
-
-export function TrailerDialog({ videoId }: { videoId: string }) {
-  return (
-    <dialog id="trailer-dialog" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-200" onClick={(e) => { const d = document.getElementById("trailer-dialog") as HTMLDialogElement; if (e.target === d) { d.close(); d.classList.add("opacity-0", "pointer-events-none"); d.classList.remove("opacity-100", "pointer-events-auto"); } }}>
-      <div className="relative w-full max-w-4xl mx-4">
-        <iframe id="trailer-iframe" className="aspect-video w-full rounded-xl" allow="autoplay; encrypted-media" allowFullScreen />
-        <button className="absolute -top-10 right-0 text-white/80 hover:text-white text-sm font-medium" onClick={() => { const d = document.getElementById("trailer-dialog") as HTMLDialogElement; d.close(); d.classList.add("opacity-0", "pointer-events-none"); d.classList.remove("opacity-100", "pointer-events-auto"); }}>✕ Close</button>
-      </div>
-    </dialog>
-  );
-}
-
-export function TrailerButton({ videoId, gameName }: { videoId: string; gameName?: string }) {
-  return (
-    <>
-      <button type="button" className="w-full" aria-haspopup="dialog" onClick={() => { const d = document.getElementById("trailer-dialog") as HTMLDialogElement; const f = document.getElementById("trailer-iframe") as HTMLIFrameElement; f.src = `https://www.youtube.com/embed/${videoId}?autoplay=1`; d.showModal(); d.classList.remove("opacity-0", "pointer-events-none"); d.classList.add("opacity-100", "pointer-events-auto"); }}>
-        <TrailerCard videoId={videoId} gameName={gameName} />
-      </button>
-      <TrailerDialog videoId={videoId} />
-    </>
+    </section>
   );
 }

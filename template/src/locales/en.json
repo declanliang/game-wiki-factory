@@ -104,6 +104,13 @@
     "readMore": "Read more",
     "quickGuide": "What This Guide Covers",
     "quickFacts": "Quick Facts",
+    "homeVideo": {
+      "eyebrow": "Gameplay Video",
+      "title": "Watch the Game in Action",
+      "description": "See how the game plays before you jump into the guides.",
+      "play": "Play video",
+      "watchOnYouTube": "Watch on YouTube"
+    },
     "viewAllInCategory": "View all {category}",
     "officialMedia": "Official media",
     "home": "Home",

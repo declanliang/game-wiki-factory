@@ -4,8 +4,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from publisher import _validate_project
+from publisher import _ensure_private_github_repo, _validate_project, _vercel_project_payload
 
 
 class PublisherValidationTests(unittest.TestCase):
@@ -29,6 +30,27 @@ class PublisherValidationTests(unittest.TestCase):
             (project / ".env.production").write_text("TOKEN=secret", encoding="utf-8")
             with self.assertRaisesRegex(RuntimeError, "Secret-like"):
                 _validate_project(project)
+
+    @patch("publisher._run")
+    def test_existing_public_repository_is_made_private_and_rechecked(self, run) -> None:
+        run.side_effect = ["PUBLIC", "", "PRIVATE"]
+
+        _ensure_private_github_repo("owner/game", Path("C:/game"), {"GH_TOKEN": "hidden"})
+
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertIn("--visibility", commands[1])
+        self.assertIn("private", commands[1])
+        self.assertEqual(commands[0], commands[2])
+
+    @patch("publisher._run", return_value="PUBLIC")
+    def test_private_visibility_is_a_required_postcondition(self, _run) -> None:
+        with self.assertRaisesRegex(RuntimeError, "must be PRIVATE"):
+            _ensure_private_github_repo("owner/game", Path("C:/game"), {})
+
+    def test_vercel_project_creation_never_sets_environment_variables(self) -> None:
+        payload = _vercel_project_payload("game", "owner/game")
+        self.assertNotIn("environmentVariables", payload)
+        self.assertEqual(payload["gitRepository"]["repo"], "owner/game")
 
 
 if __name__ == "__main__":

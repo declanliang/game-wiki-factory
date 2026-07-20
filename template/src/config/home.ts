@@ -14,10 +14,10 @@
 // JSON-driven module system.
 export const HOME_SECTIONS = [
   "hero",
+  "video",
   "ads",
   "about",
   "guideSections",
-  "video",
   "categories",
   "featured",
   "liveTools",

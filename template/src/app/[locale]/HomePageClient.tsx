@@ -25,6 +25,7 @@ type LightItem = { title: string; description: string; href: string; category?: 
 type LightSection = { title: string; description?: string; viewAllHref?: string; viewAllLabel?: string; items: LightItem[] };
 type GuideItem = { title: string; description: string; category?: string; href?: string };
 type GuideSection = { id: string; eyebrow: string; title: string; description: string; items: GuideItem[] };
+type VideoLabels = { eyebrow: string; title: string; description: string; play: string; watchOnYouTube: string };
 type Home = Omit<typeof en.home, "featured" | "liveTools" | "hero"> & {
   hero: Omit<typeof en.home.hero, "videoId"> & { videoId?: string };
   featured: LightSection;
@@ -71,7 +72,7 @@ function renderBoldText(text: string) {
 function LightCard({ item, locale }: { item: LightItem; locale: string }) {
   const Icon = (item.category && iconByKey[item.category]) || BookOpen;
   return (
-    <Link href={localizeHref(item.href, locale)} className="group flex items-start gap-3 rounded-2xl border border-border bg-card/70 p-4 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">
+    <Link href={localizeHref(item.href, locale)} className="group flex w-full max-w-[20rem] items-start gap-3 rounded-2xl border border-border bg-card/70 p-4 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]"><Icon className="h-4 w-4" /></span>
       <span className="min-w-0">
         <span className="block text-lg font-semibold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{item.title}</span>
@@ -85,11 +86,11 @@ function LightSectionBlock({ section, locale }: { section: LightSection; locale:
   if (!section.items || section.items.length === 0) return null;
   return (
     <section className="mx-auto max-w-5xl">
-      <h2 className="text-center text-5xl font-bold tracking-tight text-foreground">{section.title}</h2>
+      <h2 className="text-center text-3xl font-bold tracking-tight text-foreground sm:text-5xl">{section.title}</h2>
       {section.description && (
         <p className="mx-auto mt-4 max-w-3xl text-center text-lg text-muted-foreground">{section.description}</p>
       )}
-      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 flex flex-wrap justify-center gap-3">
         {section.items.map((item) => <LightCard key={item.href} item={item} locale={locale} />)}
       </div>
       {section.viewAllHref && (
@@ -105,26 +106,25 @@ function LightSectionBlock({ section, locale }: { section: LightSection; locale:
 
 function GuideSectionsBlock({ sections, locale }: { sections: GuideSection[]; locale: string }) {
   return (
-    <section aria-label="Game field guide" className="overflow-hidden rounded-[2rem] border border-border bg-card/45">
+    <section aria-label="Game field guide" className="mx-auto max-w-6xl space-y-16 sm:space-y-20">
       {sections.map((section, sectionIndex) => (
         <article
           key={section.id}
-          className="grid gap-7 border-t border-border px-6 py-9 first:border-t-0 md:px-9 lg:grid-cols-[0.72fr_1.28fr] lg:gap-14 lg:py-12"
+          className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:gap-16"
         >
-          <div className="lg:sticky lg:top-24 lg:self-start">
+          <div className="lg:self-start">
             <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.24em] text-[hsl(var(--nav-theme))]">
-              <span className="font-mono text-muted-foreground">{String(sectionIndex + 1).padStart(2, "0")}</span>
-              <span className="h-px w-8 bg-[hsl(var(--nav-theme)/0.45)]" />
+              <span className="grid h-10 w-10 place-items-center rounded-xl border border-[hsl(var(--nav-theme)/0.35)] bg-[hsl(var(--nav-theme)/0.1)] font-mono text-sm text-[hsl(var(--nav-theme))]">{String(sectionIndex + 1).padStart(2, "0")}</span>
               <span>{section.eyebrow}</span>
             </div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{section.title}</h2>
             <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">{section.description}</p>
           </div>
-          <ol className="divide-y divide-border border-y border-border">
+          <ol className="grid gap-4">
             {section.items.map((item, itemIndex) => {
               const body = (
-                <div className="grid grid-cols-[2rem_1fr_auto] gap-3 py-5 sm:grid-cols-[2.5rem_1fr_auto]">
-                  <span className="pt-1 font-mono text-xs text-muted-foreground">{String(itemIndex + 1).padStart(2, "0")}</span>
+                <div className="grid grid-cols-[2.75rem_1fr_auto] gap-4 rounded-2xl border border-border bg-card/70 p-5 transition group-hover:-translate-y-0.5 group-hover:border-[hsl(var(--nav-theme-light))]">
+                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-muted font-mono text-xs font-bold text-[hsl(var(--nav-theme))]">{String(itemIndex + 1).padStart(2, "0")}</span>
                   <span>
                     <span className="block text-lg font-semibold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{item.title}</span>
                     <span className="mt-1 block text-sm leading-6 text-muted-foreground">{item.description}</span>
@@ -145,13 +145,13 @@ function GuideSectionsBlock({ sections, locale }: { sections: GuideSection[]; lo
   );
 }
 
-export default function HomePageClient({ home, quickFactsLabel, locale, recentArticles, categories }: { home: Home; quickFactsLabel: string; locale: string; recentArticles: ContentItem[]; categories: Category[] }) {
+export default function HomePageClient({ home, quickFactsLabel, videoLabels, locale, recentArticles, categories }: { home: Home; quickFactsLabel: string; videoLabels: VideoLabels; locale: string; recentArticles: ContentItem[]; categories: Category[] }) {
   function renderSection(section: HomeSection) {
     switch (section) {
       case "hero":
         return (
           // Centered eyebrow above H1 → description → 2 CTAs → trust-signal stats. No sidebar, no video here.
-          <section className="text-center">
+          <section className="mx-auto max-w-6xl pt-4 text-center sm:pt-8">
             <div className="mx-auto mb-4 flex justify-center">
               <span className="inline-flex items-center rounded-full border border-[hsl(var(--nav-theme)/0.3)] bg-[hsl(var(--nav-theme)/0.1)] px-3 py-1 text-sm font-semibold text-[hsl(var(--nav-theme))]">{home.hero.eyebrow}</span>
             </div>
@@ -161,11 +161,11 @@ export default function HomePageClient({ home, quickFactsLabel, locale, recentAr
               <Button asChild size="lg"><Link href={localizeHref(home.hero.primaryCtaHref, locale)}>{home.hero.primaryCta}</Link></Button>
               <Button asChild size="lg" variant="outline"><Link href={home.hero.secondaryCtaHref}>{home.hero.secondaryCta}</Link></Button>
             </div>
-            <div className="mx-auto mt-8 grid max-w-3xl grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4">
               {home.hero.stats.map((stat) => (
-                <div key={stat.label} className="rounded-2xl border border-border bg-card/70 p-5">
-                  <p className="text-2xl font-bold text-[hsl(var(--nav-theme))] sm:text-3xl">{stat.value}</p>
-                  <p className="mt-2 text-sm text-muted-foreground">{stat.label}</p>
+                <div key={stat.label} className="flex min-h-36 flex-col rounded-2xl border border-border bg-card/70 p-5 text-left sm:min-h-40 sm:p-6">
+                  <p className="text-2xl font-bold leading-tight text-[hsl(var(--nav-theme))] sm:text-3xl">{stat.value}</p>
+                  <p className="mt-auto pt-5 text-sm leading-5 text-muted-foreground">{stat.label}</p>
                 </div>
               ))}
             </div>
@@ -183,13 +183,13 @@ export default function HomePageClient({ home, quickFactsLabel, locale, recentAr
       case "about":
         return (
           // Centered heading + divider, then paragraphs (left) / Quick Facts box (right)
-          <section>
+          <section className="mx-auto max-w-6xl">
             <div className="text-center">
-              <h2 className="text-5xl font-bold tracking-tight text-foreground">{home.aboutGame.title}</h2>
+              <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-5xl">{home.aboutGame.title}</h2>
               <div className="mx-auto mt-4 h-px w-24 bg-border" />
             </div>
-            <div className="mt-8 grid gap-8 lg:grid-cols-[1.3fr_1fr]">
-              <div>
+            <div className="mt-10 grid gap-10 lg:grid-cols-[1.18fr_0.82fr] lg:gap-16">
+              <div className="max-w-2xl">
                 {home.aboutGame.paragraphs.map((p) => <p key={p} className="mt-4 text-lg leading-8 text-muted-foreground first:mt-0">{renderBoldText(p)}</p>)}
                 <Button asChild className="mt-6"><Link href={localizeHref(home.aboutGame.ctaHref, locale)}>{home.aboutGame.cta}</Link></Button>
               </div>
@@ -216,24 +216,23 @@ export default function HomePageClient({ home, quickFactsLabel, locale, recentAr
       case "video":
         // Optional — only renders when a video ID is configured
         return home.hero.videoId ? (
-          <section className="mx-auto max-w-4xl">
-            <TrailerButton videoId={home.hero.videoId} gameName={home.hero.title} />
-          </section>
+          <TrailerButton videoId={home.hero.videoId} gameName={home.hero.title} labels={videoLabels} />
         ) : null;
 
       case "categories":
         // Auto-generated from NAVIGATION_CONFIG, zero extra config
         return categories.length > 0 ? (
-          <section className="mx-auto max-w-5xl">
-            <h2 className="text-center text-5xl font-bold tracking-tight text-foreground">{home.categories.title}</h2>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <section className="mx-auto max-w-6xl">
+            <h2 className="text-center text-3xl font-bold tracking-tight text-foreground sm:text-5xl">{home.categories.title}</h2>
+            <div className="mt-8 flex flex-wrap justify-center gap-4">
               {categories.map((category) => {
                 const Icon = iconByKey[category.key] ?? BookOpen;
                 return (
-                  <Link key={category.key} href={localizeHref(category.path, locale)} className="group rounded-2xl border border-border bg-card/70 p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">
+                  <Link key={category.key} href={localizeHref(category.path, locale)} className="group flex w-full max-w-[19rem] flex-col rounded-2xl border border-border bg-card/70 p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">
                     <span className="grid h-11 w-11 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]"><Icon className="h-5 w-5" /></span>
                     <h3 className="mt-4 text-xl font-bold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{category.title}</h3>
-                    <p className="mt-4 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{category.count} {category.count === 1 ? "Article" : "Articles"}</p>
+                    {category.description ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{category.description}</p> : null}
+                    <p className="mt-auto pt-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{category.count} {category.count === 1 ? "Article" : "Articles"}</p>
                   </Link>
                 );
               })}
@@ -264,27 +263,27 @@ export default function HomePageClient({ home, quickFactsLabel, locale, recentAr
       case "updates":
         // Compact "what's new" list, title-only rows (not a mini article grid)
         return recentArticles.length > 0 ? (
-          <section>
-            <h2 className="text-center text-5xl font-bold tracking-tight text-foreground">{home.updates.title}</h2>
-            <Card className="mt-6 border-border bg-card/70 p-5">
-              <div className="divide-y divide-border">
+          <section className="mx-auto max-w-4xl">
+            <h2 className="text-center text-3xl font-bold tracking-tight text-foreground sm:text-5xl">{home.updates.title}</h2>
+            <Card className="mt-8 border-0 bg-transparent p-0 shadow-none">
+              <div className="grid gap-3">
                 {recentArticles.map((article) => {
                   const articleHref = `/${article.contentType}/${article.slug}`;
                   const categoryLabel = article.contentType.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
                   return (
-                    <Link key={articleHref} href={localizeHref(articleHref, locale)} className="group flex items-center justify-between gap-4 py-3.5">
-                      <span className="flex min-w-0 items-center gap-3">
+                    <Link key={articleHref} href={localizeHref(articleHref, locale)} className="group flex flex-col gap-3 rounded-2xl border border-border bg-card/70 p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))] sm:flex-row sm:items-center sm:justify-between">
+                      <span className="flex min-w-0 items-start gap-3 sm:items-center">
                         <Badge className="shrink-0 bg-[hsl(var(--nav-theme))] text-primary-foreground">{categoryLabel}</Badge>
-                        <span className="truncate text-lg font-semibold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{article.metadata.title}</span>
+                        <span className="text-lg font-semibold leading-6 text-foreground group-hover:text-[hsl(var(--nav-theme))]">{article.metadata.title}</span>
                       </span>
-                      <span className="shrink-0 text-sm text-muted-foreground">{article.metadata.date}</span>
+                      <span className="shrink-0 pl-0 text-sm text-muted-foreground sm:pl-4">{article.metadata.date}</span>
                     </Link>
                   );
                 })}
               </div>
-              <Button asChild className="mt-5 w-full" variant="outline">
-                <Link href={localizeHref(home.updates.browseHref, locale)}>{home.updates.browse}</Link>
-              </Button>
+              <div className="mt-6 text-center">
+                <Button asChild variant="outline"><Link href={localizeHref(home.updates.browseHref, locale)}>{home.updates.browse}</Link></Button>
+              </div>
             </Card>
           </section>
         ) : null;
@@ -292,8 +291,8 @@ export default function HomePageClient({ home, quickFactsLabel, locale, recentAr
       case "faq":
         // Curated, stays in JSON — answers may contain [label](href) links
         return (
-          <section>
-            <h2 className="text-center text-5xl font-bold tracking-tight text-foreground">{home.faq.title}</h2>
+          <section className="mx-auto max-w-4xl">
+            <h2 className="text-center text-3xl font-bold tracking-tight text-foreground sm:text-5xl">{home.faq.title}</h2>
             <p className="mt-2 text-center text-lg text-muted-foreground">{home.faq.description}</p>
             <Accordion type="single" collapsible className="mx-auto mt-6 max-w-3xl rounded-2xl border border-border bg-card/70 px-5">
               {home.faq.items.map((item, index) => (
@@ -309,7 +308,7 @@ export default function HomePageClient({ home, quickFactsLabel, locale, recentAr
       case "finalCta":
         // Curated, stays in JSON
         return (
-          <section className="rounded-3xl border border-border bg-gradient-to-br from-muted to-card p-8 text-center">
+          <section className="mx-auto max-w-5xl rounded-3xl border border-border bg-gradient-to-br from-muted to-card p-8 text-center sm:p-12">
             <h2 className="text-4xl font-bold tracking-tight text-foreground">{home.finalCta.title}</h2>
             <p className="mx-auto mt-3 max-w-2xl text-lg text-muted-foreground">{home.finalCta.description}</p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -322,7 +321,7 @@ export default function HomePageClient({ home, quickFactsLabel, locale, recentAr
   }
 
   return (
-    <div className="space-y-16">
+    <div className="space-y-24 sm:space-y-28">
       {HOME_SECTION_ORDER.map((section) => {
         const rendered = renderSection(section);
         return rendered ? <div key={section}>{rendered}</div> : null;

@@ -216,6 +216,57 @@ class OrchestratorTests(unittest.TestCase):
         self.assertNotIn("category", items[1])
         self.assertEqual(english.keys(), spanish.keys())
 
+    def test_featured_video_uses_exact_game_long_form_result(self) -> None:
+        raw = {"response": {"tasks": [{"result": [{"items": [
+            {
+                "type": "youtube_video", "video_id": "shortWrong1", "title": "Guess the Character Color Roblox",
+                "description": "Roblox", "is_shorts": True, "is_live": False, "duration_time_seconds": 20,
+                "rank_absolute": 1, "views_count": 999999,
+            },
+            {
+                "type": "youtube_video", "video_id": "exactVideo1", "title": "Roblox Guess the Characters Color",
+                "description": "Full gameplay", "is_shorts": False, "is_live": False, "duration_time_seconds": 750,
+                "rank_absolute": 2, "views_count": 5000, "channel_name": "Player",
+            },
+            {
+                "type": "youtube_video", "video_id": "unrelated01", "title": "Roblox Guess the Logo",
+                "description": "Different game", "is_shorts": False, "is_live": False, "duration_time_seconds": 600,
+                "rank_absolute": 3, "views_count": 900000,
+            },
+        ]}]}]}}
+
+        selected = orchestrator.select_featured_youtube_video(raw, "Guess the character color")
+
+        self.assertIsNotNone(selected)
+        self.assertEqual(selected["videoId"], "exactVideo1")
+
+    def test_featured_video_reconciliation_reuses_cached_youtube_without_changing_channel_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            intake = root / "intake"
+            raw_dir = root / "guide-search" / "raw"
+            planning = root / "planning"
+            intake.mkdir()
+            raw_dir.mkdir(parents=True)
+            (intake / "site-identity.json").write_text(json.dumps({
+                "GAME_NAME": "My Giant Sandwich",
+                "YOUTUBE_VIDEO_ID": "",
+                "YOUTUBE_CHANNEL_URL": "",
+            }), encoding="utf-8")
+            (raw_dir / "youtube.json").write_text(json.dumps({"response": {"tasks": [{"result": [{"items": [{
+                "type": "youtube_video", "video_id": "emoPivDenHI", "title": "ROBLOX MY GIANT SANDWICH",
+                "description": "Roblox gameplay", "is_shorts": False, "is_live": False,
+                "duration_time_seconds": 998, "rank_absolute": 1, "views_count": 200000,
+                "channel_name": "CaylusBlox", "channel_url": "https://www.youtube.com/@caylusblox",
+            }]}]}]}}), encoding="utf-8")
+
+            selected = orchestrator.reconcile_featured_video(intake, root / "guide-search", planning)
+            identity = json.loads((intake / "site-identity.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(selected["videoId"], "emoPivDenHI")
+        self.assertEqual(identity["YOUTUBE_VIDEO_ID"], "emoPivDenHI")
+        self.assertEqual(identity["YOUTUBE_CHANNEL_URL"], "")
+
 
 if __name__ == "__main__":
     unittest.main()

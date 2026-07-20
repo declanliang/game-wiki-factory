@@ -398,6 +398,92 @@ def reconcile_homepage_guide_links(intake_dir: Path, site_plan: dict) -> None:
         write_json(content_path, content)
 
 
+def _video_title_tokens(value: str) -> set[str]:
+    tokens: set[str] = set()
+    for token in re.findall(r"[a-z0-9]+", value.casefold()):
+        if token in {"roblox", "the", "a", "an", "game", "plays", "play"}:
+            continue
+        if token.endswith("s") and len(token) > 4:
+            token = token[:-1]
+        tokens.add(token)
+    return tokens
+
+
+def select_featured_youtube_video(raw: dict, game_name: str) -> dict | None:
+    """Pick one exact-game, long-form video from the cached Guide Search response."""
+    game_tokens = _video_title_tokens(game_name)
+    if not game_tokens:
+        return None
+    candidates: list[dict] = []
+    tasks = raw.get("response", {}).get("tasks", [])
+    for task in tasks if isinstance(tasks, list) else []:
+        for result in task.get("result", []) if isinstance(task, dict) else []:
+            for item in result.get("items", []) if isinstance(result, dict) else []:
+                if not isinstance(item, dict) or item.get("type") != "youtube_video":
+                    continue
+                video_id = str(item.get("video_id") or "").strip()
+                title = str(item.get("title") or "").strip()
+                duration = item.get("duration_time_seconds")
+                if (
+                    not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id)
+                    or item.get("is_shorts")
+                    or item.get("is_live")
+                    or not isinstance(duration, int)
+                    or not 120 <= duration <= 3600
+                ):
+                    continue
+                title_tokens = _video_title_tokens(title)
+                if not game_tokens.issubset(title_tokens):
+                    continue
+                title_and_description = f"{title} {item.get('description') or ''}".casefold()
+                if "roblox" not in title_and_description:
+                    continue
+                candidates.append(item)
+    if not candidates:
+        return None
+    selected = min(
+        candidates,
+        key=lambda item: (
+            int(item.get("rank_absolute") or 1_000_000),
+            -int(item.get("views_count") or 0),
+        ),
+    )
+    return {
+        "videoId": selected["video_id"],
+        "title": selected.get("title") or "",
+        "channelName": selected.get("channel_name") or "",
+        "channelUrl": selected.get("channel_url") or "",
+        "url": selected.get("url") or f"https://www.youtube.com/watch?v={selected['video_id']}",
+        "durationSeconds": selected.get("duration_time_seconds"),
+        "source": "guide-search/raw/youtube.json",
+        "selectionReason": "Top-ranked long-form result whose title contains the complete normalized game name and identifies Roblox.",
+    }
+
+
+def reconcile_featured_video(intake_dir: Path, keyword_run_dir: Path, planning_dir: Path) -> dict | None:
+    """Fill an empty homepage video slot from already-paid, cached YouTube research."""
+    identity_path = intake_dir / "site-identity.json"
+    identity = read_json(identity_path)
+    existing = str(identity.get("YOUTUBE_VIDEO_ID") or "").strip()
+    if existing:
+        selection = {
+            "videoId": existing,
+            "source": "basic-info/site-identity.json",
+            "selectionReason": "Basic Info supplied a verified trailer or introduction video.",
+        }
+    else:
+        youtube_path = keyword_run_dir / "raw" / "youtube.json"
+        if not youtube_path.is_file():
+            return None
+        selection = select_featured_youtube_video(read_json(youtube_path), str(identity.get("GAME_NAME") or ""))
+        if not selection:
+            return None
+        identity["YOUTUBE_VIDEO_ID"] = selection["videoId"]
+        write_json(identity_path, identity)
+    write_json(planning_dir / "featured-video.json", selection)
+    return selection
+
+
 def latest_keyword_file(search_roots: Iterable[Path], slug: str) -> Path | None:
     matches: list[Path] = []
     for root in search_roots:
@@ -792,6 +878,13 @@ def main(argv: list[str] | None = None) -> int:
         copy_directory_contents(basic_intake, intake_dir)
         shutil.copytree(articles_dir, intake_dir / "articles")
         shutil.copy2(site_plan_path, intake_dir / "site-plan.json")
+        featured_video = reconcile_featured_video(intake_dir, keyword_run_dir, planning_dir)
+        record(
+            "featuredVideo",
+            "selected" if featured_video else "unavailable",
+            output=str(planning_dir / "featured-video.json") if featured_video else None,
+            source=featured_video.get("source") if featured_video else None,
+        )
         reconcile_homepage_guide_links(intake_dir, site_plan)
         record("intake", "prepared", output=str(intake_dir), articles=article_counts)
 

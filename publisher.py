@@ -65,27 +65,52 @@ def _publish_with_vercel_cli(project: Path, project_name: str, full_repo: str) -
     )
     if connected.returncode and "already" not in (connected.stdout + connected.stderr).casefold():
         raise RuntimeError((connected.stderr or connected.stdout).strip())
-    site_url = f"https://{project_name}.vercel.app"
-    _run([
-        vercel, "env", "add", "NEXT_PUBLIC_SITE_URL", "production",
-        "--value", site_url, "--yes", "--force", "--no-sensitive",
-    ], project)
-    output = _run([vercel, "deploy", "--prod", "--yes"], project)
-    try:
-        deployment = json.loads(output)
-    except json.JSONDecodeError:
-        deployment = {}
-    details = deployment.get("deployment", {}) if isinstance(deployment, dict) else {}
     return {
-        "status": "complete",
+        "status": "awaiting_domain_configuration",
         "projectName": project_name,
-        "siteUrl": site_url,
-        "deploymentId": details.get("id"),
-        "productionUrl": details.get("url"),
-        "inspectorUrl": details.get("inspectorUrl"),
-        "readyState": details.get("readyState"),
+        "requiredEnvironmentVariables": ["NEXT_PUBLIC_SITE_URL"],
+        "nextAction": "Set the final custom domain and NEXT_PUBLIC_SITE_URL in Vercel, then run npm run verify:deploy.",
         "dashboardUrl": "https://vercel.com/dashboard",
         "updatedAt": _now(),
+    }
+
+
+def _ensure_private_github_repo(full_repo: str, project: Path, env: dict[str, str]) -> None:
+    """Enforce the factory's private-only repository contract before any update push."""
+    visibility = _run(
+        ["gh", "repo", "view", full_repo, "--json", "visibility", "--jq", ".visibility"],
+        project,
+        env,
+    ).strip().upper()
+    if visibility != "PRIVATE":
+        _run(
+            [
+                "gh",
+                "repo",
+                "edit",
+                full_repo,
+                "--visibility",
+                "private",
+                "--accept-visibility-change-consequences",
+            ],
+            project,
+            env,
+        )
+        visibility = _run(
+            ["gh", "repo", "view", full_repo, "--json", "visibility", "--jq", ".visibility"],
+            project,
+            env,
+        ).strip().upper()
+    if visibility != "PRIVATE":
+        raise RuntimeError(f"GitHub repository visibility must be PRIVATE: {full_repo}")
+
+
+def _vercel_project_payload(project_name: str, full_repo: str) -> dict:
+    """Create only the Vercel project link; domain configuration belongs to the operator."""
+    return {
+        "name": project_name,
+        "framework": "nextjs",
+        "gitRepository": {"type": "github", "repo": full_repo},
     }
 
 
@@ -111,7 +136,6 @@ def publish(argv: list[str]) -> int:
     parser.add_argument("--owner", default=os.getenv("FACTORY_GITHUB_OWNER") or "declanliang")
     parser.add_argument("--repo")
     parser.add_argument("--project-dir", type=Path)
-    parser.add_argument("--private", action="store_true")
     parser.add_argument("--skip-vercel", action="store_true")
     args = parser.parse_args(argv)
     project = (args.project_dir or (PROJECTS_ROOT / args.slug)).expanduser().resolve()
@@ -135,16 +159,18 @@ def publish(argv: list[str]) -> int:
     if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project).returncode != 0:
         _run(["git", "-c", "user.name=game-wiki-factory", "-c", "user.email=factory@local.invalid", "commit", "-m", "Generate game wiki site"], project)
     if not exists:
-        visibility = "--private" if args.private else "--public"
-        _run(["gh", "repo", "create", full_repo, visibility, "--source", ".", "--remote", "origin", "--push"], project, env)
+        _run(["gh", "repo", "create", full_repo, "--private", "--source", ".", "--remote", "origin", "--push"], project, env)
     else:
+        _ensure_private_github_repo(full_repo, project, env)
         remotes = _run(["git", "remote"], project).splitlines()
         if "origin" not in remotes:
             _run(["git", "remote", "add", "origin", f"https://github.com/{full_repo}.git"], project)
         _run(["gh", "auth", "setup-git"], project, env)
         _run(["git", "push", "-u", "origin", "main"], project, env)
+    _ensure_private_github_repo(full_repo, project, env)
     receipt["stages"]["github"] = {
         "status": "complete",
+        "visibility": "PRIVATE",
         "repo": full_repo,
         "url": f"https://github.com/{full_repo}",
         "commit": _run(["git", "rev-parse", "HEAD"], project),
@@ -160,35 +186,21 @@ def publish(argv: list[str]) -> int:
             query = f"?teamId={urllib.parse.quote(team_id)}" if team_id else ""
             try:
                 vercel = _request("GET", f"https://api.vercel.com/v9/projects/{project_name}{query}", vercel_token)
-                _request(
-                    "POST",
-                    f"https://api.vercel.com/v10/projects/{project_name}/env{query + ('&' if query else '?')}upsert=true",
-                    vercel_token,
-                    {
-                        "key": "NEXT_PUBLIC_SITE_URL",
-                        "value": f"https://{project_name}.vercel.app",
-                        "type": "plain",
-                        "target": ["production"],
-                    },
-                )
             except RuntimeError as exc:
                 if "HTTP 404" not in str(exc):
                     raise
-                vercel = _request("POST", f"https://api.vercel.com/v11/projects{query}", vercel_token, {
-                    "name": project_name,
-                    "framework": "nextjs",
-                    "gitRepository": {"type": "github", "repo": full_repo},
-                    "environmentVariables": [{
-                        "key": "NEXT_PUBLIC_SITE_URL",
-                        "value": f"https://{project_name}.vercel.app",
-                        "type": "plain",
-                        "target": "production",
-                    }],
-                })
+                vercel = _request(
+                    "POST",
+                    f"https://api.vercel.com/v11/projects{query}",
+                    vercel_token,
+                    _vercel_project_payload(project_name, full_repo),
+                )
             receipt["stages"]["vercel"] = {
-                "status": "complete",
+                "status": "awaiting_domain_configuration",
                 "projectId": vercel.get("id"),
                 "projectName": vercel.get("name", project_name),
+                "requiredEnvironmentVariables": ["NEXT_PUBLIC_SITE_URL"],
+                "nextAction": "Set the final custom domain and NEXT_PUBLIC_SITE_URL in Vercel, then run npm run verify:deploy.",
                 "dashboardUrl": "https://vercel.com/dashboard",
                 "updatedAt": _now(),
             }
