@@ -48,6 +48,47 @@ def _request(method: str, url: str, token: str, payload: dict | None = None) -> 
         raise RuntimeError(f"HTTP {exc.code} from {url}: {detail}") from exc
 
 
+def _publish_with_vercel_cli(project: Path, project_name: str, full_repo: str) -> dict:
+    vercel = shutil.which("vercel.cmd") or shutil.which("vercel")
+    if not vercel:
+        raise RuntimeError("VERCEL_TOKEN is absent and no authenticated Vercel CLI was found")
+    _run([vercel, "link", "--yes", "--project", project_name], project)
+    # `vercel link` normally connects an existing Git remote automatically. An
+    # explicit connect is safe to skip when Vercel reports it is already linked.
+    connected = subprocess.run(
+        [vercel, "git", "connect", f"https://github.com/{full_repo}", "--non-interactive"],
+        cwd=project,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+    )
+    if connected.returncode and "already" not in (connected.stdout + connected.stderr).casefold():
+        raise RuntimeError((connected.stderr or connected.stdout).strip())
+    site_url = f"https://{project_name}.vercel.app"
+    _run([
+        vercel, "env", "add", "NEXT_PUBLIC_SITE_URL", "production",
+        "--value", site_url, "--yes", "--force", "--no-sensitive",
+    ], project)
+    output = _run([vercel, "deploy", "--prod", "--yes"], project)
+    try:
+        deployment = json.loads(output)
+    except json.JSONDecodeError:
+        deployment = {}
+    details = deployment.get("deployment", {}) if isinstance(deployment, dict) else {}
+    return {
+        "status": "complete",
+        "projectName": project_name,
+        "siteUrl": site_url,
+        "deploymentId": details.get("id"),
+        "productionUrl": details.get("url"),
+        "inspectorUrl": details.get("inspectorUrl"),
+        "readyState": details.get("readyState"),
+        "dashboardUrl": "https://vercel.com/dashboard",
+        "updatedAt": _now(),
+    }
+
+
 def _validate_project(project: Path) -> dict:
     manifest = read_json(project / ".gamewiki" / "manifest.json")
     if manifest.get("status") != "complete":
@@ -113,28 +154,46 @@ def publish(argv: list[str]) -> int:
 
     if not args.skip_vercel:
         vercel_token = os.getenv("VERCEL_TOKEN")
-        if not vercel_token:
-            raise RuntimeError("VERCEL_TOKEN is required unless --skip-vercel is used")
-        team_id = os.getenv("VERCEL_TEAM_ID", "").strip()
-        query = f"?teamId={urllib.parse.quote(team_id)}" if team_id else ""
         project_name = re.sub(r"[^a-z0-9-]+", "-", repo.casefold()).strip("-")[:100]
-        try:
-            vercel = _request("GET", f"https://api.vercel.com/v9/projects/{project_name}{query}", vercel_token)
-        except RuntimeError as exc:
-            if "HTTP 404" not in str(exc):
-                raise
-            vercel = _request("POST", f"https://api.vercel.com/v11/projects{query}", vercel_token, {
-                "name": project_name,
-                "framework": "nextjs",
-                "gitRepository": {"type": "github", "repo": full_repo},
-            })
-        receipt["stages"]["vercel"] = {
-            "status": "complete",
-            "projectId": vercel.get("id"),
-            "projectName": vercel.get("name", project_name),
-            "dashboardUrl": "https://vercel.com/dashboard",
-            "updatedAt": _now(),
-        }
+        if vercel_token:
+            team_id = os.getenv("VERCEL_TEAM_ID", "").strip()
+            query = f"?teamId={urllib.parse.quote(team_id)}" if team_id else ""
+            try:
+                vercel = _request("GET", f"https://api.vercel.com/v9/projects/{project_name}{query}", vercel_token)
+                _request(
+                    "POST",
+                    f"https://api.vercel.com/v10/projects/{project_name}/env{query + ('&' if query else '?')}upsert=true",
+                    vercel_token,
+                    {
+                        "key": "NEXT_PUBLIC_SITE_URL",
+                        "value": f"https://{project_name}.vercel.app",
+                        "type": "plain",
+                        "target": ["production"],
+                    },
+                )
+            except RuntimeError as exc:
+                if "HTTP 404" not in str(exc):
+                    raise
+                vercel = _request("POST", f"https://api.vercel.com/v11/projects{query}", vercel_token, {
+                    "name": project_name,
+                    "framework": "nextjs",
+                    "gitRepository": {"type": "github", "repo": full_repo},
+                    "environmentVariables": [{
+                        "key": "NEXT_PUBLIC_SITE_URL",
+                        "value": f"https://{project_name}.vercel.app",
+                        "type": "plain",
+                        "target": "production",
+                    }],
+                })
+            receipt["stages"]["vercel"] = {
+                "status": "complete",
+                "projectId": vercel.get("id"),
+                "projectName": vercel.get("name", project_name),
+                "dashboardUrl": "https://vercel.com/dashboard",
+                "updatedAt": _now(),
+            }
+        else:
+            receipt["stages"]["vercel"] = _publish_with_vercel_cli(project, project_name, full_repo)
         write_json(receipt_path, receipt)
     print(json.dumps(receipt, ensure_ascii=False, indent=2))
     return 0

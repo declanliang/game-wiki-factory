@@ -25,7 +25,7 @@ python gamewiki.py resume <slug>
 
 ## 自动发布
 
-本地或 GitHub Actions 设置 Secrets：`FACTORY_GITHUB_TOKEN`、`VERCEL_TOKEN` 以及生成/搜索/翻译 API key；设置 Variables：`FACTORY_GITHUB_OWNER`、可选 `VERCEL_TEAM_ID`。GitHub PAT 必须允许创建仓库与推送，Vercel Team 必须授权对应 GitHub integration。
+GitHub Actions 设置 Secrets：`FACTORY_GITHUB_TOKEN`、`VERCEL_TOKEN` 以及生成/搜索/翻译 API key；设置 Variables：`FACTORY_GITHUB_OWNER`、可选 `VERCEL_TEAM_ID`。本地可以复用 `gh auth login` 与 `vercel login` 会话。发布器必须写入生产 `NEXT_PUBLIC_SITE_URL`、重新部署，并验证 canonical/sitemap/robots 使用正式 origin。
 
 ```powershell
 python gamewiki.py publish <slug>

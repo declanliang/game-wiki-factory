@@ -203,7 +203,7 @@ python gamewiki.py publish <game-slug>
 
 也可以在生成命令后直接发布：`python gamewiki.py "GAME NAME" --publish`；批量生产使用 `python gamewiki.py run-many "Game A" "Game B" --jobs 2 --publish`。
 
-发布命令要求项目流水线状态为 `complete`，先检查敏感文件，再幂等创建/更新 GitHub repo，并通过 Vercel API 创建或复用同名 Next.js 项目。所需环境变量：`FACTORY_GITHUB_TOKEN`（或 `GH_TOKEN`）、可选 `FACTORY_GITHUB_OWNER`、`VERCEL_TOKEN`、可选 `VERCEL_TEAM_ID`。只推 GitHub 时加 `--skip-vercel`。发布回执写入 `.gamewiki/publish.json`，不含 token。
+发布命令要求项目流水线状态为 `complete`，先检查敏感文件，再幂等创建/更新 GitHub repo，并创建或复用同名 Vercel 项目。GitHub 使用 `FACTORY_GITHUB_TOKEN`（或 `GH_TOKEN`）；Vercel 优先使用 `VERCEL_TOKEN`，本地未设置 token 时可复用已登录的 Vercel CLI。发布器会设置生产环境的 `NEXT_PUBLIC_SITE_URL` 并重新部署，避免 canonical/sitemap 保留 `example.com`。只推 GitHub 时加 `--skip-vercel`。回执写入 `.gamewiki/publish.json`，不含 token。
 
 仓库内的 `.github/workflows/generate-and-publish.yml` 支持手动输入游戏名 JSON 数组，并以最多 3 个矩阵任务并发生成、建仓和导入 Vercel。
 
