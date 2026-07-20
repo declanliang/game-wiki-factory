@@ -11,10 +11,17 @@ from project_contract import (
     build_seo_keywords,
     build_site_plan,
     reconcile_site_plan,
+    render_project_readme,
 )
 
 
 class ProjectContractTests(unittest.TestCase):
+    def test_steam_project_readme_preserves_deterministic_resume_command(self) -> None:
+        url = "https://store.steampowered.com/app/3712080/funnel_runners/"
+        readme = render_project_readme("Funnel Runners", "Steam", url)
+        self.assertIn(f'--platform steam --official-url "{url}"', readme)
+        self.assertIn("full controller support", readme)
+
     def _basic_output(self, root: Path) -> Path:
         intake = root / "template-intake"
         intake.mkdir(parents=True)

@@ -955,7 +955,11 @@ def main(argv: list[str] | None = None) -> int:
         write_json(manifest_path, manifest)
         if not args.skip_site:
             (project_dir / "README.md").write_text(
-                render_project_readme(canonical_name),
+                render_project_readme(
+                    canonical_name,
+                    resolved_platform,
+                    str(identity.get("OFFICIAL_GAME_URL") or ""),
+                ),
                 encoding="utf-8",
             )
         if args.publish:

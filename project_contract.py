@@ -339,7 +339,26 @@ def reconcile_site_plan(site_plan: dict[str, Any], articles_dir: Path) -> dict[s
     return result
 
 
-def render_project_readme(game_name: str) -> str:
+def render_project_readme(
+    game_name: str,
+    platform: str = "Roblox",
+    official_url: str = "",
+) -> str:
+    platform_key = platform.casefold()
+    command = f'python gamewiki.py "{game_name}" --platform {platform_key}'
+    if platform_key == "steam" and official_url:
+        command += f' --official-url "{official_url}"'
+    platform_notes = ""
+    if platform_key == "steam":
+        platform_notes = """
+
+## Steam 数据边界
+
+- App ID 是稳定身份；续跑时保留 `--platform steam` 和官方 Store URL。
+- 价格、评价数量和 Early Access 状态是采集时快照，可能随时间变化。
+- `full controller support` 不等于 Steam Deck Verified/Playable；Windows 要求也不能证明 SteamOS 性能。
+- 普通续跑会复用 checkpoint。不要随意使用 refresh/recluster/overwrite，以免重复产生 API 费用。
+"""
     return f"""# {game_name} Wiki
 
 这是由 `game-wiki-factory` 生成的独立 Next.js 游戏攻略站。本目录就是 GitHub/Vercel 项目根目录，不存在额外的 `site/` 子目录。
@@ -372,7 +391,7 @@ npm run launch:site
 
 ```powershell
 cd ..\\game-wiki-factory
-python gamewiki.py "{game_name}"
+{command}
 ```
 
 同一命令自动复用已验证 checkpoint。除非日志证明缓存无效，不要使用 refresh/overwrite 参数。
@@ -380,4 +399,5 @@ python gamewiki.py "{game_name}"
 ## 部署
 
 把本目录推送为一个独立 GitHub repo，在 Vercel 直接导入；Root Directory 留空。部署前设置 `NEXT_PUBLIC_SITE_URL=https://正式域名`（公开变量，无需 Sensitive；裸域名会自动补 HTTPS），并运行 `npm run verify:deploy`。
+{platform_notes}
 """
