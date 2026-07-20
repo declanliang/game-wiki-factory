@@ -8,6 +8,8 @@ import asyncio
 import aiohttp
 import json
 import time
+import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -39,6 +41,8 @@ class LLMClient:
 
         self._key_index = 0
         self._exhausted_keys: set[str] = set()
+        self._permit_url = os.getenv("GAMEWIKI_PERMIT_URL", "").rstrip("/")
+        self._permit_token = os.getenv("GAMEWIKI_PERMIT_TOKEN", "")
 
         self.stats = {
             'total_requests': 0,
@@ -68,6 +72,32 @@ class LLMClient:
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         }
+
+    @asynccontextmanager
+    async def _shared_permit(self, session: aiohttp.ClientSession, api_key: str):
+        if not self._permit_url:
+            yield
+            return
+        slot = self.api_keys.index(api_key) + 1
+        headers = {"Authorization": f"Bearer {self._permit_token}"}
+        async with session.post(
+            f"{self._permit_url}/acquire",
+            json={"resources": ["llm", f"llm-key-{slot}"]},
+            headers=headers,
+            timeout=aiohttp.ClientTimeout(total=3600),
+        ) as response:
+            response.raise_for_status()
+            lease = (await response.json())["lease"]
+        try:
+            yield
+        finally:
+            async with session.post(
+                f"{self._permit_url}/release",
+                json={"lease": lease},
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as response:
+                response.raise_for_status()
 
     # ── single request ──────────────────────────────────────────
 
@@ -120,7 +150,7 @@ class LLMClient:
                 if effective_reasoning:
                     payload["reasoning_effort"] = effective_reasoning
 
-                async with session.post(
+                async with self._shared_permit(session, api_key), session.post(
                     self.api_url,
                     json=payload,
                     headers=self._headers(api_key),
@@ -235,46 +265,34 @@ class LLMClient:
             batch_size = Config.GENERATE_BATCH_SIZE
 
         self.stats['start_time'] = time.time()
-        results: List[Tuple[Dict, Optional[str]]] = []
+        results: List[Tuple[Dict, Optional[str]]] = [(meta, None) for _prompt, meta in prompts]
 
         async with aiohttp.ClientSession() as session:
-            for i in range(0, len(prompts), batch_size):
-                batch = prompts[i:i + batch_size]
-                batch_num = i // batch_size + 1
-                total_batches = (len(prompts) + batch_size - 1) // batch_size
+            concurrency = max(1, min(batch_size, Config.GENERATE_CONCURRENT_LIMIT))
+            semaphore = asyncio.Semaphore(concurrency)
+            completed = 0
+            completed_lock = asyncio.Lock()
+            print(f"\n  🚦 Worker queue: {len(prompts)} items, concurrency={concurrency}")
 
-                print(f"\n  📦 Batch {batch_num}/{total_batches} ({len(batch)} items)...")
-
-                tasks = [
-                    self.generate_single(
-                        session,
-                        prompt,
-                        meta,
-                        max_tokens=max_tokens,
-                        length_retry_instruction=length_retry_instruction,
-                    )
-                    for prompt, meta in batch
-                ]
-                batch_results = await asyncio.gather(*tasks)
-
-                for (prompt, meta), content in zip(batch, batch_results):
-                    results.append((meta, content))
-
-                completed = i + len(batch)
-                print(f"  ✅ {completed}/{len(prompts)} done")
-
-                if not self._has_available_key():
-                    remaining = prompts[completed:]
-                    results.extend((meta, None) for _prompt, meta in remaining)
-                    if remaining:
-                        print(
-                            f"  ⛔ All LLM key slots are out of quota; "
-                            f"skipping {len(remaining)} remaining request(s)"
+            async def worker(index: int, prompt: str, meta: Dict):
+                nonlocal completed
+                async with semaphore:
+                    if not self._has_available_key():
+                        content = None
+                    else:
+                        content = await self.generate_single(
+                            session,
+                            prompt,
+                            meta,
+                            max_tokens=max_tokens,
+                            length_retry_instruction=length_retry_instruction,
                         )
-                    break
+                    results[index] = (meta, content)
+                async with completed_lock:
+                    completed += 1
+                    print(f"  ✅ {completed}/{len(prompts)} done")
 
-                if i + batch_size < len(prompts):
-                    await asyncio.sleep(1)
+            await asyncio.gather(*(worker(index, prompt, meta) for index, (prompt, meta) in enumerate(prompts)))
 
         self.stats['end_time'] = time.time()
         return results

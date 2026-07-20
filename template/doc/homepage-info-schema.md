@@ -109,6 +109,12 @@
 | `href` | 必填 | string | 站内路径，如 `"/codes"`（指向具体文章/工具页，不要指向分类页） |
 | `category` | 可选 | string | 匹配 `NAVIGATION_CONFIG` 的 key 就自动带对应图标，不匹配用默认图标 |
 
+### `home.guideSections`（整个 key 可选——Basic Info 深度区）
+
+用于把核心玩法、入门路径、成长、模式和关键系统直接解释在首页。工厂自动产出 2–4 个 section，每个 2–6 条 item；允许的 `id` 为 `core-gameplay`、`beginner-path`、`progression`、`game-modes`、`key-systems`、`current-highlights`。人类可读字段会翻译，`id/category/href` 在各语言必须完全相同。
+
+`category` 只是 Basic Info 的分类提示，不能自行构造文章 slug。工厂在 site plan 和文章 QA 完成后，仅为 published 分类补 `href: "/<category>"`；未发布的 category/href 会被删除，因此不会产生死链。
+
 ### `home.extraSections`（整个 key 可选——数组，可以放 0 个、1 个或多个"分类精选区"）
 
 首页除了固定的 Hero/About/Featured/FAQ 等区块之外，唯一的开放扩展点。用途：把某个内容分类里**真实、具体的条目**（角色名、职业名、道具名……而不是"共 30 篇攻略"这种统计数字）直接摆到首页，一眼就能看到核心信息，同时提升首页的游戏相关关键词密度——这是为了替代旧版模板"8 模块"机制、覆盖同一个需求（"分门别类列出信息，提升关键词密度"）而设计的，但格式不同，不能沿用旧格式。

@@ -78,6 +78,8 @@ Requirements:
 - Hero stats: exactly 5 plain strings, no zero values; at most 2 dynamic stats. Favor launch/update, visits/players, server size, approval and sourced gameplay scale.
 - Exactly 4 distinct Start cards; first is Beginner Guide.
 - About stats: 5-7 entries including Developer, Platform and Genre. Never add unknown level caps or content counts.
+- Guide sections: produce 2-4 distinct, evidence-backed sections with 2-6 useful items each. Use only these IDs: core-gameplay, beginner-path, progression, game-modes, key-systems, current-highlights. Explain stable gameplay, a beginner path, progression, modes, or key systems when supported. Do not invent named weapons, units, enemies, maps, bosses, currencies, rewards, counts, or update details.
+- A guide item may include a lowercase category slug only when that category is supported by the supplied Basic Info evidence. Do not create hrefs or article slugs.
 - Sidebar always has 2 entries. Show real verified codes as Active; third-party supported codes as Unverified; fill remaining slots with code='Unavailable', reward='No verified active code found', status='Unavailable'.
 - English is language rank 1. Output 1-4 languages total, exclude Chinese, do not translate the brand name. Unsupported languages are low-confidence inference.
 - CTA play link must be the canonical Roblox URL. Other link fields are copied from facts or null.
@@ -103,7 +105,7 @@ Requirements:
 - Respect the production limits: site.description and home.meta.description must each be 80-180 characters; home.meta.title must be 10-60 characters. Compress wording, not facts, when the target language expands.
 - Keep all other localized strings within the min/max lengths encoded in the supplied JSON Schema.
 - For Spanish, prefer established game phrasing such as "unidades invocadas", "subir de nivel", "jugar en equipo" and "jugadores por servidor"; avoid literal calques such as "los invocados", "júntate en modos" or "servidores de jugadores".
-- Values whose key is href, ends in Href, or is category are immutable identifiers: copy them byte-for-byte.
+- Values whose key is id or href, ends in Href, or is category are immutable identifiers: copy them byte-for-byte.
 - Do not translate URLs, route paths, category identifiers, redeem codes, or brand/proper names such as Roblox.
 - Keep Markdown ** emphasis and internal-link syntax intact while translating visible link text.
 - Do not leave English prose in the result. Proper names and immutable identifiers are the only expected English-looking values.

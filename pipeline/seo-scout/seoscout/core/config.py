@@ -19,6 +19,7 @@ projects/<project_name>/keywords.json.
 
 import json
 import os
+import re
 import sys
 from dotenv import load_dotenv
 
@@ -240,14 +241,12 @@ class Config:
         cls.LLM_API_KEY = os.getenv("LLM_API_KEY", "")
         # 支持多个 key 轮询（LLM_API_KEY_1, LLM_API_KEY_2, ...），
         # 用于分摊限速/瞬时错误。没配置多 key 时退回单一 LLM_API_KEY。
-        keys = []
-        i = 1
-        while True:
-            k = os.getenv(f"LLM_API_KEY_{i}", "").strip()
-            if not k:
-                break
-            keys.append(k)
-            i += 1
+        numbered = []
+        for name, value in os.environ.items():
+            match = re.fullmatch(r"LLM_API_KEY_(\d+)", name)
+            if match and value.strip():
+                numbered.append((int(match.group(1)), value.strip()))
+        keys = [value for _slot, value in sorted(numbered)]
         cls.LLM_API_KEYS = keys or ([cls.LLM_API_KEY] if cls.LLM_API_KEY else [])
         cls.LLM_API_BASE_URL = llm_cfg.get("base_url", "https://api.apifast.tech/v1")
         cls.LLM_MODEL = llm_cfg.get("model", "gemini-2.5-flash")

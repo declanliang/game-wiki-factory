@@ -24,6 +24,8 @@ Games/
 5. 把 `template/` 同步到游戏根，不覆盖 intake、content、node_modules 或 `.gamewiki`。
 6. 机械物化内容并执行生产验收。
 
+`gamewiki.py run-many` 是多项目监督器。每个游戏仍以独立进程运行；监督器提供共享许可服务，原子限制 `llm`、`llm-key-N` 和 `build` 资源，并为每个进程分配独立验证端口。并发因此不会把单 key 压力或本机 build 峰值按游戏数放大。
+
 ## 数据流
 
 ```text
@@ -73,6 +75,8 @@ Games/
 2. `site-plan.json` 把 Guide Search 关键词限制在 profile 内，记录分类顺序、六语言标签与描述、关键词、交付数量及状态。`strategy/tips/tactics` 合并到 `guide` 分类但保留独立关键词；planner 不生成无搜索证据的 fallback 关键词。
 
 SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。模板只接收 intake 中 reconcile 后的 site plan。`content/` 是投影，不是反向事实源。
+
+首页也遵循同一所有权：Basic Info 生成 `home.guideSections` 的事实与文案，site plan 决定发布分类；编排器只为已经 published 的分类补 `/<category>` 链接。文章目录不能反向创造首页事实或分类。
 
 ## Checkpoint
 

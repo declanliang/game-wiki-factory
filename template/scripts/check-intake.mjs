@@ -131,7 +131,7 @@ function diffStructure(en, other, pathPrefix, issues) {
     for (const k of Object.keys(en)) {
       const next = pathPrefix ? `${pathPrefix}.${k}` : k;
       if (!(k in other)) { issues.push(`${next}：译文版缺少这个字段`); continue; }
-      if (k === "href" || k === "category") {
+      if (k === "id" || k === "href" || k === "category") {
         if (en[k] !== other[k]) issues.push(`${next}：不该翻译的字段值不一致（英文 "${en[k]}"，译文 "${other[k]}"）`);
         continue;
       }

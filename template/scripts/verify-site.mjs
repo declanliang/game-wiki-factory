@@ -26,7 +26,7 @@ const step = (msg) => console.log(`\n\x1b[1m${msg}\x1b[0m`);
 const args = process.argv.slice(2);
 const skipBuild = args.includes("--skip-build");
 const portArgIdx = args.indexOf("--port");
-const port = portArgIdx !== -1 ? Number(args[portArgIdx + 1]) : 3100;
+const port = portArgIdx !== -1 ? Number(args[portArgIdx + 1]) : Number(process.env.GAMEWIKI_VERIFY_PORT || 3100);
 
 function run(cmd, label) {
   try {

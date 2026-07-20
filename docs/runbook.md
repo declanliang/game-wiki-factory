@@ -9,6 +9,32 @@ python gamewiki.py "GAME NAME"
 
 默认网站目录是 `..\<game-slug>`。同一命令自动续跑。
 
+并发执行：
+
+```powershell
+python gamewiki.py run-many "Game A" "Game B" --jobs 2 --llm-concurrency 6 --llm-per-key 2 --build-concurrency 1
+```
+
+`--jobs` 控制游戏进程数；其余参数分别限制全局 LLM、每个 key 和全局构建许可。默认 `2/6/2/1` 是本次双游戏实测后采用的稳健值；提高前先观察 429/5xx、内存和总耗时。状态、日志和续跑不需要寻找具体文件：
+
+```powershell
+python gamewiki.py status
+python gamewiki.py logs <slug> --tail 150
+python gamewiki.py resume <slug>
+```
+
+## 自动发布
+
+本地或 GitHub Actions 设置 Secrets：`FACTORY_GITHUB_TOKEN`、`VERCEL_TOKEN` 以及生成/搜索/翻译 API key；设置 Variables：`FACTORY_GITHUB_OWNER`、可选 `VERCEL_TEAM_ID`。GitHub PAT 必须允许创建仓库与推送，Vercel Team 必须授权对应 GitHub integration。
+
+```powershell
+python gamewiki.py publish <slug>
+```
+
+需要无人值守生成后立即发布时，可用单游戏 `python gamewiki.py "GAME" --publish` 或多游戏 `python gamewiki.py run-many "A" "B" --jobs 2 --publish`。
+
+已存在的 GitHub/Vercel 项目会复用。GitHub integration 未授权时，完成授权后重复同一命令。Actions 中运行 `Generate and publish game wikis`，`games_json` 输入合法 JSON 数组，例如 `["Game A", "Game B"]`。
+
 ## 排查顺序
 
 假设目标是 `C:\Users\liang\Documents\Games\hellhole`：

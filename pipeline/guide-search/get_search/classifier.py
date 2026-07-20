@@ -298,6 +298,12 @@ def extract_candidates(topic: str, raw: dict[str, Any]) -> tuple[list[Candidate]
 
     youtube_response = raw.get("youtube", {}).get("response") or {}
     stable_topic_evidence: dict[str, list[tuple[str, int]]] = defaultdict(list)
+    same_game_videos: dict[str, tuple[str, int]] = {}
+    topic_tokens = {
+        token[:-1] if token.endswith("s") and len(token) > 4 else token
+        for token in canonical(topic).split()
+        if token not in {"roblox", "game", "the", "a", "an"}
+    }
     for result in first_task_results(youtube_response):
         for item in result.get("items") or []:
             if item.get("type") != "youtube_video":
@@ -305,6 +311,12 @@ def extract_candidates(topic: str, raw: dict[str, Any]) -> tuple[list[Candidate]
             title = canonical(str(item.get("title") or ""))
             views = int(item.get("views_count") or 0)
             original_title = str(item.get("title") or "")
+            title_tokens = {
+                token[:-1] if token.endswith("s") and len(token) > 4 else token
+                for token in title.split()
+            }
+            if topic_tokens and topic_tokens.issubset(title_tokens) and "roblox" in title_tokens:
+                same_game_videos[title] = (original_title, views)
             for topic_tail, pattern in YOUTUBE_STABLE_TOPICS:
                 if pattern.search(title):
                     stable_topic_evidence[topic_tail].append((original_title, views))
@@ -356,6 +368,23 @@ def extract_candidates(topic: str, raw: dict[str, Any]) -> tuple[list[Candidate]
                 youtube_views=sum(distinct.values()),
                 youtube_occurrences=len(distinct),
                 evidence=[title for title, _ in records[:10]],
+            ),
+        )
+
+    # Very new games may have no Suggest suffixes yet while several independent
+    # videos clearly cover the exact Roblox experience. In that narrow case a
+    # general guide is supported by multi-video same-game evidence, not invented
+    # as a zero-evidence fallback.
+    if len(same_game_videos) >= 3:
+        records = list(same_game_videos.values())
+        add_candidate(
+            store,
+            Candidate(
+                keyword=f"{canonical(topic)} guide",
+                sources={"youtube"},
+                youtube_views=sum(views for _title, views in records),
+                youtube_occurrences=len(records),
+                evidence=[title for title, _views in records[:10]],
             ),
         )
 

@@ -13,6 +13,14 @@ python gamewiki.py "GAME NAME"
 
 第一次执行创建网站；同一命令再次执行会验证并复用 checkpoint。普通续跑不要加 refresh/overwrite 参数。
 
+同时处理两到三个游戏：
+
+```powershell
+python gamewiki.py run-many "Game A" "Game B" --jobs 2
+```
+
+该命令为每个游戏启动隔离进程，并在所有进程之间统一限制 LLM 总并发、单 key 并发和 Next.js 构建并发。增加 `LLM_API_KEY_2`、`LLM_API_KEY_3` 后会自动按编号发现，不要求编号连续。
+
 ## 工厂目录
 
 ```text
@@ -116,10 +124,22 @@ python gamewiki.py "Hellhole" --output-root D:\GameSites
 
 恢复失败的默认动作永远是“不加参数重新执行同一命令”。
 
+无需翻找目录即可查看状态和日志：
+
+```powershell
+python gamewiki.py status
+python gamewiki.py status <game-slug>
+python gamewiki.py logs <game-slug> --tail 150
+python gamewiki.py resume <game-slug>
+```
+
+多游戏运行清单和独立控制台日志位于 `game-wiki-factory/.gamewiki/runs/<run-id>/`。
+
 ## 数据和质量规则
 
 - 固定语言：`en/es/de/fr/ja/ko`。
 - Basic Info 生成 `game-profile.json`，定义分类语义边界。
+- Basic Info 还可生成 2–4 个证据支持的 `home.guideSections`，为首页补充核心玩法、入门路径、成长和关键系统；模板只会把其中属于已发布 `site-plan` 分类的条目解析成链接。
 - Guide Search 调用 Google Suggest 主词和 a–z，并从多个视频共同支持的稳定机制中召回补充主题；单个娱乐视频不能独立创建文章。
 - `site-plan.json` 是分类、顺序、六语言标签、六语言分类描述和发布状态的唯一事实源。
 - 不为分类数量合成关键词；通常争取 3–5 个可靠文章主题，证据稀少时接受更少，分类最多 8 个。
@@ -177,13 +197,15 @@ npm run launch:site
 每个游戏目录是独立网站仓库：
 
 ```powershell
-cd C:\Users\liang\Documents\Games\<game-slug>
-git init
-git add .
-git commit -m "Initial game Wiki"
-git remote add origin <GAME_REPO_URL>
-git push -u origin main
+cd C:\Users\liang\Documents\Games\game-wiki-factory
+python gamewiki.py publish <game-slug>
 ```
+
+也可以在生成命令后直接发布：`python gamewiki.py "GAME NAME" --publish`；批量生产使用 `python gamewiki.py run-many "Game A" "Game B" --jobs 2 --publish`。
+
+发布命令要求项目流水线状态为 `complete`，先检查敏感文件，再幂等创建/更新 GitHub repo，并通过 Vercel API 创建或复用同名 Next.js 项目。所需环境变量：`FACTORY_GITHUB_TOKEN`（或 `GH_TOKEN`）、可选 `FACTORY_GITHUB_OWNER`、`VERCEL_TOKEN`、可选 `VERCEL_TEAM_ID`。只推 GitHub 时加 `--skip-vercel`。发布回执写入 `.gamewiki/publish.json`，不含 token。
+
+仓库内的 `.github/workflows/generate-and-publish.yml` 支持手动输入游戏名 JSON 数组，并以最多 3 个矩阵任务并发生成、建仓和导入 Vercel。
 
 在 Vercel 导入该仓库，Root Directory 留空。部署环境设置：
 

@@ -146,7 +146,7 @@ HOMEPAGE_SCHEMA: dict[str, Any] = {
     "properties": {
         "home": {
             "type": "object", "additionalProperties": False,
-            "required": ["meta", "hero", "start", "aboutGame", "finalCta"],
+            "required": ["meta", "hero", "start", "aboutGame", "guideSections", "finalCta"],
             "properties": {
                 "meta": {"$ref": "#/$defs/meta"},
                 "hero": {
@@ -175,6 +175,10 @@ HOMEPAGE_SCHEMA: dict[str, Any] = {
                         "stats": {"type": "array", "minItems": 5, "maxItems": 7, "items": {"$ref": "#/$defs/stat"}},
                         "cta": {"type": "string"},
                     },
+                },
+                "guideSections": {
+                    "type": "array", "minItems": 2, "maxItems": 4,
+                    "items": {"$ref": "#/$defs/guideSection"},
                 },
                 "finalCta": {
                     "type": "object", "additionalProperties": False,
@@ -232,6 +236,26 @@ HOMEPAGE_SCHEMA: dict[str, Any] = {
         "meta": {"type": "object", "additionalProperties": False, "required": ["title", "description"], "properties": {"title": {"type": "string", "maxLength": 60}, "description": {"type": "string", "minLength": 140, "maxLength": 160}}},
         "startCard": {"type": "object", "additionalProperties": False, "required": ["number", "title", "description"], "properties": {"number": {"type": "string"}, "title": {"type": "string"}, "description": {"type": "string"}}},
         "stat": {"type": "object", "additionalProperties": False, "required": ["label", "value"], "properties": {"label": {"type": "string"}, "value": {"type": "string"}}},
+        "guideSection": {
+            "type": "object", "additionalProperties": False,
+            "required": ["id", "eyebrow", "title", "description", "items"],
+            "properties": {
+                "id": {"enum": ["core-gameplay", "beginner-path", "progression", "game-modes", "key-systems", "current-highlights"]},
+                "eyebrow": {"type": "string", "minLength": 3},
+                "title": {"type": "string", "minLength": 5},
+                "description": {"type": "string", "minLength": 30},
+                "items": {"type": "array", "minItems": 2, "maxItems": 6, "items": {"$ref": "#/$defs/guideItem"}},
+            },
+        },
+        "guideItem": {
+            "type": "object", "additionalProperties": False,
+            "required": ["title", "description"],
+            "properties": {
+                "title": {"type": "string", "minLength": 3},
+                "description": {"type": "string", "minLength": 20},
+                "category": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+            },
+        },
         "colors": {"type": "object", "additionalProperties": False, "required": ["navTheme", "navThemeLight"], "properties": {"navTheme": {"type": "string", "pattern": "^\\d{1,3} \\d{1,3}% \\d{1,3}%$"}, "navThemeLight": {"type": "string", "pattern": "^\\d{1,3} \\d{1,3}% \\d{1,3}%$"}}},
     },
 }
@@ -358,6 +382,10 @@ TEMPLATE_SITE_CONTENT_SCHEMA: dict[str, Any] = {
                     "minItems": 1,
                     "items": {"$ref": "#/$defs/extraSection"},
                 },
+                "guideSections": {
+                    "type": "array", "minItems": 2, "maxItems": 4,
+                    "items": {"$ref": "#/$defs/guideSection"},
+                },
                 "faq": {
                     "type": "object", "additionalProperties": False,
                     "required": ["title", "items"],
@@ -405,6 +433,27 @@ TEMPLATE_SITE_CONTENT_SCHEMA: dict[str, Any] = {
                     "maxItems": 8,
                     "items": {"$ref": "#/$defs/tool"},
                 },
+            },
+        },
+        "guideSection": {
+            "type": "object", "additionalProperties": False,
+            "required": ["id", "eyebrow", "title", "description", "items"],
+            "properties": {
+                "id": {"enum": ["core-gameplay", "beginner-path", "progression", "game-modes", "key-systems", "current-highlights"]},
+                "eyebrow": {"type": "string", "minLength": 3},
+                "title": {"type": "string", "minLength": 5},
+                "description": {"type": "string", "minLength": 30},
+                "items": {"type": "array", "minItems": 2, "maxItems": 6, "items": {"$ref": "#/$defs/guideItem"}},
+            },
+        },
+        "guideItem": {
+            "type": "object", "additionalProperties": False,
+            "required": ["title", "description"],
+            "properties": {
+                "title": {"type": "string", "minLength": 3},
+                "description": {"type": "string", "minLength": 20},
+                "category": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$"},
+                "href": {"type": "string", "pattern": "^/[a-z0-9][a-z0-9/-]*$"},
             },
         },
         "faqItem": {

@@ -16,6 +16,7 @@ export const HOME_SECTIONS = [
   "hero",
   "ads",
   "about",
+  "guideSections",
   "video",
   "categories",
   "featured",

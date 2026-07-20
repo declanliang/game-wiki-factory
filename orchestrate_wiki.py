@@ -20,6 +20,7 @@ from project_contract import (
     reconcile_site_plan,
     render_project_readme,
 )
+from permit_client import shared_permit
 
 
 ROOT = Path(__file__).resolve().parent
@@ -164,10 +165,23 @@ def build_subprocess_env(
         if value:
             env[key] = value
 
+    # Numbered factory keys feed SEO Scout's rotation pool. Numbering may have
+    # gaps; Config discovers the complete environment instead of stopping at one.
+    if env.get("LLM_API_KEY", "").strip():
+        if not env.get("LLM_API_KEY_1", "").strip():
+            env["LLM_API_KEY_1"] = env["LLM_API_KEY"]
+    for name, value in list(env.items()):
+        match = re.fullmatch(r"TOAPIS_API_KEY_(\d+)", name)
+        if match and value.strip():
+            target = f"LLM_API_KEY_{match.group(1)}"
+            if not env.get(target, "").strip():
+                env[target] = value
+
     # Child CLIs print multilingual text and emoji. Windows otherwise defaults
     # redirected Python stdout to GBK, which can fail before the first API call.
     env.setdefault("PYTHONIOENCODING", "utf-8")
     env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONUNBUFFERED", "1")
 
     return env
 
@@ -204,12 +218,21 @@ def run_command(
             errors="replace",
         )
         assert process.stdout is not None
+        forward_console = True
         try:
             for line in process.stdout:
-                sys.stdout.write(line)
-                sys.stdout.flush()
                 log.write(line)
                 run_log.write(line)
+                log.flush()
+                run_log.flush()
+                if forward_console:
+                    try:
+                        sys.stdout.write(line)
+                        sys.stdout.flush()
+                    except (OSError, ValueError, UnicodeError):
+                        # A closed/legacy parent console must never abort paid work;
+                        # the dedicated UTF-8 logs remain authoritative.
+                        forward_console = False
         finally:
             process.stdout.close()
         return_code = process.wait()
@@ -350,6 +373,31 @@ def validate_articles(articles_dir: Path, languages: list[str]) -> dict[str, int
     return {locale: len(files) for locale, files in by_locale.items()}
 
 
+def reconcile_homepage_guide_links(intake_dir: Path, site_plan: dict) -> None:
+    """Resolve Basic Info guide hints only against published site-plan categories."""
+    published = {
+        str(item.get("id"))
+        for item in site_plan.get("categories", [])
+        if item.get("status") == "published" and item.get("id")
+    }
+    for content_path in sorted(intake_dir.glob("site-content*.json")):
+        content = read_json(content_path)
+        sections = content.get("home", {}).get("guideSections")
+        if not isinstance(sections, list):
+            continue
+        for section in sections:
+            for item in section.get("items", []) if isinstance(section, dict) else []:
+                if not isinstance(item, dict):
+                    continue
+                category = item.get("category")
+                if category in published:
+                    item["href"] = f"/{category}"
+                else:
+                    item.pop("category", None)
+                    item.pop("href", None)
+        write_json(content_path, content)
+
+
 def latest_keyword_file(search_roots: Iterable[Path], slug: str) -> Path | None:
     matches: list[Path] = []
     for root in search_roots:
@@ -474,6 +522,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-articles", action="store_true", help="Reuse --articles-dir or an existing seo-scout project.")
     parser.add_argument("--skip-site", action="store_true", help="Prepare the complete intake package but do not create/build a site.")
     parser.add_argument("--skip-build", action="store_true", help="Run template ingestion and checks without the Next.js production build.")
+    parser.add_argument("--publish", action="store_true", help="Publish a verified site to GitHub and Vercel after generation.")
     parser.add_argument("--refresh-basic", action="store_true", help="Ignore auto-basic-info caches (may incur API cost).")
     parser.add_argument("--overwrite-articles", action="store_true", help="Regenerate existing seo-scout articles (may incur API cost).")
     return parser
@@ -743,6 +792,7 @@ def main(argv: list[str] | None = None) -> int:
         copy_directory_contents(basic_intake, intake_dir)
         shutil.copytree(articles_dir, intake_dir / "articles")
         shutil.copy2(site_plan_path, intake_dir / "site-plan.json")
+        reconcile_homepage_guide_links(intake_dir, site_plan)
         record("intake", "prepared", output=str(intake_dir), articles=article_counts)
 
         if args.skip_site:
@@ -775,13 +825,14 @@ def main(argv: list[str] | None = None) -> int:
             launch = [npm, "run", "launch:site"]
             if args.skip_build:
                 launch.extend(["--", "--skip-build"])
-            run_command(
-                launch,
-                cwd=site_dir,
-                env=env,
-                log_path=state_dir / "logs" / f"{attempt_id}-site.log",
-                run_log_path=run_log_path,
-            )
+            with shared_permit("build"):
+                run_command(
+                    launch,
+                    cwd=site_dir,
+                    env=env,
+                    log_path=state_dir / "logs" / f"{attempt_id}-site.log",
+                    run_log_path=run_log_path,
+                )
             record("site", "generated", output=str(site_dir), buildSkipped=args.skip_build)
             paths = manifest["paths"]
             assert isinstance(paths, dict)
@@ -795,6 +846,12 @@ def main(argv: list[str] | None = None) -> int:
                 render_project_readme(canonical_name),
                 encoding="utf-8",
             )
+        if args.publish:
+            if args.skip_site or args.skip_build:
+                raise PipelineError("--publish requires a complete site and production build verification.")
+            from publisher import publish
+            publish([slug, "--project-dir", str(project_dir)])
+            record("publish", "complete", output=str(project_dir / ".gamewiki" / "publish.json"))
         with run_log_path.open("a", encoding="utf-8") as run_log:
             run_log.write(
                 f"\n[complete] {canonical_name}\n"

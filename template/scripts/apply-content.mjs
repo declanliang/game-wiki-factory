@@ -75,6 +75,7 @@ if (fs.existsSync(structuredPath)) {
 } else {
   delete en.home.liveTools;
   delete en.home.extraSections;
+  delete en.home.guideSections;
   console.warn(
     `! ${path.relative(root, structuredPath)} 不存在 —— 只填了机械字段，site.description/home.hero.description/` +
       `aboutGame/faq/finalCta 等生成式文案字段仍是 __XXX__ 占位符，verify:site 会扫出来。`,

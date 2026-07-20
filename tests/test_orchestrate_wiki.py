@@ -192,6 +192,30 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(actual_identity, identity)
         self.assertEqual(languages, ["en", "es", "de", "fr", "ja", "ko"])
 
+    def test_homepage_guide_links_only_use_published_site_plan_categories(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            intake = Path(temporary)
+            source = {
+                "home": {"guideSections": [{"items": [
+                    {"title": "Start", "description": "x", "category": "guide"},
+                    {"title": "Bosses", "description": "y", "category": "bosses"},
+                ]}]}
+            }
+            for name in ("site-content.json", "site-content.es.json"):
+                (intake / name).write_text(json.dumps(source), encoding="utf-8")
+            orchestrator.reconcile_homepage_guide_links(intake, {
+                "categories": [
+                    {"id": "guide", "status": "published"},
+                    {"id": "bosses", "status": "unfulfilled"},
+                ]
+            })
+            english = json.loads((intake / "site-content.json").read_text(encoding="utf-8"))
+            spanish = json.loads((intake / "site-content.es.json").read_text(encoding="utf-8"))
+        items = english["home"]["guideSections"][0]["items"]
+        self.assertEqual(items[0]["href"], "/guide")
+        self.assertNotIn("category", items[1])
+        self.assertEqual(english.keys(), spanish.keys())
+
 
 if __name__ == "__main__":
     unittest.main()

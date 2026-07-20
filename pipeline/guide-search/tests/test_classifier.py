@@ -194,6 +194,27 @@ class ClassifierTests(unittest.TestCase):
         self.assertEqual(stable.youtube_views, 110000)
         self.assertNotIn(f"{topic} bomb passing techniques", by_keyword)
 
+    def test_three_exact_same_game_videos_support_a_general_guide(self):
+        topic = "guess the character color roblox"
+        raw = {"youtube": {"response": response_with_result({"items": [
+            {"type": "youtube_video", "title": "Roblox Guess the Character Color", "views_count": 100},
+            {"type": "youtube_video", "title": "We Play Guess the Characters Color on Roblox", "views_count": 200},
+            {"type": "youtube_video", "title": "Guess the Character Color Roblox Challenge", "views_count": 300},
+        ]})}}
+        candidates, _ = extract_candidates(topic, raw)
+        candidate = next(item for item in candidates if item.keyword == f"{topic} guide")
+        self.assertEqual(candidate.sources, {"youtube"})
+        self.assertEqual(candidate.youtube_occurrences, 3)
+
+    def test_two_same_game_videos_do_not_create_a_general_guide(self):
+        topic = "guess the character color roblox"
+        raw = {"youtube": {"response": response_with_result({"items": [
+            {"type": "youtube_video", "title": "Roblox Guess the Character Color", "views_count": 100},
+            {"type": "youtube_video", "title": "Guess the Character Color Roblox Challenge", "views_count": 300},
+        ]})}}
+        candidates, _ = extract_candidates(topic, raw)
+        self.assertNotIn(f"{topic} guide", {item.keyword for item in candidates})
+
     def test_selection_and_validation(self):
         topic = "animal hospital roblox"
         candidates = []

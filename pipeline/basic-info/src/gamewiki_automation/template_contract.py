@@ -107,6 +107,7 @@ def build_site_content(facts: dict[str, Any], homepage: dict[str, Any]) -> dict[
                     {"label": "Genre", "value": " / ".join(genres)} if genres else None,
                 ] if item],
             },
+            "guideSections": list(home.get("guideSections") or []),
             "faq": {
                 "title": "Frequently Asked Questions",
                 "items": _faq_items(facts, about_paragraphs, genres),
@@ -132,6 +133,8 @@ def build_site_content(facts: dict[str, Any], homepage: dict[str, Any]) -> dict[
                 "category": "codes",
             } for code in supported_codes[:8]],
         }
+    if not content["home"]["guideSections"]:
+        content["home"].pop("guideSections")
     return content
 
 
@@ -596,7 +599,7 @@ def _value_at_path(value: Any, path: str) -> Any:
 def _is_immutable_locale_path(path: str) -> bool:
     key = path.rsplit(".", 1)[-1]
     return (
-        key in {"href", "category"}
+        key in {"id", "href", "category"}
         or key.endswith("Href")
         or path in {"site.datePublished", "site.priceCurrency", "site.developer"}
         or re.fullmatch(r"site\.gamePlatform\.\d+", path) is not None

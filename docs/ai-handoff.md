@@ -28,6 +28,16 @@ intake、MDX、TypeScript、production build、sitemap 直接 200、self-canonic
 最终报告：网站根目录、分类、语言、文章数、manifest、最新日志、API 是否复用、部署前待配置项。
 ```
 
+多个游戏要求并发时使用监督器，不要自行开多个无协调终端：
+
+```powershell
+python gamewiki.py run-many "GAME A" "GAME B" --jobs 2
+python gamewiki.py status
+python gamewiki.py logs <slug> --tail 150
+```
+
+只有用户明确授权创建 GitHub/Vercel 外部资源时才运行 `python gamewiki.py publish <slug>`。
+
 ## 只做诊断的 Prompt
 
 ```text

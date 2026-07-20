@@ -23,6 +23,8 @@ type LightItem = { title: string; description: string; href: string; category?: 
 // where a sentence or two of real, keyword-bearing copy above the item cards is the point
 // (see doc/homepage-info-schema.md), but any LightSection can use it.
 type LightSection = { title: string; description?: string; viewAllHref?: string; viewAllLabel?: string; items: LightItem[] };
+type GuideItem = { title: string; description: string; category?: string; href?: string };
+type GuideSection = { id: string; eyebrow: string; title: string; description: string; items: GuideItem[] };
 type Home = Omit<typeof en.home, "featured" | "liveTools" | "hero"> & {
   hero: Omit<typeof en.home.hero, "videoId"> & { videoId?: string };
   featured: LightSection;
@@ -30,6 +32,7 @@ type Home = Omit<typeof en.home, "featured" | "liveTools" | "hero"> & {
   // Zero or more additional category-highlight blocks — the homepage's one open-ended
   // extension point, see the HOME_SECTIONS comment in src/config/home.ts.
   extraSections?: LightSection[];
+  guideSections?: GuideSection[];
 };
 
 type Category = { key: string; path: string; title: string; description: string; count: number };
@@ -100,6 +103,48 @@ function LightSectionBlock({ section, locale }: { section: LightSection; locale:
   );
 }
 
+function GuideSectionsBlock({ sections, locale }: { sections: GuideSection[]; locale: string }) {
+  return (
+    <section aria-label="Game field guide" className="overflow-hidden rounded-[2rem] border border-border bg-card/45">
+      {sections.map((section, sectionIndex) => (
+        <article
+          key={section.id}
+          className="grid gap-7 border-t border-border px-6 py-9 first:border-t-0 md:px-9 lg:grid-cols-[0.72fr_1.28fr] lg:gap-14 lg:py-12"
+        >
+          <div className="lg:sticky lg:top-24 lg:self-start">
+            <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.24em] text-[hsl(var(--nav-theme))]">
+              <span className="font-mono text-muted-foreground">{String(sectionIndex + 1).padStart(2, "0")}</span>
+              <span className="h-px w-8 bg-[hsl(var(--nav-theme)/0.45)]" />
+              <span>{section.eyebrow}</span>
+            </div>
+            <h2 className="mt-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{section.title}</h2>
+            <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">{section.description}</p>
+          </div>
+          <ol className="divide-y divide-border border-y border-border">
+            {section.items.map((item, itemIndex) => {
+              const body = (
+                <div className="grid grid-cols-[2rem_1fr_auto] gap-3 py-5 sm:grid-cols-[2.5rem_1fr_auto]">
+                  <span className="pt-1 font-mono text-xs text-muted-foreground">{String(itemIndex + 1).padStart(2, "0")}</span>
+                  <span>
+                    <span className="block text-lg font-semibold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{item.title}</span>
+                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">{item.description}</span>
+                  </span>
+                  {item.href ? <ArrowRight className="mt-1 h-4 w-4 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-[hsl(var(--nav-theme))]" /> : null}
+                </div>
+              );
+              return item.href ? (
+                <li key={`${section.id}-${itemIndex}`}>
+                  <Link className="group block" href={localizeHref(item.href, locale)}>{body}</Link>
+                </li>
+              ) : <li key={`${section.id}-${itemIndex}`}>{body}</li>;
+            })}
+          </ol>
+        </article>
+      ))}
+    </section>
+  );
+}
+
 export default function HomePageClient({ home, quickFactsLabel, locale, recentArticles, categories }: { home: Home; quickFactsLabel: string; locale: string; recentArticles: ContentItem[]; categories: Category[] }) {
   function renderSection(section: HomeSection) {
     switch (section) {
@@ -162,6 +207,11 @@ export default function HomePageClient({ home, quickFactsLabel, locale, recentAr
             </div>
           </section>
         );
+
+      case "guideSections":
+        return home.guideSections && home.guideSections.length > 0
+          ? <GuideSectionsBlock sections={home.guideSections} locale={locale} />
+          : null;
 
       case "video":
         // Optional — only renders when a video ID is configured

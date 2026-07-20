@@ -32,7 +32,7 @@ export function applyStructuredContent(target, structured) {
   target.home = target.home ?? {};
   if (structured.home) {
     for (const key of Object.keys(structured.home)) {
-      if (key === "liveTools" || key === "extraSections") continue; // arrays/all-or-nothing, handled below
+      if (key === "liveTools" || key === "extraSections" || key === "guideSections") continue; // arrays/all-or-nothing, handled below
       target.home[key] = { ...(target.home[key] ?? {}), ...structured.home[key] };
     }
   }
@@ -48,6 +48,12 @@ export function applyStructuredContent(target, structured) {
     target.home.extraSections = structured.home.extraSections;
   } else {
     delete target.home.extraSections;
+  }
+
+  if (Array.isArray(structured.home?.guideSections) && structured.home.guideSections.length > 0) {
+    target.home.guideSections = structured.home.guideSections;
+  } else {
+    delete target.home.guideSections;
   }
 
   target.footer = target.footer ?? {};
