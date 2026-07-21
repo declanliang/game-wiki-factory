@@ -13,6 +13,7 @@ from get_search.llm_cluster import (
     _request_toapis,
     apply_cluster_decisions,
     cluster_candidates,
+    supplement_context_opportunities,
 )
 
 
@@ -179,6 +180,60 @@ class LLMClusterTests(unittest.TestCase):
         self.assertEqual(len(errors), 2)
         self.assertTrue(any("unknown keyword" in error for error in errors))
         self.assertTrue(any("omitted candidate" in error for error in errors))
+
+    def test_context_opportunities_require_strong_evidence_and_profile_category(self) -> None:
+        context = {
+            "trusted_basic_info": {
+                "game_profile": {
+                    "categoryCandidates": [{"id": "characters"}, {"id": "tier-list"}]
+                }
+            },
+            "page_opportunities": [
+                {
+                    "topic_suffix": "akaza unit",
+                    "page_type": "entity",
+                    "category": "characters",
+                    "entity_name": "Akaza",
+                    "entity_type": "unit",
+                    "player_intent": "How to obtain and use Akaza",
+                    "confidence": 0.9,
+                    "evidence_urls": ["https://example.com/official-akaza"],
+                    "evidence_types": ["official"],
+                    "official_or_creator": True,
+                },
+                {
+                    "topic_suffix": "rumored unit",
+                    "page_type": "entity",
+                    "category": "characters",
+                    "entity_name": "Rumor",
+                    "entity_type": "unit",
+                    "player_intent": "Find the rumored unit",
+                    "confidence": 0.8,
+                    "evidence_urls": ["https://example.com/one"],
+                    "evidence_types": ["community"],
+                    "official_or_creator": False,
+                },
+                {
+                    "topic_suffix": "map route",
+                    "page_type": "guide",
+                    "category": "floors",
+                    "entity_name": None,
+                    "entity_type": None,
+                    "player_intent": "Find the map route",
+                    "confidence": 0.95,
+                    "evidence_urls": ["https://example.com/official-map"],
+                    "evidence_types": ["official"],
+                    "official_or_creator": True,
+                },
+            ],
+        }
+        selected, rejected = supplement_context_opportunities("Anime Squadron Roblox", [], context)
+        self.assertEqual([item.keyword for item in selected], ["anime squadron roblox akaza unit"])
+        self.assertEqual(selected[0].page_type, "entity")
+        self.assertEqual(selected[0].entity_name, "Akaza")
+        reasons = [item["reason"] for item in rejected]
+        self.assertTrue(any("two distinct URLs" in reason for reason in reasons))
+        self.assertTrue(any("outside the Basic Info profile" in reason for reason in reasons))
 
     def test_no_category_minimum_is_enforced(self) -> None:
         candidates = [self.candidate("anime expeditions traits", {"autocomplete"})]

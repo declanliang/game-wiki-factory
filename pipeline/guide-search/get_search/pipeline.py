@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,12 +17,14 @@ from .collectors import (
 )
 from .config import Settings
 from .llm_cluster import (
+    CONTEXT_POLICY_VERSION,
     DEFAULT_CLUSTER_MODEL,
     DEFAULT_CONTEXT_MODEL,
     LLMCall,
     apply_cluster_decisions,
     cluster_candidates,
     research_game_context,
+    supplement_context_opportunities,
 )
 from .manual_inputs import google_suggest_path, load_manual_inputs, merge_manual_candidates
 
@@ -33,6 +36,32 @@ def slugify(value: str) -> str:
 def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def youtube_discovery_evidence(raw: dict[str, Any], maximum: int = 100) -> list[dict[str, Any]]:
+    """Return compact, deduplicated video evidence for context research."""
+    found: dict[str, dict[str, Any]] = {}
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            if value.get("type") == "youtube_video" and value.get("title") and value.get("url"):
+                url = str(value["url"]).split("&", 1)[0]
+                record = {
+                    "title": str(value["title"]).strip(),
+                    "url": url,
+                    "views": int(value.get("views_count") or 0),
+                }
+                existing = found.get(url)
+                if existing is None or record["views"] > existing["views"]:
+                    found[url] = record
+            for item in value.values():
+                visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+
+    visit(raw.get("youtube") or {})
+    return sorted(found.values(), key=lambda item: (-item["views"], item["title"]))[:maximum]
 
 
 def load_run_metadata(
@@ -70,7 +99,7 @@ def load_context_checkpoint(
         return None
     value = json.loads(path.read_text(encoding="utf-8"))
     if (
-        value.get("version") != 1
+        value.get("version") != CONTEXT_POLICY_VERSION
         or value.get("topic") != topic
         or value.get("candidate_keywords") != candidate_keywords
         or value.get("requested_model") != model
@@ -95,7 +124,7 @@ def write_context_checkpoint(
     write_json(
         run_dir / "llm" / "context-checkpoint.json",
         {
-            "version": 1,
+            "version": CONTEXT_POLICY_VERSION,
             "topic": topic,
             "candidate_keywords": candidate_keywords,
             "requested_model": requested_model,
@@ -273,8 +302,8 @@ def write_report(
             "",
             "- Labs search volume is DataForSEO/Google monthly volume, not Similarweb 28-day volume.",
             "- Google Trends values are relative popularity, not absolute search counts.",
-            "- YouTube titles are converted into candidate topics using explicit phrase rules.",
-            "- A YouTube-only topic cannot enter the final keyword set.",
+            "- YouTube titles are converted into candidate topics using explicit phrase rules and multi-video gates.",
+            "- Web-researched page opportunities require one official/creator source or two distinct URLs.",
             "- Reddit, Discord, Trello, logo, YouTube and game-link topics are hard-filtered.",
             f"- Rejected records: `{len(rejected)}`. See `candidates.json` and `llm/rejected.json`.",
         ]
@@ -371,6 +400,7 @@ def run_pipeline(
     rules_selected = select_keywords(candidates, maximum=40)
     rules_keywords = build_keywords_json(topic, rules_selected)
     llm_rejected: list[dict[str, Any]] = []
+    opportunity_rejected: list[dict[str, Any]] = []
     llm_audit_errors: list[str] = []
     llm_manifest: dict[str, Any] = {}
     if cluster_mode == "llm":
@@ -380,8 +410,13 @@ def run_pipeline(
                 "or TOAPIS_API_KEY, or use --cluster-mode rules."
             )
         candidate_keywords = [item.keyword for item in candidates]
+        video_evidence = youtube_discovery_evidence(raw)
+        video_fingerprint = hashlib.sha256(
+            json.dumps(video_evidence, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        context_checkpoint_inputs = [*candidate_keywords, f"youtube-evidence:{video_fingerprint}"]
         context_call = load_context_checkpoint(
-            run_dir, topic, candidate_keywords, context_model
+            run_dir, topic, context_checkpoint_inputs, context_model
         )
         if context_call is None:
             context_call = research_game_context(
@@ -389,14 +424,18 @@ def run_pipeline(
                 topic,
                 candidates,
                 trusted_context=trusted_context,
+                youtube_discovery_evidence=video_evidence,
                 model=context_model,
             )
             write_context_checkpoint(
-                run_dir, topic, candidate_keywords, context_model, context_call
+                run_dir, topic, context_checkpoint_inputs, context_model, context_call
             )
         effective_context = dict(context_call.data)
         if trusted_context:
             effective_context["trusted_basic_info"] = trusted_context
+        candidates, opportunity_rejected = supplement_context_opportunities(
+            topic, candidates, effective_context
+        )
         cluster_call = cluster_candidates(
             settings.toapis_api_key,
             topic,
@@ -425,7 +464,11 @@ def run_pipeline(
         write_json(run_dir / "llm" / "cluster-response.json", cluster_call.response_meta)
         write_json(
             run_dir / "llm" / "rejected.json",
-            {"rejected": llm_rejected, "audit_errors": llm_audit_errors},
+            {
+                "rejected": llm_rejected,
+                "opportunity_rejected": opportunity_rejected,
+                "audit_errors": llm_audit_errors,
+            },
         )
     else:
         selected = rules_selected
@@ -461,6 +504,10 @@ def run_pipeline(
         "total_cost_usd": total_cost(raw),
         "cluster_mode": cluster_mode,
         "toapis": llm_manifest,
+        "context_opportunities": {
+            "admitted": sum("context-opportunity" in item.sources for item in candidates),
+            "rejected": len(opportunity_rejected),
+        },
         "validation_errors": errors,
     }
     write_json(run_dir / "manifest.json", manifest)
@@ -475,7 +522,8 @@ def run_pipeline(
     write_json(run_dir / "keywords-rules.json", rules_keywords)
     write_json(run_dir / "keywords.json", keywords)
     write_report(
-        run_dir, topic, manifest, candidates, selected, rejected + llm_rejected, errors
+        run_dir, topic, manifest, candidates, selected,
+        rejected + opportunity_rejected + llm_rejected, errors
     )
     if errors:
         raise ValueError("Output validation failed: " + "; ".join(errors))

@@ -6,11 +6,12 @@ import re
 import time
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .classifier import Candidate, canonical
+from .classifier import Candidate, canonical, page_type_for_category
 
 
 TOAPIS_CHAT_URL = "https://toapis.com/v1/chat/completions"
@@ -19,7 +20,9 @@ TOAPIS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) get-search/1.0"
 DEFAULT_CONTEXT_MODEL = "gpt-5.3-codex-official"
 DEFAULT_CLUSTER_MODEL = "gpt-5.6-terra"
 LOW_CONFIDENCE_THRESHOLD = 0.55
-CLUSTER_POLICY_VERSION = 3
+CLUSTER_POLICY_VERSION = 4
+CONTEXT_POLICY_VERSION = 3
+OPPORTUNITY_CONFIDENCE_THRESHOLD = 0.72
 TOAPIS_RETRY_ATTEMPTS = 3
 TOAPIS_RETRYABLE_HTTP = {408, 425, 429, 500, 502, 503, 504, 520, 522, 524}
 
@@ -272,11 +275,57 @@ CONTEXT_SCHEMA: dict[str, Any] = {
                 "required": ["url", "type"],
             },
         },
+        "page_opportunities": {
+            "type": "array",
+            "maxItems": 24,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "topic_suffix": {"type": "string"},
+                    "page_type": {
+                        "type": "string",
+                        "enum": ["codes", "tier_list", "update", "entity", "guide"],
+                    },
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "guide", "progression", "mechanics", "updates", "enemies",
+                            "floors", "upgrades", "economy", "bosses", "weapons",
+                            "characters", "codes", "tier-list", "modes", "items", "quests"
+                        ],
+                    },
+                    "entity_name": {"type": ["string", "null"]},
+                    "entity_type": {"type": ["string", "null"]},
+                    "player_intent": {"type": "string"},
+                    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+                    "evidence_urls": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {"type": "string"},
+                    },
+                    "evidence_types": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                            "type": "string",
+                            "enum": ["official", "creator", "community", "editorial", "video", "forum"]
+                        },
+                    },
+                    "official_or_creator": {"type": "boolean"},
+                },
+                "required": [
+                    "topic_suffix", "page_type", "category", "entity_name", "entity_type",
+                    "player_intent", "confidence", "evidence_urls", "evidence_types",
+                    "official_or_creator"
+                ],
+            },
+        },
         "warnings": {"type": "array", "items": {"type": "string"}},
     },
     "required": [
         "topic", "game_type", "release_status", "release_date", "summary",
-        "entities", "terminology", "official_sources", "warnings",
+        "entities", "terminology", "official_sources", "page_opportunities", "warnings",
     ],
 }
 
@@ -329,22 +378,33 @@ def research_game_context(
     topic: str,
     candidates: list[Candidate],
     trusted_context: dict[str, Any] | None = None,
+    youtube_discovery_evidence: list[dict[str, Any]] | None = None,
     model: str = DEFAULT_CONTEXT_MODEL,
 ) -> LLMCall:
     focus = [item.keyword for item in candidates[:80]]
     instructions = (
         "You research game terminology for SEO clustering. You must use web search. "
-        "Prefer official platform pages, creator/community sources, and reliable recent sources. "
+        "Prefer official platform pages, creator-owned sources, and reliable recent community/editorial sources. "
         "Do not use competitor wikis as evidence. Never invent names, dates, mechanics, or URLs. "
-        "Separate the game's real concepts from generic video-title language. Return only one JSON "
+        "Separate the game's real concepts from generic video-title language. Also propose focused, "
+        "search-facing page opportunities for codes, tier lists, named updates, and named game entities. "
+        "For roster or collection games, inspect the supplied YouTube discovery evidence for named units, "
+        "characters, bosses, modes, and items. When the same named entity is supported by at least two "
+        "different videos, or by one official/creator source, propose its own entity page instead of only "
+        "an umbrella roster page. Return up to ten such named entity opportunities when genuinely supported. "
+        "A page opportunity needs either one official/creator source or two distinct supporting URLs. "
+        "Do not propose calculators, Discord/Reddit/Trello navigation pages, generic empty status pages, "
+        "or a tier list unless the game has a genuinely rankable set. Use short ASCII topic_suffix values "
+        "that can follow the normalized game name. Return only one JSON "
         "object matching the supplied schema, without Markdown fences or commentary."
     )
     input_text = json.dumps(
         {
-            "task": "Build a compact factual context pack for keyword clustering.",
+            "task": "Build a factual context pack and evidence-backed focused-page opportunities for keyword clustering.",
             "game": topic,
             "trusted_basic_info": trusted_context or {},
             "candidate_terms_to_disambiguate": focus,
+            "youtube_discovery_evidence": youtube_discovery_evidence or [],
             "output_json_schema": CONTEXT_SCHEMA,
         },
         ensure_ascii=False,
@@ -354,7 +414,7 @@ def research_game_context(
         model,
         instructions,
         input_text,
-        max_tokens=7000,
+        max_tokens=12000,
     )
 
 
@@ -374,7 +434,92 @@ def _compact_candidate(item: Candidate) -> dict[str, Any]:
             "youtube_occurrences": item.youtube_occurrences,
         },
         "evidence": item.evidence[:3],
+        "page_type": item.page_type,
+        "entity_name": item.entity_name,
+        "entity_type": item.entity_type,
+        "intent": item.intent,
+        "confidence": item.confidence,
+        "evidence_urls": item.evidence_urls[:5],
     }
+
+
+def _valid_evidence_url(value: str) -> bool:
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return False
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+def supplement_context_opportunities(
+    topic: str,
+    candidates: list[Candidate],
+    game_context: dict[str, Any],
+    *,
+    confidence_threshold: float = OPPORTUNITY_CONFIDENCE_THRESHOLD,
+) -> tuple[list[Candidate], list[dict[str, Any]]]:
+    """Admit web-researched page opportunities through a deterministic gate."""
+    merged = {canonical(item.keyword): item for item in candidates}
+    rejected: list[dict[str, Any]] = []
+    topic_key = canonical(topic)
+    trusted = game_context.get("trusted_basic_info") or {}
+    profile = trusted.get("game_profile") or {}
+    allowed_categories = {
+        str(item.get("id") or "") for item in (profile.get("categoryCandidates") or [])
+    }
+    for raw in game_context.get("page_opportunities") or []:
+        suffix = canonical(str(raw.get("topic_suffix") or ""))
+        category = canonical(str(raw.get("category") or "")).replace(" ", "-")
+        confidence = float(raw.get("confidence") or 0)
+        urls = list(dict.fromkeys(
+            str(value).strip()
+            for value in (raw.get("evidence_urls") or [])
+            if _valid_evidence_url(str(value).strip())
+        ))
+        source_types = {canonical(str(value)) for value in (raw.get("evidence_types") or [])}
+        official = bool(raw.get("official_or_creator")) or bool(source_types & {"official", "creator"})
+        reason: str | None = None
+        if not suffix or suffix in {"wiki", "game", "official", "guide"}:
+            reason = "missing or generic topic suffix"
+        elif FORBIDDEN_STANDALONE.search(suffix):
+            reason = "forbidden community/navigation topic"
+        elif confidence < confidence_threshold:
+            reason = f"confidence {confidence:.2f} below {confidence_threshold:.2f}"
+        elif not ((official and len(urls) >= 1) or len(urls) >= 2):
+            reason = "needs one official/creator source or two distinct URLs"
+        elif not category or category in FORBIDDEN_CATEGORIES:
+            reason = f"invalid category '{category}'"
+        elif allowed_categories and category not in allowed_categories:
+            reason = f"category '{category}' is outside the Basic Info profile"
+        if reason:
+            rejected.append({"topic_suffix": suffix, "reason": reason, "evidence_urls": urls})
+            continue
+
+        keyword = f"{topic_key} {suffix}"
+        candidate = Candidate(
+            keyword=keyword,
+            sources={"context-opportunity", *source_types},
+            evidence=[str(raw.get("player_intent") or ""), *urls],
+            category=category,
+            page_type=str(raw.get("page_type") or page_type_for_category(category)),
+            entity_name=(str(raw.get("entity_name")).strip() if raw.get("entity_name") else None),
+            entity_type=(str(raw.get("entity_type")).strip() if raw.get("entity_type") else None),
+            intent=str(raw.get("player_intent") or "").strip(),
+            confidence=confidence,
+            evidence_urls=urls,
+        )
+        candidate.finish()
+        candidate.score = round(
+            max(candidate.score, 95 + confidence * 60 + min(24, len(urls) * 8)),
+            3,
+        )
+        key = canonical(keyword)
+        if key in merged:
+            merged[key].merge(candidate)
+            merged[key].score = max(merged[key].score, candidate.score)
+        else:
+            merged[key] = candidate
+    return sorted(merged.values(), key=lambda item: (-item.score, item.keyword)), rejected
 
 
 def _cluster_candidate_batch(
@@ -412,15 +557,17 @@ def _cluster_candidate_batch(
                         "maximum_keywords": 40,
                         "maximum_categories": 8,
                         "category_minimum": (
-                            "Do not force a category count. Prefer 3-5 durable article topics when the "
-                            "evidence supports them, but accept fewer and never synthesize a keyword."
+                            "Do not force a page count. Keep multiple distinct, evidence-backed entity, "
+                            "codes, tier-list, and update intents when they solve different player needs; "
+                            "accept fewer for a simple game and never synthesize an unsupported topic."
                         ),
                         "category_overlap": (
                             "Small overlap between categories and articles is acceptable. Do not merge "
                             "distinct useful guide intents merely because their content may overlap."
                         ),
                         "category_names": (
-                            "One lowercase English word, except 'tier list'. Never wiki/gameplay/general."
+                            "One lowercase English slug; use 'tier-list' for rankings. "
+                            "Never wiki/gameplay/general."
                         ),
                         "standalone_forbidden": [
                             "reddit", "discord", "trello", "logo", "youtube", "game link"
@@ -606,9 +753,7 @@ def cluster_candidates(
 
 
 def _category_valid(value: str) -> bool:
-    return bool(value) and value not in FORBIDDEN_CATEGORIES and (
-        " " not in value or value == "tier list"
-    )
+    return bool(value) and value not in FORBIDDEN_CATEGORIES and " " not in value
 
 
 def apply_cluster_decisions(
@@ -641,7 +786,7 @@ def apply_cluster_decisions(
             continue
         action = str(decision.get("action") or "drop")
         confidence = float(decision.get("confidence") or 0)
-        category = canonical(str(decision.get("category") or ""))
+        category = canonical(str(decision.get("category") or "")).replace(" ", "-")
         reason = str(decision.get("reason") or "LLM decision")
         hard_reason: str | None = None
         tail = canonical(candidate.keyword).removeprefix(canonical(topic)).strip()
@@ -665,6 +810,7 @@ def apply_cluster_decisions(
             )
             continue
         candidate.category = category
+        candidate.page_type = page_type_for_category(category)
         eligible.append(candidate)
 
     ranked_categories: dict[str, float] = {}

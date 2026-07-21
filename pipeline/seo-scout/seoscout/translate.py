@@ -147,6 +147,75 @@ def _build_mdx(title: str, description: str, category: str, date: str, body: str
     return f"{metadata}\n\n{body}\n"
 
 
+def _common_slug_prefix(stems: list[str]) -> list[str]:
+    token_lists = [stem.split('-') for stem in stems]
+    if not token_lists:
+        return []
+    prefix = []
+    for values in zip(*token_lists):
+        if len(set(values)) != 1:
+            break
+        prefix.append(values[0])
+    return prefix
+
+
+def _unique_title(title: str, stem: str, common_prefix: list[str], lang_code: str) -> str:
+    tokens = stem.split('-')[len(common_prefix):] or stem.split('-')[-4:]
+    qualifier = ' '.join(token.capitalize() for token in tokens[-6:] if token)
+    limit = 36 if lang_code in CJK_LANGUAGES else 60
+    # Preserve enough of the localized title to remain readable while keeping
+    # the source topic phrase visible. English game/entity terms are common in
+    # localized game searches and are safer than inventing a new translation.
+    qualifier_limit = min(26, max(12, limit // 2))
+    qualifier = _compact_serp_field(qualifier, qualifier_limit, 'en')
+    suffix = f" · {qualifier}"
+    base_limit = max(8, limit - len(suffix))
+    base = _compact_serp_field(title, base_limit, lang_code)
+    return f"{base}{suffix}"[:limit].rstrip(" ·-–—")
+
+
+def deduplicate_translated_titles(articles_root: Path, target_langs: list[str]) -> int:
+    """Deterministically disambiguate model-collapsed localized titles.
+
+    Different focused pages sometimes receive the same generic Japanese or
+    Korean title even when their bodies and English sources are distinct. Keep
+    the translation checkpoint and append the unique source-topic slug instead
+    of retranslating a complete article.
+    """
+    changed = 0
+    for lang_code in target_langs:
+        locale_root = articles_root / lang_code
+        if not locale_root.is_dir():
+            continue
+        records = []
+        for path in sorted(locale_root.glob('**/*.mdx')):
+            try:
+                fields = extract_source_fields(path.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                continue
+            records.append((path, fields))
+        groups: dict[str, list[tuple[Path, dict]]] = {}
+        for record in records:
+            groups.setdefault(record[1]['title'].casefold(), []).append(record)
+        for group in groups.values():
+            if len(group) < 2:
+                continue
+            common_prefix = _common_slug_prefix([path.stem for path, _fields in group])
+            for path, fields in group:
+                unique = _unique_title(fields['title'], path.stem, common_prefix, lang_code)
+                content = _build_mdx(
+                    unique,
+                    fields['description'],
+                    fields['category'],
+                    fields['date'],
+                    fields['body'],
+                )
+                path.write_text(content, encoding='utf-8')
+                changed += 1
+                print(f"  🏷️  [{lang_code.upper()}] disambiguated title: {path.name}")
+    return changed
+
+
 MAX_ARTICLE_CHARS = 50_000
 REPEATED_WHITESPACE_RE = re.compile(r'\s{200,}')
 STARTS_WITH_METADATA_RE = re.compile(r'\Aexport const metadata\s*=\s*\{')
@@ -528,7 +597,9 @@ async def run_translate(
     if skipped > 0:
         print(f"  ⏭️  Skipped {skipped} (already translated)\n")
 
+    articles_root = Path(Config.DATA_DIR) / "articles"
     if not all_tasks:
+        deduplicate_translated_titles(articles_root, target_langs)
         print("  ℹ️  All articles already translated")
         return
 
@@ -650,12 +721,15 @@ async def run_translate(
             if i + batch_size < len(all_tasks):
                 await asyncio.sleep(batch_delay)
 
+    deduplicated = deduplicate_translated_titles(articles_root, target_langs)
+
     # Summary
     print("\n" + "=" * 70)
     print(f"  {'✅' if failed == 0 else '⚠️ '} Translate complete")
     print("=" * 70)
     print(f"  Saved:   {saved}")
     print(f"  Failed:  {failed}")
+    print(f"  Titles disambiguated locally: {deduplicated}")
     for lang_code in target_langs:
         lang_dir = Path(Config.DATA_DIR) / "articles" / lang_code
         count = len(list(lang_dir.glob("**/*.mdx"))) if lang_dir.exists() else 0

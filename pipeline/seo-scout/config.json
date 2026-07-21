@@ -43,7 +43,7 @@
   "generate": {
     "max_tokens": 10000,
     "batch_size": 10,
-    "concurrent_limit": 6
+    "concurrent_limit": 3
   },
 
   "translate": {

@@ -6,7 +6,9 @@
 
 业务目标是为具体 Roblox 或 Steam 游戏生成信息型 Wiki，通过广告 CPM 获取收入。网站的核心价值是搜集、筛选和组织有效游戏信息；允许少量不影响玩家安全的事实误差，但明确错误、明显属于其他游戏或纯粹由单个娱乐视频推断出的内容必须排除。首页深度、视频、清晰排版和站内链接用于改善用户体验、增加浏览页数与停留时间。广告接入不属于当前工厂范围。
 
-首页数据所有权：Basic Info 提供事实和深度文案；Guide Search 的缓存 YouTube 结果只可补一个严格匹配游戏的长视频；site-plan 决定可发布分类；现有文章提供具体内链。模板不得反向发明事实、分类或文章。
+首页数据所有权：Basic Info 提供事实和深度文案；Guide Search 的缓存 YouTube 结果只可补一个严格匹配游戏的长视频；site-plan 决定可发布分类；现有文章提供具体内链和分类专题。模板不得反向发明事实、分类或文章。
+
+内容深度 V4 把 Google 搜索需求与有证据的知识机会并列为发现来源。联网研究可以提出 Codes、Tier List、Updates 和具体实体页，但必须通过 URL 证据、置信度和 Basic Info 分类边界三重门槛。一个页面解决一个聚焦需求；Calculator 等工具页仍不在范围。完整设计见 `docs/design/content-depth-v4.md`。
 
 ## 标准执行 Prompt
 
@@ -27,10 +29,12 @@ Steam 已知商店页时追加：--official-url "STEAM URL"
 - 先确认 platform；Steam 身份使用 App ID，Roblox 身份使用 Place/Universe，不能混用事实字段。
 - 所有游戏 GitHub 仓库只能是 Private；发布器不得创建 Public repo。
 - 有正式域名时传 `--site-url`；没有时模板使用 Vercel 自动域名，禁止 `example.com` 出现在生产 sitemap/canonical。
-- 不接纳完全无关关键词，不为凑数量降低门槛。
+- 不接纳完全无关主题，不为凑数量降低门槛；也不要把资料丰富的游戏强行压成 3–5 篇长文。
+- 检查 Guide Search 的 page_opportunities 及审计结果；Codes、Tier List、Updates 和实体资料页必须保留其页面类型元数据。
+- 不生成 Calculator、Planner、Team Builder 等工具页。
 - 不手工补标签掩盖被截断的翻译。
 
-完成标准：只保留有证据的 published 分类，通常争取 3–5 个可靠主题但不凑数；en/es/de/fr/ja/ko；六语言文章树一致；
+完成标准：只保留有证据的 published 分类；简单游戏允许少量页面，资料丰富的游戏要保留不同意图和实体入口；en/es/de/fr/ja/ko；六语言文章树一致；
 intake、MDX、TypeScript、production build、sitemap 直接 200、self-canonical、OG 和 hreflang 全部通过。
 
 最终报告：网站根目录、分类、语言、文章数、首页视频来源、manifest、最新日志、API 是否复用、Private repo 状态、Vercel 待配置域名与环境变量。

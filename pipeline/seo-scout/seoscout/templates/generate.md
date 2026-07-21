@@ -4,6 +4,10 @@ You are an experienced SEO content writer. Write a high-quality, original blog p
 
 {merged_data}
 
+## Page Type Requirements
+
+{page_brief}
+
 ## Article Title Rules
 
 Generate a title based on the keyword field in the reference material:
@@ -14,13 +18,13 @@ Generate a title based on the keyword field in the reference material:
 
 ## Writing Requirements
 
-1. Write a fully original blog post, approximately 1,200–1,600 words
-2. Include the main keyword at least 9 times:
+1. Write a fully original focused page, usually 1,000–1,600 words; a source-rich Tier List may be longer, while a factual Codes/update status page may be shorter when padding would add no value
+2. Keep one primary search intent. Include the main keyword naturally 4–7 times when its length allows it:
    - Once in the title (H1)
-   - Twice within the first 120 words
-   - 4+ times naturally throughout the body
+   - Once within the first 120 words
+   - Naturally in relevant headings or body copy without forced repetition
 3. Naturally incorporate semantic and LSI keywords
-4. Provide actionable tips, statistics, or examples
+4. Provide actionable tips, statistics, or examples only when the source packet supports them
 5. When referencing the source material, paraphrase — do not copy verbatim
 6. Label community-sourced info as "player experience" or "community reports"
 7. Include 1 authoritative external link (official site, Steam, major gaming media)
@@ -56,7 +60,7 @@ Generate a title based on the keyword field in the reference material:
 
 - Hook the reader immediately
 - Answer "why does this matter?"
-- Include the main keyword twice in the first 120 words
+- Include the main keyword once in the first 120 words
 
 ## Output Format
 

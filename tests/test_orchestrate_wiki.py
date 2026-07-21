@@ -163,6 +163,32 @@ class OrchestratorTests(unittest.TestCase):
             with self.assertRaises(orchestrator.PipelineError):
                 orchestrator.validate_articles(root, ["en", "es"])
 
+    def test_article_projection_excludes_categories_removed_by_final_site_plan(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source"
+            destination = root / "intake" / "articles"
+            for locale in ("en", "es"):
+                for category in ("guide", "characters", "bosses"):
+                    article = source / locale / category / f"{category}.mdx"
+                    article.parent.mkdir(parents=True)
+                    article.write_text("export const metadata = {}\n", encoding="utf-8")
+            site_plan = {
+                "categories": [
+                    {"id": "guide", "status": "published"},
+                    {"id": "characters", "status": "published"},
+                    {"id": "bosses", "status": "unfulfilled"},
+                ]
+            }
+
+            counts = orchestrator.project_articles_for_site_plan(
+                source, destination, site_plan, ["en", "es"]
+            )
+
+            self.assertEqual(counts, {"en": 2, "es": 2})
+            self.assertTrue((destination / "en" / "guide" / "guide.mdx").is_file())
+            self.assertFalse((destination / "en" / "bosses").exists())
+
     def test_basic_output_contract_accepts_complete_template_intake(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary)

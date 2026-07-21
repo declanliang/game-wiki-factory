@@ -584,6 +584,45 @@ def replace_directory(source: Path, destination: Path) -> None:
     shutil.copytree(source, destination)
 
 
+def project_articles_for_site_plan(
+    source: Path,
+    destination: Path,
+    site_plan: dict,
+    languages: list[str],
+) -> dict[str, int]:
+    """Materialize only the article categories published by the final site plan.
+
+    SEO Scout intentionally keeps prior generated articles as reusable checkpoints.
+    A later recluster can remove a category from the capped site plan, so copying the
+    whole checkpoint tree would leak stale categories into the deployable intake.
+    """
+    published = [
+        str(category.get("id", "")).strip()
+        for category in site_plan.get("categories", [])
+        if category.get("status") == "published"
+    ]
+    if not published:
+        raise PipelineError("site-plan has no published article categories")
+
+    if destination.exists():
+        shutil.rmtree(destination)
+
+    counts: dict[str, int] = {}
+    for locale in languages:
+        locale_count = 0
+        for category in published:
+            category_source = source / locale / category
+            files = sorted(category_source.glob("*.mdx")) if category_source.is_dir() else []
+            if not files:
+                raise PipelineError(
+                    f"site-plan publishes {category}, but {locale}/{category} has no MDX articles"
+                )
+            shutil.copytree(category_source, destination / locale / category)
+            locale_count += len(files)
+        counts[locale] = locale_count
+    return counts
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Run homepage research, keyword research, article generation, and Wiki site assembly."
@@ -899,7 +938,12 @@ def main(argv: list[str] | None = None) -> int:
         if intake_dir.exists():
             shutil.rmtree(intake_dir)
         copy_directory_contents(basic_intake, intake_dir)
-        shutil.copytree(articles_dir, intake_dir / "articles")
+        article_counts = project_articles_for_site_plan(
+            articles_dir,
+            intake_dir / "articles",
+            site_plan,
+            languages,
+        )
         shutil.copy2(site_plan_path, intake_dir / "site-plan.json")
         featured_video = reconcile_featured_video(intake_dir, keyword_run_dir, planning_dir, resolved_platform)
         record(

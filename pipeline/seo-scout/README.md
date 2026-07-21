@@ -695,7 +695,7 @@ LLM_API_KEY_1=your_llm_api_key_here
 
 ### 如何使用自定义 prompt 模板？
 
-给 `classify`、`generate`、`qa` 或 `translate` 传 `--prompt /path/to/your/prompt.md`。classify 模板使用 `$game_name`、`$category_options`、`$keywords_json` 变量；generate 模板使用 `{merged_data}`、`{current_date}`、`{category}` 变量（模型输出 `TITLE:`/`DESCRIPTION:`/`QUICKGUIDE:`（可选）/`BODY:` 四段文本——`QUICKGUIDE:` 是 3-5 条纯文本 bullet，用于开头的 Quick Guide 摘要框，省略也不会导致校验失败；`export const metadata` 块和 Quick Guide 的 `<Callout>` 包装都由代码拼装，不需要在模板里写 JS/JSX 语法）；qa 模板使用 `$game_name`、`$title`、`$body` 变量，模型只输出 `VERDICT:`/`REASON:` 两行；translate 模板使用 `$language_name`、`$lang_code`、`$title`、`$description`、`$body` 变量，输出格式和 generate 一致（不含 `QUICKGUIDE:` ——那部分已经在英文 body 里以 `<Callout>` 形式存在，翻译时按第 8 条规则原样保留标签、翻译内部文字）。
+给 `classify`、`generate`、`qa` 或 `translate` 传 `--prompt /path/to/your/prompt.md`。classify 模板使用 `$game_name`、`$category_options`、`$keywords_json` 变量；generate 模板使用 `{merged_data}`、`{current_date}`、`{category}`、`{page_brief}` 变量（模型输出 `TITLE:`/`DESCRIPTION:`/`QUICKGUIDE:`（可选）/`BODY:` 四段文本——`QUICKGUIDE:` 是 3-5 条纯文本 bullet，用于开头的 Quick Guide 摘要框，省略也不会导致校验失败；`page_brief` 来自 site plan 的 Codes/Tier List/Update/Entity/Guide 页面类型；`export const metadata` 块和 Quick Guide 的 `<Callout>` 包装都由代码拼装，不需要在模板里写 JS/JSX 语法）；qa 模板使用 `$game_name`、`$title`、`$body` 变量，模型只输出 `VERDICT:`/`REASON:` 两行；translate 模板使用 `$language_name`、`$lang_code`、`$title`、`$description`、`$body` 变量，输出格式和 generate 一致（不含 `QUICKGUIDE:` ——那部分已经在英文 body 里以 `<Callout>` 形式存在，翻译时按第 8 条规则原样保留标签、翻译内部文字）。
 
 ### 可以用 OpenAI / DeepSeek 等其他模型吗？
 

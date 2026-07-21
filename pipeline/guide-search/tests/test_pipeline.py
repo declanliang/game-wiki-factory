@@ -9,12 +9,24 @@ from get_search.pipeline import (
     load_run_metadata,
     slugify,
     total_cost,
+    youtube_discovery_evidence,
     write_context_checkpoint,
     write_json,
 )
 
 
 class PipelineTests(unittest.TestCase):
+    def test_youtube_discovery_evidence_deduplicates_and_ranks_video_titles(self):
+        raw = {"youtube": {"items": [
+            {"type": "youtube_video", "title": "Aizen guide", "url": "https://youtube.com/watch?v=1&x=2", "views_count": 50},
+            {"type": "youtube_video", "title": "Aizen guide newer", "url": "https://youtube.com/watch?v=1", "views_count": 80},
+            {"type": "youtube_video", "title": "Broly guide", "url": "https://youtube.com/watch?v=2", "views_count": 60},
+            {"type": "youtube_channel", "title": "Ignore", "url": "https://youtube.com/c/x"},
+        ]}}
+        result = youtube_discovery_evidence(raw)
+        self.assertEqual([item["title"] for item in result], ["Aizen guide newer", "Broly guide"])
+        self.assertEqual(result[0]["url"], "https://youtube.com/watch?v=1")
+
     def test_context_checkpoint_requires_exact_candidate_and_model_match(self):
         call = LLMCall(
             model="context-model",

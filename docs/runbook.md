@@ -28,6 +28,8 @@ python gamewiki.py run-many "Game A" "Game B" --jobs 2 --llm-concurrency 6 --llm
 
 `--jobs` 控制游戏进程数；其余参数分别限制全局 LLM、每个 key 和全局构建许可。默认 `2/6/2/1` 是本次双游戏实测后采用的稳健值；提高前先观察 429/5xx、内存和总耗时。状态、日志和续跑不需要寻找具体文件：
 
+单个 SEO Scout 生成进程默认最多并发 3 个长文章请求；两游戏并发时总量仍可达到 6。不要把单进程并发直接提高到 6：真实长文生成出现过连续 `Server disconnected`，重试开销反而更高。
+
 ```powershell
 python gamewiki.py status
 python gamewiki.py logs <slug> --tail 150
@@ -64,12 +66,15 @@ Vercel 导入完成后，未传 `--site-url` 时 `.gamewiki/publish.json` 的 Ve
 - 默认直接重跑同一命令；所有阶段先验证 checkpoint。
 - API 限速、网络错误：直接重跑，不加 overwrite。
 - Guide Search 聚类失败：复用 `.gamewiki/planning/guide-search/raw`。
+- V4 联网背景研究会生成 `llm/game-context.json.page_opportunities`；检查 `llm/rejected.json.opportunity_rejected` 可区分“没有发现”和“发现但证据/分类门槛不足”。该契约版本变化会使旧 context checkpoint 自动失效，但不会重做 Suggest/DataForSEO 原始采集。
 - Guide Search 的 ToAPIs 请求遇到 SSL EOF、429 或常见 5xx/52x：自动指数退避重试，已完成的聚类 batch checkpoint 不会重做。
 - 某语言缺失或截断：SEO Scout 只删除并重翻无效文件。
 - 英文生成出现 `finish_reason=length`：客户端会以 10,000-token 上限和无表格紧凑提示词重试；仍失败会返回非零并把 Articles stage 标记为 failed。不要使用 overwrite。
 - 翻译正文完整但 SERP 标题/描述略超限：流水线会本地压缩元数据后重新执行完整性校验，不重翻正文。
+- 多个不同页面被翻译成同一个泛化标题：翻译收尾会根据英文 source slug 追加短主题限定词，本地消歧，不重翻正文。
 - LLM 返回余额不足：当前 key slot 会被禁用；所有 key 都无额度时立即停止剩余批次并保留已有文章。充值后不加 overwrite 续跑。
-- 主题稀少：检查 Suggest 和多视频共同支持的机制主题；接受较少的可靠文章，不能合成 fallback 关键词。
+- 主题稀少：同时检查 Suggest、多视频共同支持的机制主题、`page_opportunities` 及拒绝原因。简单游戏接受较少页面；资料丰富的游戏应保留不同玩家意图和具体实体页，不能为旧的 3–5 篇经验值过度合并，也不能合成 fallback 主题。
+- Codes/Tier List/实体页异常：确认 Basic Info profile 是否允许对应分类。Tier List 还必须有可比较实体证据；Codes 不得编造兑换码；Calculator/Planner 等工具页不属于当前流水线。
 - Steam Deck：`full controller support` 不等于 Deck Verified/Playable；没有官方兼容性等级时只能写“未确认”和谨慎测试建议。
 - 模板失败：修工厂 `template/` 后重跑，不能重新付费生成上游内容。
 
@@ -84,6 +89,8 @@ Vercel 导入完成后，未传 `--site-url` 时 `.gamewiki/publish.json` 的 Ve
 ## 翻译完整性
 
 翻译任务使用独立 reasoning 配置。客户端拒绝非 `finish_reason=stop` 的响应；落盘前对照英文检查标题层级、列表、表格、FAQ、Callout、长度和结尾。不要手工补标签掩盖截断正文。
+
+`--recluster-keywords` 可能改变最终 8 个 published 分类。SEO Scout 中未入选的新旧文章都会保留为 checkpoint；编排器重建 `intake/articles` 时只复制当前 site-plan 分类。因此看到 content-pipeline 中存在旧分类是正常的，部署输入和网站中不应出现它们。
 
 ## 网站验收
 
@@ -104,6 +111,7 @@ npm run launch:site
 - OG/Twitter image 正常
 - hreflang 包含六语言和 x-default；每个 locale 页面 canonical 等于自身最终 URL
 - 非英语分类描述、法律页和文章正文没有英语静默回退
+- 首页 Hero 使用真实游戏图；有至少两篇文章的高价值分类会生成本地化专题入口，且所有专题链接存在
 
 本地 `example.com` 是未配置正式域名的预期状态。部署前设置 `NEXT_PUBLIC_SITE_URL` 后运行：
 

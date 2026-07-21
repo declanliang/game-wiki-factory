@@ -11,5 +11,6 @@
 - 每个页面必须 self-canonical；HTML、sitemap 与 JSON-LD 必须使用相同的 locale-aware URL。
 - ingest 必须先清理生成 content，且拒绝 site-plan 未声明的语言/分类。
 - 模板脚本必须幂等；同一 intake 连续运行两次结果应一致。
+- 首页 Hero 使用 `public/images/hero.webp` 作为真实游戏背景并保留可读遮罩。`generate-featured.mjs` 只能从 published site-plan 和已存在的本地化 MDX 生成分类专题；至少两篇文章才显示，不能创建空链接或反向创造分类。
 
 修改后运行所有 `node --check scripts/*.mjs`（至少修改文件）、`npx tsc --noEmit`，并在隔离的具体游戏 site 副本中运行 `npm run launch:site`。

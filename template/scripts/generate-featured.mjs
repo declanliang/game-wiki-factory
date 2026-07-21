@@ -35,6 +35,8 @@ const info = (msg) => console.log(`\x1b[36mi\x1b[0m ${msg}`);
 const BEGINNER_RE = /beginner|getting-started|getting started|how-to-play|how to play|guide|start|intro/i;
 const MAX_ITEMS = 8;
 const MIN_ITEMS = 4;
+const MAX_SPOTLIGHTS = 6;
+const MAX_SPOTLIGHT_ITEMS = 4;
 
 function fileNameToSlug(fileName) {
   return fileName
@@ -90,7 +92,9 @@ for (const category of categoryOrder) {
       date: extractField(source, "date"),
     };
   });
-  articles.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  articles.sort((a, b) =>
+    (b.date || "").localeCompare(a.date || "") || a.slug.localeCompare(b.slug),
+  );
   if (articles.length > 0) articlesByCategory.set(category, articles);
 }
 
@@ -153,6 +157,20 @@ if (fs.existsSync(overridePath)) {
 
 if (errors > 0) process.exit(1);
 
+// Category spotlights turn the homepage into a real content hub. General guides
+// are already represented by Featured and the Basic Info field-guide sections;
+// spotlights therefore prioritize deeper game-specific categories and only
+// appear when at least two focused pages exist.
+const spotlightSelections = plan.categories
+  .filter((category) => category.status === "published" && category.id !== "guide")
+  .sort((a, b) => a.order - b.order)
+  .map((category) => ({
+    category,
+    articles: (articlesByCategory.get(category.id) || []).slice(0, MAX_SPOTLIGHT_ITEMS),
+  }))
+  .filter((entry) => entry.articles.length >= 2)
+  .slice(0, MAX_SPOTLIGHTS);
+
 // --- 4. Materialize the same selections with each locale's own metadata --------
 for (const locale of plan.languages) {
   const localePath = path.join(root, "src", "locales", `${locale}.json`);
@@ -184,8 +202,50 @@ for (const locale of plan.languages) {
     });
   }
   messages.home.featured.items = localizedItems;
+
+  const localizedSpotlights = [];
+  for (const { category, articles } of spotlightSelections) {
+    const spotlightItems = [];
+    for (const selected of articles) {
+      const file = walkMdx(path.join(root, "content", locale, selected.category))
+        .find((candidate) => fileNameToSlug(path.basename(candidate)) === selected.slug);
+      if (!file) {
+        fail(`${locale} 缺少首页专题文章 ${selected.category}/${selected.slug}`);
+        continue;
+      }
+      const source = fs.readFileSync(file, "utf-8");
+      const title = extractField(source, "title");
+      const description = extractField(source, "description");
+      if (!title || !description) {
+        fail(`${locale} 首页专题文章 ${selected.category}/${selected.slug} 缺少本地化 metadata`);
+        continue;
+      }
+      spotlightItems.push({
+        title,
+        description,
+        href: `/${selected.category}/${selected.slug}`,
+        category: selected.category,
+      });
+    }
+    const categoryLabel = category.labels?.[locale];
+    const categoryDescription = category.descriptions?.[locale];
+    if (!categoryLabel || !categoryDescription) {
+      fail(`${locale} site-plan 分类 ${category.id} 缺少本地化 label/description`);
+      continue;
+    }
+    const viewAllTemplate = messages.shared?.viewAllInCategory || "View all {category}";
+    localizedSpotlights.push({
+      title: categoryLabel,
+      description: categoryDescription,
+      viewAllHref: `/${category.id}`,
+      viewAllLabel: viewAllTemplate.replace("{category}", categoryLabel),
+      items: spotlightItems,
+    });
+  }
+  if (localizedSpotlights.length > 0) messages.home.extraSections = localizedSpotlights;
+  else delete messages.home.extraSections;
   fs.writeFileSync(localePath, `${JSON.stringify(messages, null, 2)}\n`);
-  ok(`${locale} home.featured.items 已生成 ${localizedItems.length} 条`);
+  ok(`${locale} 首页已生成 ${localizedItems.length} 条精选与 ${localizedSpotlights.length} 个分类专题`);
 }
 
 if (errors > 0) process.exit(1);

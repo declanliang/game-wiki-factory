@@ -33,7 +33,7 @@ if (!fs.existsSync(sitePlanPath)) {
 } else {
   try {
     sitePlan = JSON.parse(fs.readFileSync(sitePlanPath, "utf-8"));
-    if (sitePlan.schemaVersion !== 1) fail("intake/site-plan.json schemaVersion 必须是 1");
+    if (sitePlan.schemaVersion !== 2) fail("intake/site-plan.json schemaVersion 必须是 2");
     if (JSON.stringify(sitePlan.languages) !== JSON.stringify(FIXED_LANGUAGES)) {
       fail(`site-plan.languages 必须是固定策略 ${FIXED_LANGUAGES.join(", ")}`);
     }

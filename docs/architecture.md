@@ -34,7 +34,7 @@ Games/
       平台解析器 → Roblox adapter 或 Steam adapter
       官方身份、规范事实、首页、hero/favicon、固定六语言、category candidates
   → pipeline/guide-search
-      Google Suggest 主词+a–z、DataForSEO、搜索意图、语义聚类与淘汰审计
+      Google Suggest 主词+a–z、DataForSEO、去重视频标题证据、联网知识/实体机会、语义聚类与淘汰审计
   → planner / project_contract.py
       game-profile + keywords → site-plan
   → pipeline/seo-scout
@@ -82,12 +82,13 @@ Roblox 与 Steam 共用 Basic Info 之后的全部契约：`facts.json` / `evide
 
 ## 规划契约
 
-1. `game-profile.json` 由 Basic Info 根据可信游戏事实生成，定义允许的分类候选和语义边界。
-2. `site-plan.json` 把 Guide Search 关键词限制在 profile 内，记录分类顺序、六语言标签与描述、关键词、交付数量及状态。`strategy/tips/tactics` 合并到 `guide` 分类但保留独立关键词；planner 不生成无搜索证据的 fallback 关键词。
+1. `game-profile.json` 由 Basic Info 根据可信游戏事实和平台能力生成，定义允许的分类候选和语义边界。候选词汇可宽于最终导航（最多 16 个），避免在关键词研究前过早淘汰真实类别；最终 site plan 仍最多发布 8 类。Roblox 可把 Codes 作为候选能力，但没有后续证据就不会发布。
+2. Guide Search 把搜索关键词和联网研究发现的 `page_opportunities` 合并后审计。知识机会只有在置信度至少 0.72，且拥有一个官方/创作者 URL 或两个不同支持 URL时才能进入聚类；Discord、Reddit、Trello、游戏链接、无实体依据的 Tier List 和工具页会被拒绝。
+3. `site-plan.json` 把 Guide Search 主题限制在 profile 内，记录分类顺序、六语言标签与描述、关键词、页面类型、实体/意图元数据、交付数量及状态。`strategy/tips/tactics` 合并到 `guide` 分类但保留独立关键词；planner 不生成无证据的 fallback 主题。
 
-SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。模板只接收 intake 中 reconcile 后的 site plan。`content/` 是投影，不是反向事实源。
+SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。生成阶段按 Codes、Tier List、Update、Entity、Guide 五种页面 brief 控制结构和事实边界；所有形态仍走同一搜索、采集、QA、翻译和 MDX 路由。模板只接收 intake 中 reconcile 后的 site plan。`content/` 是投影，不是反向事实源。
 
-首页也遵循同一所有权：Basic Info 生成 `home.guideSections` 的事实与文案，site plan 决定发布分类；编排器只为已经 published 的分类补 `/<category>` 链接。文章目录不能反向创造首页事实或分类。
+首页也遵循同一所有权：Basic Info 生成 `home.guideSections` 的事实与文案，site plan 决定发布分类；编排器只为已经 published 的分类补 `/<category>` 链接。模板可从 published MDX 确定性生成分类专题卡片，但文章目录不能反向创造首页事实或分类。Hero 使用已处理的真实游戏图片，专题和相关推荐只链接实际存在的页面。
 
 ## Checkpoint
 
@@ -95,7 +96,7 @@ SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。模板只
 - Guide Search：保留 raw、LLM decision、rejected、manifest 和 keywords。
 - SEO Scout：搜索、收集、生成、QA、翻译按文件幂等；翻译与英文做结构完整性对照。
 - LLM 截断或退化输出不会落盘：英文生成使用独立 token 上限和紧凑降级重试；仅翻译元数据超限时本地压缩后复验正文。
-- Template：从 intake 重建 content，防止已删除文章或旧分类残留。
+- Template：编排器先按当前 site-plan 把 SEO Scout checkpoint 投影到 intake，再从 intake 重建 content；历史文章可留在 `.gamewiki` 复用，但被淘汰的旧分类不能进入部署项目。
 
 `manifest.json.stages` 记录 generated/reused/migrated/reconciled/failed。日志按 UTC attempt 命名，不覆盖失败现场。
 

@@ -23,7 +23,7 @@ try {
   fail(`intake/site-plan.json 不是合法 JSON：${error.message}`);
 }
 
-if (plan.schemaVersion !== 1 || !Array.isArray(plan.categories)) fail("site-plan schemaVersion/categories 不合法");
+if (plan.schemaVersion !== 2 || !Array.isArray(plan.categories)) fail("site-plan schemaVersion/categories 不合法");
 if (JSON.stringify(plan.languages) !== JSON.stringify(FIXED_LANGUAGES)) {
   fail(`site-plan languages 必须是固定策略 ${FIXED_LANGUAGES.join(", ")}`);
 }

@@ -45,11 +45,12 @@ class ProjectContractTests(unittest.TestCase):
         ids = [item["id"] for item in profile["categoryCandidates"]]
         self.assertEqual(profile["languages"], FIXED_LANGUAGES)
         self.assertGreaterEqual(len(ids), 4)
-        self.assertLessEqual(len(ids), 8)
+        self.assertLessEqual(len(ids), 16)
         self.assertIn("enemies", ids)
         self.assertIn("floors", ids)
         self.assertIn("upgrades", ids)
         self.assertIn("economy", ids)
+        self.assertIn("codes", ids)
         for candidate in profile["categoryCandidates"]:
             self.assertEqual(list(candidate["descriptions"]), FIXED_LANGUAGES)
             self.assertTrue(all(candidate["descriptions"].values()))
@@ -61,7 +62,7 @@ class ProjectContractTests(unittest.TestCase):
             "categories": [
                 {"category": "guide", "keywords": ["hellhole guide"]},
                 {"category": "strategy", "keywords": ["hellhole tips and tricks"]},
-                {"category": "codes", "keywords": ["unverified code"]},
+                {"category": "pets", "keywords": ["unverified pets"]},
             ]
         }
         plan = build_site_plan(profile, raw)
@@ -75,8 +76,40 @@ class ProjectContractTests(unittest.TestCase):
             "site-plan-relevant-fallback",
             [source for item in plan["categories"] for source in item["sources"]],
         )
-        self.assertNotIn("codes", [item["id"] for item in plan["categories"]])
+        self.assertNotIn("pets", [item["id"] for item in plan["categories"]])
         self.assertEqual(build_seo_keywords(plan)["languages"], FIXED_LANGUAGES[1:])
+
+    def test_rankable_entities_enable_tier_list_and_topic_metadata_survives(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = self._basic_output(Path(temporary))
+            content_path = root / "template-intake" / "site-content.json"
+            content_path.write_text(
+                json.dumps({"site": {"description": "Collect units, evolve characters, and compare traits."}}),
+                encoding="utf-8",
+            )
+            profile = build_game_profile(root)
+        ids = [item["id"] for item in profile["categoryCandidates"]]
+        self.assertIn("characters", ids)
+        self.assertIn("tier-list", ids)
+        raw = {
+            "categories": [{
+                "category": "tier-list",
+                "keywords": ["hellhole unit tier list"],
+                "topics": [{
+                    "keyword": "hellhole unit tier list",
+                    "pageType": "tier_list",
+                    "intent": "Compare the strongest units",
+                    "confidence": 0.88,
+                    "discoverySources": ["context-opportunity", "official"],
+                    "evidenceUrls": ["https://example.com/official"],
+                }],
+            }],
+        }
+        plan = build_site_plan(profile, raw)
+        self.assertEqual(plan["schemaVersion"], 2)
+        self.assertEqual(plan["categories"][0]["topics"][0]["pageType"], "tier_list")
+        bridge = build_seo_keywords(plan)
+        self.assertEqual(bridge["topic_specs"]["hellhole unit tier list"]["pageType"], "tier_list")
 
     def test_site_plan_rejects_an_empty_evidence_set(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

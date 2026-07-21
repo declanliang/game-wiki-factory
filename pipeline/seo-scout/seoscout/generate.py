@@ -33,6 +33,49 @@ the exact TITLE / DESCRIPTION / QUICKGUIDE / BODY output contract and finish the
 FAQ cleanly.
 """
 
+PAGE_TYPE_BRIEFS = {
+    "codes": (
+        "Create one canonical Codes page. Separate verified active, community-reported, expired, "
+        "and unavailable codes. Include redemption availability, how to redeem when supported, "
+        "a last-checked/status note, and troubleshooting. Never invent a code, reward, or expiry date."
+    ),
+    "tier_list": (
+        "Create a focused Tier List page. Explain the ranking basis and update sensitivity. Rank only "
+        "entities supported by the source packet, label community judgment, and include practical "
+        "alternatives. Do not fabricate tiers, stats, units, or numerical comparisons."
+    ),
+    "update": (
+        "Create a focused update or event page. State the version/date scope only when sourced, separate "
+        "confirmed changes from reports, explain affected systems and player actions, and avoid generic "
+        "patch-note filler."
+    ),
+    "entity": (
+        "Create a focused named-entity reference page. Explain what the entity is, how players encounter "
+        "or obtain it, why it matters, how it connects to relevant systems, and the next useful player "
+        "decision. Do not turn it into a broad all-game guide."
+    ),
+    "guide": (
+        "Create a focused how-to page that answers the supplied player intent. Link related concepts in "
+        "the explanation, but do not absorb unrelated entities or several different search intents into "
+        "one monolithic guide."
+    ),
+}
+
+
+def page_type_brief(spec: dict, category: str) -> str:
+    page_type = str(spec.get("pageType") or "").strip()
+    if not page_type:
+        page_type = "codes" if category == "codes" else "tier_list" if category == "tier-list" else "update" if category == "updates" else "guide"
+    brief = PAGE_TYPE_BRIEFS.get(page_type, PAGE_TYPE_BRIEFS["guide"])
+    details = []
+    if spec.get("entityName"):
+        details.append(f"Entity: {spec['entityName']}")
+    if spec.get("entityType"):
+        details.append(f"Entity type: {spec['entityType']}")
+    if spec.get("intent"):
+        details.append(f"Player intent: {spec['intent']}")
+    return brief + ("\n" + "\n".join(details) if details else "")
+
 
 # ── helpers ─────────────────────────────────────────────────────
 
@@ -51,7 +94,8 @@ def load_prompt_template(prompt_path: str = None) -> str:
 
     Template variables (str.format() {var} syntax): {merged_data} (collected
     reference material — JSON of YouTube transcripts + web content),
-    {current_date} (YYYY-MM-DD), {category} (content category slug).
+    {current_date} (YYYY-MM-DD), {category} (content category slug), and
+    {page_brief} (the deterministic page-type requirements).
 
     Deliberately not documented as a leading comment inside the .md file
     itself — that comment becomes the literal first thing in the prompt sent
@@ -320,6 +364,7 @@ async def run_generate(
     except (FileNotFoundError, json.JSONDecodeError):
         keyword_input = {}
     trusted_context = keyword_input.get('trusted_context') or {}
+    topic_specs = keyword_input.get('topic_specs') or {}
 
     # Load keywords with categories from search_results.json
     search_results_path = f"{Config.OUT_DIR}/search_results.json"
@@ -331,6 +376,7 @@ async def run_generate(
             keyword_entries.append({
                 'keyword': kw['keyword'],
                 'category': kw.get('category', ''),
+                'topic_spec': topic_specs.get(kw['keyword']) or {},
                 'search_evidence': {
                     'youtube_titles': [
                         {'title': item.get('title'), 'url': item.get('url')}
@@ -419,6 +465,7 @@ async def run_generate(
         enriched['trusted_game_context'] = trusted_context
         enriched['search_evidence'] = entry.get('search_evidence') or {}
         enriched['target_keyword'] = keyword
+        enriched['page_spec'] = entry.get('topic_spec') or topic_specs.get(keyword) or {}
         merged_json = json.dumps(enriched, indent=2, ensure_ascii=False)
         current_date = datetime.now().strftime('%Y-%m-%d')
         cat_slug_final = cat_slug if category else "general"
@@ -427,6 +474,7 @@ async def run_generate(
             merged_data=merged_json,
             current_date=current_date,
             category=cat_slug_final,
+            page_brief=page_type_brief(enriched['page_spec'], cat_slug_final),
         )
         relative_output = str(Path(output_path).relative_to(Path(articles_dir))).replace('\\', '/')
         source_fingerprint = hashlib.sha256(prompt.encode('utf-8')).hexdigest()

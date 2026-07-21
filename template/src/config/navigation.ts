@@ -7,11 +7,14 @@ import {
   Layers3,
   Map,
   Newspaper,
+  Gamepad2,
+  ScrollText,
   Settings2,
   ShieldAlert,
   Sparkles,
   Swords,
   Tag,
+  Trophy,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
@@ -31,6 +34,7 @@ const ICONS: Record<string, LucideIcon> = {
   progression: TrendingUp,
   mechanics: Settings2,
   updates: Newspaper,
+  "tier-list": Trophy,
   enemies: ShieldAlert,
   floors: Layers3,
   upgrades: Sparkles,
@@ -41,6 +45,8 @@ const ICONS: Record<string, LucideIcon> = {
   codes: Tag,
   maps: Map,
   items: Boxes,
+  modes: Gamepad2,
+  quests: ScrollText,
 };
 
 export const SITE_PLAN_CATEGORIES = (sitePlan.categories as SitePlanCategory[])

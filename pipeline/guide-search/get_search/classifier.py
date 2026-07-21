@@ -24,7 +24,7 @@ FOREIGN_QUERY_PATTERN = re.compile(
 
 CATEGORY_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("codes", re.compile(r"\b(code|codes|redeem)\b", re.I)),
-    ("tier list", re.compile(r"\b(tier\s*list|ranking|rankings|best)\b", re.I)),
+    ("tier-list", re.compile(r"\b(tier\s*list|ranking|rankings|best)\b", re.I)),
     ("units", re.compile(r"\b(unit|units|trait|traits|mythic|starter|evolve|evolution|meta)\b", re.I)),
     ("anomalies", re.compile(r"\b(anomaly|anomalies|ghost|jumpscare|stalker|secret|secrets)\b", re.I)),
     ("characters", re.compile(r"\b(character|characters|class|classes|intern|secretary)\b", re.I)),
@@ -67,6 +67,21 @@ YOUTUBE_STABLE_TOPICS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 YOUTUBE_STABLE_TOPIC_MIN_VIDEOS = 2
 
+ENTITY_CATEGORIES = {"characters", "units", "enemies", "bosses", "weapons", "items", "modes", "quests"}
+
+
+def page_type_for_category(category: str) -> str:
+    normalized = canonical(category).replace(" ", "-")
+    if normalized == "codes":
+        return "codes"
+    if normalized == "tier-list":
+        return "tier_list"
+    if normalized == "updates":
+        return "update"
+    if normalized in ENTITY_CATEGORIES:
+        return "entity"
+    return "guide"
+
 
 def ascii_text(value: str) -> str:
     value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
@@ -108,6 +123,12 @@ class Candidate:
     evidence: list[str] = field(default_factory=list)
     category: str = "guide"
     score: float = 0
+    page_type: str = "guide"
+    entity_name: str | None = None
+    entity_type: str | None = None
+    intent: str = ""
+    confidence: float | None = None
+    evidence_urls: list[str] = field(default_factory=list)
 
     def merge(self, other: "Candidate") -> None:
         self.sources.update(other.sources)
@@ -126,6 +147,14 @@ class Candidate:
         self.youtube_views += other.youtube_views
         self.youtube_occurrences += other.youtube_occurrences
         self.evidence = list(dict.fromkeys(self.evidence + other.evidence))[:10]
+        if other.page_type != "guide" or self.page_type == "guide":
+            self.page_type = other.page_type
+        self.entity_name = self.entity_name or other.entity_name
+        self.entity_type = self.entity_type or other.entity_type
+        self.intent = self.intent or other.intent
+        if other.confidence is not None:
+            self.confidence = max(self.confidence or 0, other.confidence)
+        self.evidence_urls = list(dict.fromkeys(self.evidence_urls + other.evidence_urls))[:10]
 
     def finish(self) -> None:
         score = 0.0
@@ -160,6 +189,12 @@ class Candidate:
                 "youtube_occurrences": self.youtube_occurrences,
             },
             "evidence": self.evidence,
+            "pageType": self.page_type,
+            "entityName": self.entity_name,
+            "entityType": self.entity_type,
+            "intent": self.intent,
+            "confidence": self.confidence,
+            "evidenceUrls": self.evidence_urls,
         }
 
 
@@ -394,6 +429,7 @@ def extract_candidates(topic: str, raw: dict[str, Any]) -> tuple[list[Candidate]
     candidates = list(store.values())
     for candidate in candidates:
         candidate.category = classify(candidate.keyword, topic)
+        candidate.page_type = page_type_for_category(candidate.category)
         candidate.finish()
     candidates.sort(key=lambda item: (-item.score, item.keyword))
     return candidates, rejected
@@ -465,6 +501,19 @@ def build_keywords_json(topic: str, selected: list[Candidate]) -> dict[str, Any]
             {
                 "category": category,
                 "keywords": [item.keyword for item in sorted(grouped[category], key=lambda item: -item.score)],
+                "topics": [
+                    {
+                        "keyword": item.keyword,
+                        "pageType": item.page_type,
+                        "entityName": item.entity_name,
+                        "entityType": item.entity_type,
+                        "intent": item.intent,
+                        "confidence": item.confidence,
+                        "discoverySources": sorted(item.sources),
+                        "evidenceUrls": item.evidence_urls,
+                    }
+                    for item in sorted(grouped[category], key=lambda item: -item.score)
+                ],
             }
             for category in ordered_categories
         ],
@@ -485,6 +534,9 @@ def validate_keywords(data: dict[str, Any]) -> list[str]:
         if name in {"wiki", "gameplay", "general"}:
             errors.append(f"forbidden category: {name}")
         keywords = category.get("keywords") or []
+        topics = category.get("topics") or []
+        if topics and [item.get("keyword") for item in topics] != keywords:
+            errors.append(f"topic metadata does not match keywords for category: {name}")
         if name == "codes" and len(keywords) > 1:
             errors.append("codes contains more than one keyword")
         for keyword in keywords:

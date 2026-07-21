@@ -170,18 +170,22 @@ python gamewiki.py resume <game-slug>
 ## 数据和质量规则
 
 - 固定语言：`en/es/de/fr/ja/ko`。
-- Basic Info 生成 `game-profile.json`，定义分类语义边界。
+- Basic Info 生成 `game-profile.json`，定义分类语义边界。候选边界可最多包含 16 类，最终 `site-plan` 仍最多发布 8 类，避免在关键词证据出现前过早丢掉真实类别。
 - Basic Info 还可生成 2–4 个证据支持的 `home.guideSections`，为首页补充核心玩法、入门路径、成长和关键系统；模板只会把其中属于已发布 `site-plan` 分类的条目解析成链接。
-- Guide Search 调用 Google Suggest 主词和 a–z，并从多个视频共同支持的稳定机制中召回补充主题；单个娱乐视频不能独立创建文章。
+- Guide Search 调用 Google Suggest 主词和 a–z，并把去重后的视频标题+URL交给联网背景研究；同一命名实体被至少两个不同视频支持时，可召回独立角色/单位/模式/物品页。联网研究还会发现有证据的 Codes、Tier List 和 Updates 页面机会。单个娱乐视频不能独立创建文章。
 - 首页视频优先使用 Basic Info 已确认的 trailer；没有时只复用 Guide Search 已缓存的 YouTube 结果，选择标题完整匹配游戏名、平台语义一致、时长 2–60 分钟的最高排名长视频。选中结果只填充视频 ID，不把第三方频道冒充官方频道，也不新增 API 调用。
 - `site-plan.json` 是分类、顺序、六语言标签、六语言分类描述和发布状态的唯一事实源。
-- 不为分类数量合成关键词；通常争取 3–5 个可靠文章主题，证据稀少时接受更少，分类最多 8 个。
+- 不为分类或文章数量合成主题；页面机会必须有一个官方/创作者来源 URL，或至少两个不同的支持 URL，并且仍受 Basic Info 分类边界约束。简单游戏可以只有少量页面，资料丰富的游戏应拆成更多可独立搜索和互链的聚焦页面；分类最多 8 个。
+- 当前重点页面形态包括 Codes、Tier List、Updates、实体资料页和既有攻略页；Calculator、Planner、Team Builder 等工具页暂不生成。
+- 首页使用游戏 Hero 作为沉浸式背景，并从已发布文章确定性生成分类专题入口；专题至少需要两篇真实文章，不创建空区块或虚假链接。
 - `strategy/tips/tactics` 映射进 `guide`，但每个不同关键词仍生成独立文章。
 - SEO Scout 在翻译前执行文不对题 QA。
 - 翻译必须保留标题、列表、表格、FAQ 和 Callout 结构；截断响应不会成为 checkpoint。
 - 英文生成单独限制为 10,000 completion tokens；截断重试会自动改用紧凑、无表格的降级提示词，避免重复字符耗尽预算。
 - 翻译仅有标题或描述超限时会本地压缩 SERP 字段并重新验证正文，不会为元数据小问题重翻整篇文章。
+- 不同英文页面若被翻译成相同的泛化标题，流水线会保留译文并按英文主题 slug 追加短限定词，避免多篇页面拥有重复 SEO 标题。
 - 六语言文章树必须完全一致。
+- 增量重聚类保留 SEO Scout 的历史文章 checkpoint，但最终 `intake/articles` 只投影当前 site-plan 的 published 分类；被计划淘汰的旧分类不会泄漏到网站。
 - 最终验收包括 intake、TypeScript、配置、production build、sitemap 直接 200、self-canonical、OG 和 hreflang。
 
 ## 交给 AI 执行
@@ -213,6 +217,7 @@ AI 接手前还应阅读：
 - [`docs/architecture.md`](docs/architecture.md)
 - [`docs/runbook.md`](docs/runbook.md)
 - [`docs/ai-handoff.md`](docs/ai-handoff.md)
+- [`docs/design/content-depth-v4.md`](docs/design/content-depth-v4.md)
 
 ## 网站本地运行
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, BookOpen, ChevronRight, type LucideIcon } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
@@ -150,24 +151,28 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
     switch (section) {
       case "hero":
         return (
-          // Centered eyebrow above H1 → description → 2 CTAs → trust-signal stats. No sidebar, no video here.
-          <section className="mx-auto max-w-6xl pt-4 text-center sm:pt-8">
-            <div className="mx-auto mb-4 flex justify-center">
-              <span className="inline-flex items-center rounded-full border border-[hsl(var(--nav-theme)/0.3)] bg-[hsl(var(--nav-theme)/0.1)] px-3 py-1 text-sm font-semibold text-[hsl(var(--nav-theme))]">{home.hero.eyebrow}</span>
-            </div>
-            <h1 className="text-5xl font-extrabold tracking-tight text-foreground sm:text-6xl lg:text-7xl">{home.hero.title}</h1>
-            <p className="mx-auto mt-5 max-w-3xl text-lg leading-relaxed text-muted-foreground">{home.hero.description}</p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <Button asChild size="lg"><Link href={localizeHref(home.hero.primaryCtaHref, locale)}>{home.hero.primaryCta}</Link></Button>
-              <Button asChild size="lg" variant="outline"><Link href={home.hero.secondaryCtaHref}>{home.hero.secondaryCta}</Link></Button>
-            </div>
-            <div className="mx-auto mt-10 grid max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4">
-              {home.hero.stats.map((stat) => (
-                <div key={stat.label} className="flex min-h-36 flex-col rounded-2xl border border-border bg-card/70 p-5 text-left sm:min-h-40 sm:p-6">
-                  <p className="text-2xl font-bold leading-tight text-[hsl(var(--nav-theme))] sm:text-3xl">{stat.value}</p>
-                  <p className="mt-auto pt-5 text-sm leading-5 text-muted-foreground">{stat.label}</p>
-                </div>
-              ))}
+          <section className="relative mx-auto min-h-[42rem] max-w-[90rem] overflow-hidden rounded-[2rem] border border-white/10 bg-card text-center shadow-2xl shadow-black/30 sm:min-h-[46rem]">
+            <Image src="/images/hero.webp" alt="" fill priority sizes="(max-width: 1440px) 100vw, 1440px" className="object-cover" />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,6,10,.38)_0%,rgba(4,6,10,.62)_48%,rgba(4,6,10,.94)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,transparent_0%,rgba(0,0,0,.2)_52%,rgba(0,0,0,.6)_100%)]" />
+            <div className="relative z-10 mx-auto flex min-h-[42rem] max-w-6xl flex-col justify-end px-5 pb-8 pt-24 sm:min-h-[46rem] sm:px-10 sm:pb-10 lg:px-14">
+              <div className="mx-auto mb-4 flex justify-center">
+                <span className="inline-flex items-center rounded-full border border-white/25 bg-black/35 px-4 py-1.5 text-sm font-semibold text-white backdrop-blur-md">{home.hero.eyebrow}</span>
+              </div>
+              <h1 className="text-5xl font-extrabold tracking-[-0.045em] text-white drop-shadow-2xl sm:text-6xl lg:text-7xl">{home.hero.title}</h1>
+              <p className="mx-auto mt-5 max-w-3xl text-lg leading-relaxed text-white/80 drop-shadow-lg sm:text-xl">{home.hero.description}</p>
+              <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+                <Button asChild size="lg" className="shadow-lg shadow-black/20"><Link href={localizeHref(home.hero.primaryCtaHref, locale)}>{home.hero.primaryCta}</Link></Button>
+                <Button asChild size="lg" variant="outline" className="border-white/35 bg-black/25 text-white backdrop-blur-md hover:bg-white hover:text-black"><Link href={home.hero.secondaryCtaHref}>{home.hero.secondaryCta}</Link></Button>
+              </div>
+              <div className="mx-auto mt-10 grid w-full max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4">
+                {home.hero.stats.map((stat) => (
+                  <div key={stat.label} className="flex min-h-32 flex-col rounded-2xl border border-white/15 bg-black/40 p-5 text-left text-white shadow-lg backdrop-blur-md sm:min-h-36 sm:p-6">
+                    <p className="text-2xl font-bold leading-tight text-white sm:text-3xl">{stat.value}</p>
+                    <p className="mt-auto pt-5 text-sm leading-5 text-white/65">{stat.label}</p>
+                  </div>
+                ))}
+              </div>
             </div>
           </section>
         );
