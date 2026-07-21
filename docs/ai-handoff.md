@@ -16,14 +16,15 @@
 请在 C:\Users\liang\Documents\Games\game-wiki-factory 中，
 为 PLATFORM（Roblox 或 Steam）游戏“GAME NAME”创建或续跑游戏 Wiki。
 
-执行：python gamewiki.py "GAME NAME" --platform PLATFORM
-Steam 已知商店页时追加：--official-url "STEAM URL"
+优先读取用户提供的 jobs/<game>.json 并执行：
+python gamewiki.py --config jobs/<game>.json
+如果没有配置文件，再使用直接参数模式。
 目标目录：C:\Users\liang\Documents\Games\<game-slug>
 
 约束：
 - 先读工厂 README.md、AGENTS.md、docs/architecture.md、docs/runbook.md。
 - 默认复用 checkpoint；不要主动使用 refresh/recluster/overwrite。
-- 失败先读目标 `.gamewiki/manifest.json` 和最新日志。
+- 失败先读目标 `.gamewiki/manifest.json`、`configs/` 和最新日志。
 - 优先修复工厂中的通用代码，再用同一命令续跑。
 - 不打印或提交任何 .env/API key。
 - 先确认 platform；Steam 身份使用 App ID，Roblox 身份使用 Place/Universe，不能混用事实字段。

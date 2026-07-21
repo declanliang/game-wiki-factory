@@ -6,10 +6,13 @@ from orchestrate_wiki import main
 
 
 if __name__ == "__main__":
+    if len(sys.argv) > 2 and sys.argv[1] == "--config":
+        from factory_cli import dispatch
+        raise SystemExit(dispatch("run-config", sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "publish":
         from publisher import publish
         raise SystemExit(publish(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] in {"run-many", "status", "logs", "resume"}:
+    if len(sys.argv) > 1 and sys.argv[1] in {"run-config", "run-many", "status", "logs", "resume"}:
         from factory_cli import dispatch
         raise SystemExit(dispatch(sys.argv[1], sys.argv[2:]))
     raise SystemExit(main())

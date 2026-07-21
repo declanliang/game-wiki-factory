@@ -4,10 +4,14 @@
 
 ```powershell
 cd C:\Users\liang\Documents\Games\game-wiki-factory
-python gamewiki.py "GAME NAME"
+Copy-Item jobs\example.json jobs\my-game.json
+# 编辑 my-game.json 后执行：
+python gamewiki.py --config jobs\my-game.json
 ```
 
-平台明确时优先显式传入，Steam 官方 URL 可消除同名应用歧义：
+配置文件必须明确 `game`、`platform` 和已知的 `officialUrl`；Steam 使用 Store App URL，Roblox 使用 Experience URL。`publish: true` 会完成 Private GitHub 和 Vercel production 发布。真实 `jobs/*.json`、配置快照和日志都被 Git 忽略。
+
+直接参数模式仍可用于调试：
 
 ```powershell
 python gamewiki.py "Funnel Runners" --platform steam --official-url "https://store.steampowered.com/app/3712080/Funnel_Runners/"
@@ -16,7 +20,7 @@ python gamewiki.py "Hellhole" --platform roblox
 
 `auto` 模式会依次尝试 Roblox 和 Steam。平台身份不确定属于阻断错误，应补充官方 URL 或显式平台，不要调低身份阈值。
 
-默认网站目录是 `..\<game-slug>`。同一命令自动续跑。
+默认网站目录是 `..\<game-slug>`。同一配置自动续跑；完整配置快照和终端日志位于项目 `.gamewiki/configs/` 与 `.gamewiki/logs/`。
 
 并发执行：
 

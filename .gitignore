@@ -6,6 +6,8 @@ __pycache__/
 runs/
 .gamewiki/
 /.log
+/jobs/*.json
+!/jobs/example.json
 
 # Local dependency/build outputs inside the bundled template.
 template/node_modules/

@@ -19,7 +19,7 @@ python -m pip install -e .
 
 ### 2. 配置 API Key
 
-项目自动读取根目录 `.env`：
+由 factory 执行时，配置统一来自 `game-wiki-factory/.env`：
 
 ```dotenv
 TOAPIS_API_KEY=你的 ToAPIs Key
@@ -30,7 +30,7 @@ PERPLEXITY_API_KEY=你的 Perplexity Key
 
 现有变量名 `toapis_API_KEY`、`toapis_api_key` 和 `perplexity_api_key` 也兼容。OpenRouter 已完全退出运行链。不要提交或分享 `.env`。
 
-完整配置见 [.env.example](.env.example)。
+完整配置见 factory 根目录 `.env.example`。单独调试本模块时，先把 factory 环境加载到当前进程；不要在模块目录维护第二份密钥文件。
 
 ### 3. 运行
 

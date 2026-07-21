@@ -8,13 +8,15 @@
 
 要求：Python 3.11 或更高版本。项目只使用 Python 标准库，不需要安装额外依赖。
 
-复制 `.env.example` 为 `.env` 并填写凭据：
+凭据统一填写在 `game-wiki-factory/.env`，由根编排器传入本模块：
 
 ```dotenv
 dataforseo_name=your_dataforseo_login
 dataforseo_password=your_dataforseo_password
 TOAPIS_KEY=your_toapis_key
 ```
+
+不要在本模块目录维护第二份 `.env`。日常从 factory 根目录使用 `python gamewiki.py --config ...`；直接调试 `main.py` 时需先把根 `.env` 加载到当前进程。
 
 运行一个新游戏：
 

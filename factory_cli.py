@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import secrets
+import shutil
 import socket
 import subprocess
 import sys
@@ -23,6 +24,100 @@ from orchestrate_wiki import read_json, slugify, write_json
 ROOT = Path(__file__).resolve().parent
 PROJECTS_ROOT = ROOT.parent
 RUNTIME_ROOT = ROOT / ".gamewiki" / "runs"
+
+
+def _config_command(config: dict[str, object]) -> tuple[str, list[str]]:
+    allowed = {"schemaVersion", "game", "platform", "officialUrl", "siteUrl", "publish", "refresh"}
+    unknown = sorted(set(config) - allowed)
+    if unknown:
+        raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
+    game_value = config.get("game")
+    if not isinstance(game_value, str) or not game_value.strip():
+        raise ValueError("config.game must be a non-empty string")
+    # JSON can legally contain escaped newlines. Collapse all whitespace so an
+    # accidental line break never becomes part of identity or search queries.
+    game = " ".join(game_value.split())
+    platform = str(config.get("platform") or "auto").casefold()
+    if platform not in {"auto", "roblox", "steam"}:
+        raise ValueError("config.platform must be auto, roblox, or steam")
+    args = ["--platform", platform]
+    for field, flag in (("officialUrl", "--official-url"), ("siteUrl", "--site-url")):
+        value = config.get(field)
+        if value is not None:
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"config.{field} must be a non-empty string when supplied")
+            args.extend([flag, value.strip()])
+    publish = config.get("publish", False)
+    if not isinstance(publish, bool):
+        raise ValueError("config.publish must be true or false")
+    if publish:
+        args.append("--publish")
+    refresh = config.get("refresh") or {}
+    if not isinstance(refresh, dict):
+        raise ValueError("config.refresh must be an object")
+    refresh_flags = {
+        "basicInfo": "--refresh-basic",
+        "keywords": "--recluster-keywords",
+        "articles": "--overwrite-articles",
+    }
+    unknown_refresh = sorted(set(refresh) - set(refresh_flags))
+    if unknown_refresh:
+        raise ValueError(f"unknown config.refresh field(s): {', '.join(unknown_refresh)}")
+    for field, flag in refresh_flags.items():
+        enabled = refresh.get(field, False)
+        if not isinstance(enabled, bool):
+            raise ValueError(f"config.refresh.{field} must be true or false")
+        if enabled:
+            args.append(flag)
+    return game, args
+
+
+def run_config(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="gamewiki.py --config")
+    parser.add_argument("config", type=Path)
+    args = parser.parse_args(argv)
+    config_path = args.config.expanduser().resolve()
+    try:
+        config = read_json(config_path)
+        game, passthrough = _config_command(config)
+    except (OSError, ValueError, RuntimeError) as exc:
+        parser.error(str(exc))
+    slug = slugify(game)
+    attempt = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    temporary_log_dir = RUNTIME_ROOT / "config"
+    temporary_log_dir.mkdir(parents=True, exist_ok=True)
+    temporary_log = temporary_log_dir / f"{attempt}-{slug}.log"
+    command = [sys.executable, str(ROOT / "gamewiki.py"), game, *passthrough]
+    print(f"[config] {config_path}")
+    print(f"[log] {temporary_log}")
+    with temporary_log.open("w", encoding="utf-8") as log:
+        log.write(f"config={config_path}\nstarted={_now()}\n")
+        process = subprocess.Popen(
+            command,
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        assert process.stdout is not None
+        for line in process.stdout:
+            log.write(line)
+            log.flush()
+            print(line, end="", flush=True)
+        code = process.wait()
+        log.write(f"\nfinished={_now()}\nexitCode={code}\n")
+    project_state = PROJECTS_ROOT / slug / ".gamewiki"
+    if project_state.is_dir():
+        saved_config = project_state / "configs" / f"{attempt}.json"
+        write_json(saved_config, config)
+        final_log = project_state / "logs" / f"{attempt}-config.log"
+        final_log.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(temporary_log, final_log)
+        print(f"[saved-config] {saved_config}")
+        print(f"[saved-log] {final_log}")
+    return code
 
 
 def _now() -> str:
@@ -266,7 +361,7 @@ def resume(argv: list[str]) -> int:
     return subprocess.call([sys.executable, str(ROOT / "gamewiki.py"), game], cwd=ROOT)
 
 
-COMMANDS = {"run-many": run_many, "status": status, "logs": logs, "resume": resume}
+COMMANDS = {"run-config": run_config, "run-many": run_many, "status": status, "logs": logs, "resume": resume}
 
 
 def dispatch(command: str, argv: list[str]) -> int:

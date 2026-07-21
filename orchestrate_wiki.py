@@ -109,21 +109,10 @@ def build_subprocess_env(
     extra_env_files: Iterable[Path] = (),
     base_env: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    """Build one private child environment from canonical and legacy .env files."""
+    """Build one private child environment from the canonical factory .env."""
     env = dict(base_env if base_env is not None else os.environ)
-    parent = root.parent
     candidates = [
         root / ".env",
-        root / "pipeline" / "basic-info" / ".env",
-        root / "pipeline" / "guide-search" / ".env",
-        root / "pipeline" / "seo-scout" / ".env",
-        # Pre-factory paths remain readable during a one-time local migration.
-        root / "auto-basic-info" / ".env",
-        root / "keyword-research" / ".env",
-        root / "seo-scout" / ".env",
-        parent / "auto-basic-info" / ".env",
-        parent / "get-search" / ".env",
-        parent / "seoscout" / ".env",
         *extra_env_files,
     ]
     loaded: dict[str, str] = {}
