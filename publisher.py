@@ -15,7 +15,7 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
-from orchestrate_wiki import read_json, write_json
+from orchestrate_wiki import build_subprocess_env, read_json, write_json
 
 
 ROOT = Path(__file__).resolve().parent
@@ -48,16 +48,17 @@ def _request(method: str, url: str, token: str, payload: dict | None = None) -> 
         raise RuntimeError(f"HTTP {exc.code} from {url}: {detail}") from exc
 
 
-def _publish_with_vercel_cli(project: Path, project_name: str, full_repo: str) -> dict:
+def _publish_with_vercel_cli(project: Path, project_name: str, full_repo: str, env: dict[str, str]) -> dict:
     vercel = shutil.which("vercel.cmd") or shutil.which("vercel")
     if not vercel:
         raise RuntimeError("VERCEL_TOKEN is absent and no authenticated Vercel CLI was found")
-    _run([vercel, "link", "--yes", "--project", project_name], project)
+    _run([vercel, "link", "--yes", "--project", project_name], project, env)
     # `vercel link` normally connects an existing Git remote automatically. An
     # explicit connect is safe to skip when Vercel reports it is already linked.
     connected = subprocess.run(
         [vercel, "git", "connect", f"https://github.com/{full_repo}", "--non-interactive"],
         cwd=project,
+        env=env,
         text=True,
         encoding="utf-8",
         errors="replace",
@@ -75,7 +76,12 @@ def _publish_with_vercel_cli(project: Path, project_name: str, full_repo: str) -
     }
 
 
-def _set_vercel_site_url(project: Path, project_name: str, site_url: str) -> str:
+def _set_vercel_site_url(
+    project: Path,
+    project_name: str,
+    site_url: str,
+    env: dict[str, str] | None = None,
+) -> str:
     """Set the public canonical origin only when the operator supplied it explicitly."""
     configured = site_url.strip()
     if not re.match(r"^https?://", configured, flags=re.I):
@@ -87,15 +93,29 @@ def _set_vercel_site_url(project: Path, project_name: str, site_url: str) -> str
     vercel = shutil.which("vercel.cmd") or shutil.which("vercel")
     if not vercel:
         raise RuntimeError("Vercel CLI is required when --site-url is supplied")
-    token = os.getenv("VERCEL_TOKEN", "").strip()
+    command_env = env or dict(os.environ)
+    token = command_env.get("VERCEL_TOKEN", "").strip()
     auth = ["--token", token] if token else []
-    _run([vercel, "link", "--yes", "--project", project_name, *auth], project)
+    _run([vercel, "link", "--yes", "--project", project_name, *auth], project, command_env)
     _run(
         [vercel, "env", "add", "NEXT_PUBLIC_SITE_URL", "production", "--value", origin,
          "--force", "--yes", "--no-sensitive", *auth],
         project,
+        command_env,
     )
     return origin
+
+
+def _deploy_with_vercel_cli(project: Path, env: dict[str, str]) -> str:
+    """Create a production deployment after linking and environment setup."""
+    vercel = shutil.which("vercel.cmd") or shutil.which("vercel")
+    if not vercel:
+        raise RuntimeError("Vercel CLI is required to create the production deployment")
+    token = env.get("VERCEL_TOKEN", "").strip()
+    auth = ["--token", token] if token else []
+    output = _run([vercel, "--prod", "--yes", *auth], project, env)
+    urls = re.findall(r"https://[^\s]+", output)
+    return urls[-1].rstrip(".,") if urls else ""
 
 
 def _ensure_private_github_repo(full_repo: str, project: Path, env: dict[str, str]) -> None:
@@ -154,9 +174,10 @@ def _validate_project(project: Path) -> dict:
 
 
 def publish(argv: list[str]) -> int:
+    runtime_env = build_subprocess_env(ROOT)
     parser = argparse.ArgumentParser(prog="gamewiki.py publish")
     parser.add_argument("slug")
-    parser.add_argument("--owner", default=os.getenv("FACTORY_GITHUB_OWNER") or "declanliang")
+    parser.add_argument("--owner", default=runtime_env.get("FACTORY_GITHUB_OWNER") or "declanliang")
     parser.add_argument("--repo")
     parser.add_argument("--project-dir", type=Path)
     parser.add_argument("--site-url", help="Optional final domain/URL to configure in Vercel.")
@@ -168,13 +189,16 @@ def publish(argv: list[str]) -> int:
     receipt_path = project / ".gamewiki" / "publish.json"
     receipt = read_json(receipt_path) if receipt_path.is_file() else {"schemaVersion": 1, "slug": args.slug, "createdAt": _now(), "stages": {}}
 
-    gh_token = os.getenv("FACTORY_GITHUB_TOKEN") or os.getenv("GH_TOKEN")
-    if not gh_token:
-        raise RuntimeError("FACTORY_GITHUB_TOKEN (or GH_TOKEN) is required")
+    gh_token = runtime_env.get("FACTORY_GITHUB_TOKEN") or runtime_env.get("GH_TOKEN")
     if not shutil.which("gh"):
         raise RuntimeError("GitHub CLI (gh) is required for credential-safe publishing")
-    env = dict(os.environ)
-    env["GH_TOKEN"] = gh_token
+    env = dict(runtime_env)
+    if gh_token:
+        env["GH_TOKEN"] = gh_token
+    else:
+        # Local operators commonly authenticate once with `gh auth login`.
+        # Reuse that credential store when no explicit automation token exists.
+        _run(["gh", "auth", "status"], project, env)
     full_repo = f"{args.owner}/{repo}"
     exists = subprocess.run(["gh", "repo", "view", full_repo], cwd=project, env=env, capture_output=True).returncode == 0
     if not (project / ".git").is_dir():
@@ -203,10 +227,10 @@ def publish(argv: list[str]) -> int:
     write_json(receipt_path, receipt)
 
     if not args.skip_vercel:
-        vercel_token = os.getenv("VERCEL_TOKEN")
+        vercel_token = runtime_env.get("VERCEL_TOKEN")
         project_name = re.sub(r"[^a-z0-9-]+", "-", repo.casefold()).strip("-")[:100]
         if vercel_token:
-            team_id = os.getenv("VERCEL_TEAM_ID", "").strip()
+            team_id = runtime_env.get("VERCEL_TEAM_ID", "").strip()
             query = f"?teamId={urllib.parse.quote(team_id)}" if team_id else ""
             try:
                 vercel = _request("GET", f"https://api.vercel.com/v9/projects/{project_name}{query}", vercel_token)
@@ -229,9 +253,9 @@ def publish(argv: list[str]) -> int:
                 "updatedAt": _now(),
             }
         else:
-            receipt["stages"]["vercel"] = _publish_with_vercel_cli(project, project_name, full_repo)
+            receipt["stages"]["vercel"] = _publish_with_vercel_cli(project, project_name, full_repo, env)
         if args.site_url:
-            configured_origin = _set_vercel_site_url(project, project_name, args.site_url)
+            configured_origin = _set_vercel_site_url(project, project_name, args.site_url, env)
             receipt["stages"]["vercel"].update({
                 "status": "configured",
                 "siteUrl": configured_origin,
@@ -239,6 +263,13 @@ def publish(argv: list[str]) -> int:
                 "nextAction": "Trigger a production deployment, then run npm run verify:deploy.",
                 "updatedAt": _now(),
             })
+        deployment_url = _deploy_with_vercel_cli(project, env)
+        receipt["stages"]["vercel"].update({
+            "status": "complete",
+            "deploymentUrl": deployment_url,
+            "nextAction": "Add or verify the custom domain in Vercel when one is planned.",
+            "updatedAt": _now(),
+        })
         write_json(receipt_path, receipt)
     print(json.dumps(receipt, ensure_ascii=False, indent=2))
     return 0

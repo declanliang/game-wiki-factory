@@ -244,9 +244,9 @@ python gamewiki.py publish <game-slug>
 
 也可以在生成命令后直接发布：`python gamewiki.py "GAME NAME" --publish`；批量生产使用 `python gamewiki.py run-many "Game A" "Game B" --jobs 2 --publish`。
 
-发布命令要求项目流水线状态为 `complete`，先检查敏感文件，再幂等创建/更新 GitHub repo，并创建或复用同名 Vercel 项目。**游戏 GitHub 仓库只能是 Private**：创建固定使用私有模式，已有仓库也会在推送前后验证 `PRIVATE` 可见性，不提供 Public 开关。GitHub 使用 `FACTORY_GITHUB_TOKEN`（或 `GH_TOKEN`）；Vercel 优先使用 `VERCEL_TOKEN`，本地未设置 token 时可复用已登录的 Vercel CLI。
+发布命令要求项目流水线状态为 `complete`，先检查敏感文件，再幂等创建/更新 GitHub repo，创建或复用同名 Vercel 项目，并触发一次 production deployment。**游戏 GitHub 仓库只能是 Private**：创建固定使用私有模式，已有仓库也会在推送前后验证 `PRIVATE` 可见性，不提供 Public 开关。GitHub 优先使用 factory `.env` 或进程环境中的 `FACTORY_GITHUB_TOKEN`（或 `GH_TOKEN`），本地未设置 token 时复用 `gh auth login` 的登录会话；Vercel 同样优先使用 `VERCEL_TOKEN`，否则复用已登录的 Vercel CLI。
 
-未传 `--site-url` 时，发布器不写 Vercel 环境变量，模板会使用 Vercel 自动提供的 production URL，避免 sitemap、robots 和 canonical 出现 `example.com`。若创建项目时已经知道正式域名，可运行 `python gamewiki.py "GAME" --site-url game.example --publish`，或 `python gamewiki.py publish <slug> --site-url game.example`；发布器会把规范化后的 HTTPS origin 写入 Production 的 `NEXT_PUBLIC_SITE_URL`。绑定域名并部署后执行 `npm run verify:deploy`。只推 GitHub 时加 `--skip-vercel`。回执写入 `.gamewiki/publish.json`，不含 token。
+未传 `--site-url` 时，发布器不写 Vercel 环境变量，模板会使用 Vercel 自动提供的 production URL，避免 sitemap、robots 和 canonical 出现 `example.com`。若创建项目时已经知道正式域名，可运行 `python gamewiki.py "GAME" --site-url game.example --publish`，或 `python gamewiki.py publish <slug> --site-url game.example`；发布器会先把规范化后的 HTTPS origin 写入 Production 的 `NEXT_PUBLIC_SITE_URL`，再触发 production deployment。绑定正式域名后执行 `npm run verify:deploy`。只推 GitHub 时加 `--skip-vercel`。回执写入 `.gamewiki/publish.json`，不含 token。
 
 仓库内的 `.github/workflows/generate-and-publish.yml` 支持手动输入游戏名 JSON 数组，并以最多 3 个矩阵任务并发生成、建仓和导入 Vercel。
 
