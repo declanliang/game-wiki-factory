@@ -106,7 +106,7 @@ export async function SiteFooter({ locale }: { locale: string }) {
             {/* Disclaimer shown once here instead of duplicated in a top banner + the copyright line */}
             <p className="mt-3 text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">{site("legalNotice")}</p>
           </div>
-          <FooterList locale={locale} title={t("guides")} links={contentLinks} />
+          <FooterList locale={locale} title="Wiki" links={contentLinks} />
           <FooterList locale={locale} title={t("legal")} links={legalLinks} />
         </div>
         <div className="mt-10 border-t border-border pt-6">

@@ -91,7 +91,7 @@ function LightSectionBlock({ section, locale }: { section: LightSection; locale:
       {section.description && (
         <p className="mx-auto mt-4 max-w-3xl text-center text-lg text-muted-foreground">{section.description}</p>
       )}
-      <div className="mt-6 flex flex-wrap justify-center gap-3">
+      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {section.items.map((item) => <LightCard key={item.href} item={item} locale={locale} />)}
       </div>
       {section.viewAllHref && (
@@ -115,7 +115,7 @@ function GuideSectionsBlock({ sections, locale }: { sections: GuideSection[]; lo
         >
           <div className="lg:self-start">
             <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.24em] text-[hsl(var(--nav-theme))]">
-              <span className="grid h-10 w-10 place-items-center rounded-xl border border-[hsl(var(--nav-theme)/0.35)] bg-[hsl(var(--nav-theme)/0.1)] font-mono text-sm text-[hsl(var(--nav-theme))]">{String(sectionIndex + 1).padStart(2, "0")}</span>
+              <span className="grid h-12 w-12 place-items-center rounded-2xl border border-[hsl(var(--nav-theme)/0.35)] bg-[hsl(var(--nav-theme)/0.1)] font-mono text-base text-[hsl(var(--nav-theme))]">{String(sectionIndex + 1).padStart(2, "0")}</span>
               <span>{section.eyebrow}</span>
             </div>
             <h2 className="mt-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{section.title}</h2>
@@ -124,8 +124,8 @@ function GuideSectionsBlock({ sections, locale }: { sections: GuideSection[]; lo
           <ol className="grid gap-4">
             {section.items.map((item, itemIndex) => {
               const body = (
-                <div className="grid grid-cols-[2.75rem_1fr_auto] gap-4 rounded-2xl border border-border bg-card/70 p-5 transition group-hover:-translate-y-0.5 group-hover:border-[hsl(var(--nav-theme-light))]">
-                  <span className="grid h-11 w-11 place-items-center rounded-xl bg-muted font-mono text-xs font-bold text-[hsl(var(--nav-theme))]">{String(itemIndex + 1).padStart(2, "0")}</span>
+                <div className="grid grid-cols-[3.5rem_1fr_auto] gap-5 rounded-2xl border border-border bg-card/70 p-5 transition group-hover:-translate-y-0.5 group-hover:border-[hsl(var(--nav-theme-light))]">
+                  <span className="grid h-14 w-14 place-items-center rounded-2xl bg-muted font-mono text-sm font-bold text-[hsl(var(--nav-theme))]">{String(itemIndex + 1).padStart(2, "0")}</span>
                   <span>
                     <span className="block text-lg font-semibold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{item.title}</span>
                     <span className="mt-1 block text-sm leading-6 text-muted-foreground">{item.description}</span>
@@ -151,23 +151,25 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
     switch (section) {
       case "hero":
         return (
-          <section className="relative mx-auto min-h-[42rem] max-w-[90rem] overflow-hidden rounded-[2rem] border border-white/10 bg-card text-center shadow-2xl shadow-black/30 sm:min-h-[46rem]">
+          <section className="relative mx-auto min-h-[36rem] max-w-[90rem] overflow-hidden rounded-[2rem] border border-white/10 bg-card text-center shadow-2xl shadow-black/30">
             <Image src="/images/hero.webp" alt="" fill priority sizes="(max-width: 1440px) 100vw, 1440px" className="object-cover" />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,6,10,.38)_0%,rgba(4,6,10,.62)_48%,rgba(4,6,10,.94)_100%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,transparent_0%,rgba(0,0,0,.2)_52%,rgba(0,0,0,.6)_100%)]" />
-            <div className="relative z-10 mx-auto flex min-h-[42rem] max-w-6xl flex-col justify-end px-5 pb-8 pt-24 sm:min-h-[46rem] sm:px-10 sm:pb-10 lg:px-14">
-              <div className="mx-auto mb-4 flex justify-center">
-                <span className="inline-flex items-center rounded-full border border-white/25 bg-black/35 px-4 py-1.5 text-sm font-semibold text-white backdrop-blur-md">{home.hero.eyebrow}</span>
+            <div className="relative z-10 mx-auto flex min-h-[36rem] max-w-6xl flex-col px-5 pb-6 pt-6 sm:px-10 lg:px-14">
+              <div className="flex flex-1 flex-col items-center justify-center py-4 sm:py-5">
+                <div className="mx-auto mb-4 flex justify-center">
+                  <span className="inline-flex items-center rounded-full border border-white/25 bg-black/35 px-4 py-1.5 text-sm font-semibold text-white backdrop-blur-md">{home.hero.eyebrow}</span>
+                </div>
+                <h1 className="text-5xl font-extrabold tracking-[-0.045em] text-white drop-shadow-2xl sm:text-6xl lg:text-7xl">{home.hero.title}</h1>
+                <p className="mx-auto mt-5 max-w-3xl text-lg leading-relaxed text-white/80 drop-shadow-lg sm:text-xl">{home.hero.description}</p>
+                <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+                  <Button asChild size="lg" className="shadow-lg shadow-black/20"><Link href={localizeHref(home.hero.primaryCtaHref, locale)}>{home.hero.primaryCta}</Link></Button>
+                  <Button asChild size="lg" variant="outline" className="border-white/35 bg-black/25 text-white backdrop-blur-md hover:bg-white hover:text-black"><Link href={home.hero.secondaryCtaHref}>{home.hero.secondaryCta}</Link></Button>
+                </div>
               </div>
-              <h1 className="text-5xl font-extrabold tracking-[-0.045em] text-white drop-shadow-2xl sm:text-6xl lg:text-7xl">{home.hero.title}</h1>
-              <p className="mx-auto mt-5 max-w-3xl text-lg leading-relaxed text-white/80 drop-shadow-lg sm:text-xl">{home.hero.description}</p>
-              <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-                <Button asChild size="lg" className="shadow-lg shadow-black/20"><Link href={localizeHref(home.hero.primaryCtaHref, locale)}>{home.hero.primaryCta}</Link></Button>
-                <Button asChild size="lg" variant="outline" className="border-white/35 bg-black/25 text-white backdrop-blur-md hover:bg-white hover:text-black"><Link href={home.hero.secondaryCtaHref}>{home.hero.secondaryCta}</Link></Button>
-              </div>
-              <div className="mx-auto mt-10 grid w-full max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mx-auto grid w-full max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4">
                 {home.hero.stats.map((stat) => (
-                  <div key={stat.label} className="flex min-h-32 flex-col rounded-2xl border border-white/15 bg-black/40 p-5 text-left text-white shadow-lg backdrop-blur-md sm:min-h-36 sm:p-6">
+                  <div key={stat.label} className="flex min-h-28 flex-col rounded-2xl border border-white/15 bg-black/40 p-5 text-left text-white shadow-lg backdrop-blur-md sm:min-h-32 sm:p-5">
                     <p className="text-2xl font-bold leading-tight text-white sm:text-3xl">{stat.value}</p>
                     <p className="mt-auto pt-5 text-sm leading-5 text-white/65">{stat.label}</p>
                   </div>
