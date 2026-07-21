@@ -16,6 +16,7 @@ from datetime import datetime
 from .core.config import Config
 from .core.llm_client import LLMClient
 from .core.utils import ensure_dir, extract_source_fields
+from .markdown_normalize import normalize_raw_html_blocks
 
 
 class TranslationError(RuntimeError):
@@ -82,7 +83,7 @@ def clean_llm_output(content: str) -> str:
             content = content[3:]
     if content.rstrip().endswith('```'):
         content = content.rstrip()[:-3].rstrip()
-    return content
+    return normalize_raw_html_blocks(content)
 
 
 # ── source parsing / output assembly ────────────────────────────

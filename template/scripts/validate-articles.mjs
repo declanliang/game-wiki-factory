@@ -156,6 +156,9 @@ for (const locale of localeDirs) {
     if (!balancedCallouts(callouts)) {
       fail(`${rel}：<Callout> 标签未正确闭合`);
     }
+    if (/<\/?(?:h[1-6]|ul|ol|li|p)(?:\s+[^>]*)?>/i.test(articleBody(source))) {
+      fail(`${rel}：包含不受支持的原始 HTML 标题/列表标签，应转换为 Markdown`);
+    }
   }
 }
 

@@ -27,6 +27,15 @@ class SeoMetadataValidationTests(unittest.TestCase):
         raw = f"TITLE: {title}\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{BODY}"
         content, error = process_english(raw, "guide", "2026-07-19")
         self.assertIsNotNone(content, error)
+
+    def test_normalizes_basic_raw_html_blocks_before_saving_mdx(self) -> None:
+        body = "<h2>Maps</h2>\n<ul><li><h3>Facility</h3>Use cover carefully.</li></ul>\n" + BODY
+        raw = f"TITLE: Dino Hunters Maps\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{body}"
+        content, error = process_english(raw, "floors", "2026-07-21")
+        self.assertIsNotNone(content, error)
+        self.assertIn("## Maps", content)
+        self.assertIn("### Facility", content)
+        self.assertNotIn("<li>", content)
         metadata_title = content.split('title: ', 1)[1].splitlines()[0]
         self.assertLessEqual(len(metadata_title) - 3, 60)
 

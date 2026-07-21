@@ -17,6 +17,7 @@ from pathlib import Path
 from .core.config import Config
 from .core.llm_client import LLMClient
 from .core.utils import load_json, save_json, ensure_dir
+from .markdown_normalize import normalize_raw_html_blocks
 
 
 class GenerationError(RuntimeError):
@@ -78,7 +79,7 @@ def clean_llm_output(content: str) -> str:
         content = content[3:].lstrip('\n')
     if content.rstrip().endswith('```'):
         content = content.rstrip()[:-3].rstrip()
-    return content
+    return normalize_raw_html_blocks(content)
 
 
 # ── output parsing/assembly ─────────────────────────────────────
