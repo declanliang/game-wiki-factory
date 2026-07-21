@@ -16,6 +16,7 @@ python gamewiki.py "GAME NAME"
 ```powershell
 python gamewiki.py "Funnel Runners" --platform steam --official-url "https://store.steampowered.com/app/3712080/Funnel_Runners/"
 python gamewiki.py "Hellhole" --platform roblox
+python gamewiki.py "Hellhole" --platform roblox --site-url hell-hole-roblox.wiki --publish
 ```
 
 不指定 `--platform` 时会先尝试 Roblox、再尝试 Steam；身份存在歧义时流水线会停止，不会猜测。
@@ -203,7 +204,7 @@ python gamewiki.py resume <game-slug>
 5. 完成时必须确认：所有分类有真实关键词证据、六语言文章树一致、intake 通过、TypeScript 通过、production build 通过、sitemap loc/hreflang 全部直接 200、self-canonical 与 hreflang 完整。
 6. 报告最终网站根目录、分类、语言、文章数、最新日志和任何部署前待配置项。
 7. 只有用户明确要求发布时才创建外部资源；GitHub repo 必须且只能是 Private。
-8. Vercel 只创建/导入项目，不填写环境变量；报告需要用户手动配置的正式域名和 NEXT_PUBLIC_SITE_URL。
+8. 若已提供正式域名，使用 `--site-url` 让发布器配置 `NEXT_PUBLIC_SITE_URL`；未提供时站点回退到 Vercel 自动域名，不允许 `example.com` 上线。
 ```
 
 AI 接手前还应阅读：
@@ -240,7 +241,7 @@ python gamewiki.py publish <game-slug>
 
 发布命令要求项目流水线状态为 `complete`，先检查敏感文件，再幂等创建/更新 GitHub repo，并创建或复用同名 Vercel 项目。**游戏 GitHub 仓库只能是 Private**：创建固定使用私有模式，已有仓库也会在推送前后验证 `PRIVATE` 可见性，不提供 Public 开关。GitHub 使用 `FACTORY_GITHUB_TOKEN`（或 `GH_TOKEN`）；Vercel 优先使用 `VERCEL_TOKEN`，本地未设置 token 时可复用已登录的 Vercel CLI。
 
-发布器不会填写或修改 Vercel 环境变量，也不会把默认 `*.vercel.app` 当成正式域名。Vercel 回执状态为 `awaiting_domain_configuration`；项目导入后，由站点负责人绑定正式域名并手动填写 `NEXT_PUBLIC_SITE_URL=https://正式域名`，再执行 `npm run verify:deploy`。只推 GitHub 时加 `--skip-vercel`。回执写入 `.gamewiki/publish.json`，不含 token。
+未传 `--site-url` 时，发布器不写 Vercel 环境变量，模板会使用 Vercel 自动提供的 production URL，避免 sitemap、robots 和 canonical 出现 `example.com`。若创建项目时已经知道正式域名，可运行 `python gamewiki.py "GAME" --site-url game.example --publish`，或 `python gamewiki.py publish <slug> --site-url game.example`；发布器会把规范化后的 HTTPS origin 写入 Production 的 `NEXT_PUBLIC_SITE_URL`。绑定域名并部署后执行 `npm run verify:deploy`。只推 GitHub 时加 `--skip-vercel`。回执写入 `.gamewiki/publish.json`，不含 token。
 
 仓库内的 `.github/workflows/generate-and-publish.yml` 支持手动输入游戏名 JSON 数组，并以最多 3 个矩阵任务并发生成、建仓和导入 Vercel。
 

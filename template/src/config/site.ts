@@ -1,5 +1,5 @@
 import type en from "@/locales/en.json";
-import { resolveSiteUrl } from "./site-url.mjs";
+import { resolveDeploymentSiteUrl } from "./site-url.mjs";
 import { absoluteLocalizedUrl } from "./site-path.mjs";
 
 /**
@@ -8,7 +8,7 @@ import { absoluteLocalizedUrl } from "./site-path.mjs";
  * see getSiteName() below. Swap those, not this file, when reusing this codebase.
  */
 
-export const SITE_URL = resolveSiteUrl(process.env.NEXT_PUBLIC_SITE_URL);
+export const SITE_URL = resolveDeploymentSiteUrl(process.env);
 
 export const SITE_LOGO_PATH = "/android-chrome-512x512.png";
 export const SITE_OG_IMAGE_PATH = "/images/hero.webp";

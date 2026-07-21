@@ -591,6 +591,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("game", help='Roblox or Steam game name, for example "Funnel Runners"')
     parser.add_argument("--platform", choices=["auto", "roblox", "steam"], default="auto")
     parser.add_argument("--official-url", help="Optional Roblox game or Steam app URL for deterministic identity selection.")
+    parser.add_argument("--site-url", help="Optional final site domain/URL; passed to Vercel when --publish is used.")
     parser.add_argument("--template-dir", type=Path, default=ROOT / "template")
     parser.add_argument("--seo-scout-dir", type=Path, default=ROOT / "pipeline" / "seo-scout")
     parser.add_argument(
@@ -969,7 +970,10 @@ def main(argv: list[str] | None = None) -> int:
             if args.skip_site or args.skip_build:
                 raise PipelineError("--publish requires a complete site and production build verification.")
             from publisher import publish
-            publish([slug, "--project-dir", str(project_dir)])
+            publish_args = [slug, "--project-dir", str(project_dir)]
+            if args.site_url:
+                publish_args.extend(["--site-url", args.site_url])
+            publish(publish_args)
             record("publish", "complete", output=str(project_dir / ".gamewiki" / "publish.json"))
         with run_log_path.open("a", encoding="utf-8") as run_log:
             run_log.write(

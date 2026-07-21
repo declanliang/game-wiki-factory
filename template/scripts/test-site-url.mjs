@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { resolveSiteUrl } from "../src/config/site-url.mjs";
+import { resolveDeploymentSiteUrl, resolveSiteUrl } from "../src/config/site-url.mjs";
 import { absoluteLocalizedUrl, localizedPathname, normalizePathname } from "../src/config/site-path.mjs";
 
 const cases = [
@@ -29,5 +29,7 @@ assert.equal(localizedPathname("/guide/tips", "en"), "/guide/tips");
 assert.equal(localizedPathname("/guide/tips", "es"), "/es/guide/tips");
 assert.equal(localizedPathname("/", "ja"), "/ja");
 assert.equal(absoluteLocalizedUrl("https://game.example.com/", "/guide", "de"), "https://game.example.com/de/guide");
+assert.equal(resolveDeploymentSiteUrl({ VERCEL_PROJECT_PRODUCTION_URL: "game.vercel.app" }), "https://game.vercel.app");
+assert.equal(resolveDeploymentSiteUrl({ NEXT_PUBLIC_SITE_URL: "custom.wiki", VERCEL_PROJECT_PRODUCTION_URL: "game.vercel.app" }), "https://custom.wiki");
 assert.throws(() => normalizePathname("https://other.example.com/guide"), /site-relative/);
 console.log("localized site paths: canonical path and double-slash cases passed");

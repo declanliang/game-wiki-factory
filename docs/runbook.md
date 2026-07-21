@@ -36,7 +36,7 @@ python gamewiki.py resume <slug>
 
 ## 自动发布
 
-GitHub Actions 设置 Secrets：`FACTORY_GITHUB_TOKEN`、`VERCEL_TOKEN` 以及生成/搜索/翻译 API key；设置 Variables：`FACTORY_GITHUB_OWNER`、可选 `VERCEL_TEAM_ID`。本地可以复用 `gh auth login` 与 `vercel login` 会话。发布器强制 GitHub 仓库为 Private，只创建/复用 Vercel 项目，不写任何 Vercel 环境变量。
+GitHub Actions 设置 Secrets：`FACTORY_GITHUB_TOKEN`、`VERCEL_TOKEN` 以及生成/搜索/翻译 API key；设置 Variables：`FACTORY_GITHUB_OWNER`、可选 `VERCEL_TEAM_ID`。本地可以复用 `gh auth login` 与 `vercel login` 会话。发布器强制 GitHub 仓库为 Private；只有明确传入 `--site-url` 才会写 Production 的公开 canonical 环境变量。
 
 ```powershell
 python gamewiki.py publish <slug>
@@ -46,7 +46,7 @@ python gamewiki.py publish <slug>
 
 已存在的 GitHub/Vercel 项目会复用。GitHub integration 未授权读取 Private repo 时，完成授权后重复同一命令。Actions 中运行 `Generate and publish game wikis`，`games_json` 输入合法 JSON 数组，例如 `["Game A", "Game B"]`。
 
-Vercel 导入完成后，`.gamewiki/publish.json` 的 Vercel stage 会是 `awaiting_domain_configuration`。人工完成以下步骤后才算正式上线：绑定最终域名、设置生产 `NEXT_PUBLIC_SITE_URL`、触发生产部署、运行 `npm run verify:deploy`。不要把 Vercel 默认域名自动写入该变量。
+Vercel 导入完成后，未传 `--site-url` 时 `.gamewiki/publish.json` 的 Vercel stage 会是 `awaiting_domain_configuration`，但模板会使用 Vercel 自动 production URL，绝不输出 `example.com`。已知正式域名时传 `--site-url`，发布器会配置 Production；随后绑定域名、触发生产部署并运行 `npm run verify:deploy`。
 
 ## 排查顺序
 

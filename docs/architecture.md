@@ -103,4 +103,4 @@ SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。模板只
 
 每个游戏 GitHub 仓库强制为 Private，发布器没有 Public 模式，并在推送前后验证可见性。游戏目录的 `package.json` 位于仓库根，因此 Vercel Root Directory 留空。部署只运行确定性 Next.js build；所有 AI 工作在本地工厂完成。
 
-发布器只连接 Private GitHub repo 与 Vercel project，不拥有正式域名决策权，也不写 Vercel 环境变量。站点负责人绑定最终域名并填写 `NEXT_PUBLIC_SITE_URL` 后再完成生产验证。模板集中把裸域名规范为 HTTPS origin，并让 metadata、JSON-LD、sitemap 与 robots 共享 locale-aware URL 构造器；非英语页面必须 self-canonical。部署验收拒绝重定向 sitemap URL、域名后双斜杠、canonical/hreflang 冲突和 metadata 缺失。
+发布器只在调用者明确传入 `--site-url` 时写入 `NEXT_PUBLIC_SITE_URL`；否则模板使用 Vercel 自动 production URL。站点负责人绑定最终域名后再完成生产验证。模板集中把裸域名规范为 HTTPS origin，并让 metadata、JSON-LD、sitemap 与 robots 共享 locale-aware URL 构造器；非英语页面必须 self-canonical。部署验收拒绝重定向 sitemap URL、域名后双斜杠、canonical/hreflang 冲突和 metadata 缺失。

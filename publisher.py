@@ -75,6 +75,29 @@ def _publish_with_vercel_cli(project: Path, project_name: str, full_repo: str) -
     }
 
 
+def _set_vercel_site_url(project: Path, project_name: str, site_url: str) -> str:
+    """Set the public canonical origin only when the operator supplied it explicitly."""
+    configured = site_url.strip()
+    if not re.match(r"^https?://", configured, flags=re.I):
+        configured = f"https://{configured}"
+    parsed = urllib.parse.urlparse(configured)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise RuntimeError("--site-url must be a valid hostname or HTTP(S) URL")
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    vercel = shutil.which("vercel.cmd") or shutil.which("vercel")
+    if not vercel:
+        raise RuntimeError("Vercel CLI is required when --site-url is supplied")
+    token = os.getenv("VERCEL_TOKEN", "").strip()
+    auth = ["--token", token] if token else []
+    _run([vercel, "link", "--yes", "--project", project_name, *auth], project)
+    _run(
+        [vercel, "env", "add", "NEXT_PUBLIC_SITE_URL", "production", "--value", origin,
+         "--force", "--yes", "--no-sensitive", *auth],
+        project,
+    )
+    return origin
+
+
 def _ensure_private_github_repo(full_repo: str, project: Path, env: dict[str, str]) -> None:
     """Enforce the factory's private-only repository contract before any update push."""
     visibility = _run(
@@ -136,6 +159,7 @@ def publish(argv: list[str]) -> int:
     parser.add_argument("--owner", default=os.getenv("FACTORY_GITHUB_OWNER") or "declanliang")
     parser.add_argument("--repo")
     parser.add_argument("--project-dir", type=Path)
+    parser.add_argument("--site-url", help="Optional final domain/URL to configure in Vercel.")
     parser.add_argument("--skip-vercel", action="store_true")
     args = parser.parse_args(argv)
     project = (args.project_dir or (PROJECTS_ROOT / args.slug)).expanduser().resolve()
@@ -206,6 +230,15 @@ def publish(argv: list[str]) -> int:
             }
         else:
             receipt["stages"]["vercel"] = _publish_with_vercel_cli(project, project_name, full_repo)
+        if args.site_url:
+            configured_origin = _set_vercel_site_url(project, project_name, args.site_url)
+            receipt["stages"]["vercel"].update({
+                "status": "configured",
+                "siteUrl": configured_origin,
+                "requiredEnvironmentVariables": [],
+                "nextAction": "Trigger a production deployment, then run npm run verify:deploy.",
+                "updatedAt": _now(),
+            })
         write_json(receipt_path, receipt)
     print(json.dumps(receipt, ensure_ascii=False, indent=2))
     return 0

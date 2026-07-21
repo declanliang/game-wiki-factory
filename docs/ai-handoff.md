@@ -26,7 +26,7 @@ Steam 已知商店页时追加：--official-url "STEAM URL"
 - 不打印或提交任何 .env/API key。
 - 先确认 platform；Steam 身份使用 App ID，Roblox 身份使用 Place/Universe，不能混用事实字段。
 - 所有游戏 GitHub 仓库只能是 Private；发布器不得创建 Public repo。
-- Vercel 只导入项目，不填写环境变量；正式域名和 NEXT_PUBLIC_SITE_URL 由用户手动配置。
+- 有正式域名时传 `--site-url`；没有时模板使用 Vercel 自动域名，禁止 `example.com` 出现在生产 sitemap/canonical。
 - 不接纳完全无关关键词，不为凑数量降低门槛。
 - 不手工补标签掩盖被截断的翻译。
 

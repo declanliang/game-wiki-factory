@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from publisher import _ensure_private_github_repo, _validate_project, _vercel_project_payload
+from publisher import _ensure_private_github_repo, _set_vercel_site_url, _validate_project, _vercel_project_payload
 
 
 class PublisherValidationTests(unittest.TestCase):
@@ -51,6 +51,15 @@ class PublisherValidationTests(unittest.TestCase):
         payload = _vercel_project_payload("game", "owner/game")
         self.assertNotIn("environmentVariables", payload)
         self.assertEqual(payload["gitRepository"]["repo"], "owner/game")
+
+    @patch("publisher.shutil.which", return_value="vercel")
+    @patch("publisher._run")
+    def test_explicit_site_url_sets_production(self, run, _which) -> None:
+        origin = _set_vercel_site_url(Path("C:/game"), "game", "game.example/path")
+        self.assertEqual(origin, "https://game.example")
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(commands[0][:4], ["vercel", "link", "--yes", "--project"])
+        self.assertEqual(commands[1][4], "production")
 
 
 if __name__ == "__main__":

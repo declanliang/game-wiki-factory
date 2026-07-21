@@ -26,3 +26,11 @@ export function resolveSiteUrl(value) {
   }
   return parsed.origin;
 }
+
+export function resolveDeploymentSiteUrl(env) {
+  return resolveSiteUrl(
+    env.NEXT_PUBLIC_SITE_URL ||
+      env.VERCEL_PROJECT_PRODUCTION_URL ||
+      env.VERCEL_URL,
+  );
+}
