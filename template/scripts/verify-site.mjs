@@ -91,6 +91,10 @@ if (placeholderHits === 0) ok("没有残留的 __XXX__ 占位符");
 
 // --- 2. 类型检查 ----------------------------------------------------------------
 step("2. 类型检查");
+// A template upgrade can remove a route while an older `.next/types` tree still
+// imports it.  Normal verification is about to rebuild, so discard only those
+// generated types before tsc; `--skip-build` keeps the known-current build intact.
+if (!skipBuild) fs.rmSync(path.join(root, ".next", "types"), { recursive: true, force: true });
 run("npx tsc --noEmit", "npx tsc --noEmit");
 
 // --- 3. 配置同步检查 -------------------------------------------------------------
@@ -210,7 +214,7 @@ function waitForServer(url, timeoutMs) {
   return new Promise((resolve, reject) => {
     const attempt = async () => {
       try {
-        const res = await fetch(url);
+        const res = await fetch(url, { redirect: "manual" });
         if (res.status < 500) return resolve();
       } catch {
         // not up yet
@@ -242,7 +246,13 @@ if (fs.existsSync(standaloneServer)) {
   }
   serverArgs = [standaloneServer];
   serverCwd = standaloneRoot;
-  serverEnv = { ...process.env, HOSTNAME: "127.0.0.1", PORT: String(port) };
+  // Next's standalone server constructs middleware rewrite origins from its
+  // bind hostname.  Binding to 127.0.0.1 makes next-intl see two different
+  // origins (`127.0.0.1` and its internal `localhost`) and can redirect the
+  // default locale forever.  The standalone production default avoids that;
+  // checks still connect through loopback below and the random port lives only
+  // for this short-lived QA process.
+  serverEnv = { ...process.env, HOSTNAME: "0.0.0.0", PORT: String(port) };
 }
 
 const server = spawn(process.execPath, serverArgs, { cwd: serverCwd, env: serverEnv, stdio: "pipe" });

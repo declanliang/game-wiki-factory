@@ -540,6 +540,13 @@ def copy_template(template_dir: Path, site_dir: Path) -> None:
 def sync_template_source(template_dir: Path, site_dir: Path) -> None:
     """Refresh template code in an existing project without touching runtime data."""
     excluded_names = {".git", ".next", "node_modules", "intake", "content"}
+    # These paths existed in earlier template releases but conflict with the
+    # current next-intl `as-needed` middleware route.  Copying only files that
+    # still exist cannot remove obsolete template code from a resumed project.
+    for relative in (Path("src/app/page.tsx"),):
+        obsolete = site_dir / relative
+        if obsolete.is_file():
+            obsolete.unlink()
     for item in template_dir.iterdir():
         if item.name in excluded_names or item.name in {".env", ".env.local", "new-site.env"}:
             continue

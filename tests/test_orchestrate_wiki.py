@@ -11,6 +11,22 @@ import orchestrate_wiki as orchestrator
 
 
 class OrchestratorTests(unittest.TestCase):
+    def test_template_sync_removes_obsolete_root_redirect(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            template = root / "template"
+            site = root / "site"
+            (template / "src" / "app").mkdir(parents=True)
+            (site / "src" / "app").mkdir(parents=True)
+            (template / "package.json").write_text("{}", encoding="utf-8")
+            obsolete = site / "src" / "app" / "page.tsx"
+            obsolete.write_text('redirect("/en")', encoding="utf-8")
+
+            orchestrator.sync_template_source(template, site)
+
+            self.assertFalse(obsolete.exists())
+            self.assertTrue((site / "package.json").is_file())
+
     def test_replace_directory_is_noop_when_source_is_destination(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             checkpoint = Path(temporary) / "articles"
