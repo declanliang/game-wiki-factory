@@ -15,6 +15,7 @@ Read `/srv/game-wiki-factory/app/docs/background-jobs.md` and `/srv/game-wiki-fa
 
 Rules:
 
+- For every queue/status question, you MUST execute `/usr/local/bin/gamewiki jobs list --json` first. Never infer an empty queue from service status or memory.
 - GitHub repositories must remain Private.
 - Never read, print, copy, summarize, or edit `/srv/game-wiki-factory/secrets/factory.env`.
 - Never bypass build/QA to publish.
