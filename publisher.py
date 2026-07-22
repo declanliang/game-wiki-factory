@@ -125,6 +125,53 @@ def _deploy_with_vercel_cli(project: Path, project_name: str, env: dict[str, str
     return deployment_urls[-1] if deployment_urls else ""
 
 
+def _verify_online_deployment(project: Path, origin: str, env: dict[str, str]) -> dict:
+    """Make remote SEO/runtime verification a publish postcondition."""
+    npm = shutil.which("npm.cmd") or shutil.which("npm")
+    if not npm:
+        raise RuntimeError("npm is required for online deployment verification")
+    normalized = origin.strip().rstrip("/")
+    parsed = urllib.parse.urlparse(normalized)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise RuntimeError("online verification requires a valid HTTP(S) production origin")
+    verify_env = dict(env)
+    verify_env["NEXT_PUBLIC_SITE_URL"] = f"{parsed.scheme}://{parsed.netloc}"
+    # Rebuild with the final public origin.  The generation build may have used
+    # example.com intentionally, while Vercel injects its production env only in
+    # the remote build.  Reusing that local artifact would create false failures
+    # and would not prove the final-origin build itself is healthy.
+    command = [npm, "run", "verify:deploy"]
+    result = subprocess.run(
+        command,
+        cwd=project,
+        env=verify_env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+    )
+    output = (result.stdout or "") + (result.stderr or "")
+    log_path = project / ".gamewiki" / "deploy-verification.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text(output, encoding="utf-8")
+    if result.returncode:
+        tail = output[-2000:].strip()
+        raise RuntimeError(
+            f"online deployment verification failed for {verify_env['NEXT_PUBLIC_SITE_URL']}; "
+            f"see {log_path}{(': ' + tail) if tail else ''}"
+        )
+    return {
+        "status": "complete",
+        "origin": verify_env["NEXT_PUBLIC_SITE_URL"],
+        "checks": [
+            "home metadata", "canonical", "sitemap", "robots",
+            "all sitemap loc/hreflang targets direct 200",
+        ],
+        "log": str(log_path),
+        "checkedAt": _now(),
+    }
+
+
 def _ensure_private_github_repo(full_repo: str, project: Path, env: dict[str, str]) -> None:
     """Enforce the factory's private-only repository contract before any update push."""
     visibility = _run(
@@ -326,6 +373,7 @@ def publish(argv: list[str]) -> int:
             }
         else:
             receipt["stages"]["vercel"] = _publish_with_vercel_cli(project, project_name, full_repo, env)
+        configured_origin = ""
         if args.site_url:
             configured_origin = _set_vercel_site_url(project, project_name, args.site_url, env)
             receipt["stages"]["vercel"].update({
@@ -340,10 +388,24 @@ def publish(argv: list[str]) -> int:
         finally:
             _remove_vercel_oidc_env(project)
         receipt["stages"]["vercel"].update({
-            "status": "complete",
+            "status": "verifying",
             "deploymentUrl": deployment_url,
             "requiredEnvironmentVariables": [],
-            "nextAction": "Add or verify the custom domain in Vercel when one is planned.",
+            "nextAction": "Automated online production verification is running.",
+            "updatedAt": _now(),
+        })
+        receipt["stages"]["onlineVerification"] = {
+            "status": "running",
+            "origin": configured_origin or f"https://{project_name}.vercel.app",
+            "updatedAt": _now(),
+        }
+        write_json(receipt_path, receipt)
+        verification_origin = configured_origin or f"https://{project_name}.vercel.app"
+        verification = _verify_online_deployment(project, verification_origin, env)
+        receipt["stages"]["onlineVerification"] = verification
+        receipt["stages"]["vercel"].update({
+            "status": "complete",
+            "nextAction": "Production deployment and online verification are complete.",
             "updatedAt": _now(),
         })
         write_json(receipt_path, receipt)

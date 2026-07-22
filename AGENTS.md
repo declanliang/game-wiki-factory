@@ -19,6 +19,7 @@
 - 生成的 GitHub 仓库必须且只能是 Private；不得提供 Public 发布参数。
 - 旧站统一使用 `operation: rebuild` 原地重做，不维护升级分支。广告 JSON 必须先严格匹配游戏身份、Vercel 域名、七个固定标题和代码尺寸，再写入任何环境变量。
 - 未提供 `--site-url` 时，Vercel 自动化只创建/连接项目；模板使用 Vercel 自动域名，绝不让 `example.com` 上线。提供 `--site-url` 时，发布器把它写入 `NEXT_PUBLIC_SITE_URL`。
+- Vercel deployment 不是完成状态。每次发布必须自动执行线上首页、metadata、canonical、sitemap、robots 和全部 loc/hreflang 直接 200 验证；失败时任务不得标记 `succeeded`。广告任务还必须逐路由验证本次代码哈希。
 
 ## 修改后最低验收
 

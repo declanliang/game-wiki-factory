@@ -290,7 +290,7 @@ VERCEL_GIT_PROVIDER        github
 7. Create it when absent with `gitRepository.type=github`, repository full name, Next.js framework, and empty root directory.
 8. Do not create, update, or infer Vercel environment variables.
 9. Record Vercel as `awaiting_domain_configuration` and tell the operator to bind the final domain and set `NEXT_PUBLIC_SITE_URL` manually.
-10. After manual domain configuration, run remote `verify:deploy` against the actual production URL.
+10. After every production deployment, automatically run remote `verify:deploy` against the configured custom domain or the Vercel production alias; publication cannot succeed when it fails.
 11. Write `.gamewiki/publish.json` with non-secret IDs, URLs, commit SHA, status, and timestamps.
 
 Re-running publish updates the same repository and Vercel project. Name collisions owned by another account fail safely.

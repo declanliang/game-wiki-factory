@@ -77,6 +77,7 @@ def connect() -> sqlite3.Connection:
           cancel_requested INTEGER NOT NULL DEFAULT 0,
           last_error TEXT,
           log_path TEXT,
+          result_json TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL,
           started_at TEXT,
@@ -106,6 +107,13 @@ def connect() -> sqlite3.Connection:
         );
         """
     )
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(jobs)").fetchall()}
+    if "result_json" not in columns:
+        try:
+            db.execute("ALTER TABLE jobs ADD COLUMN result_json TEXT")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column" not in str(exc).casefold():
+                raise
     return db
 
 
@@ -361,6 +369,40 @@ def _prune_success_build_artifacts(config: dict[str, Any], slug: str) -> list[st
     return removed
 
 
+def _completion_result(config: dict[str, Any], slug: str) -> dict[str, Any]:
+    """Persist a non-secret acceptance summary before workspace cleanup."""
+    projects_root = Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)).expanduser().resolve()
+    project = (projects_root / slug).resolve()
+    task_type = str(config.get("taskType") or "site")
+    if task_type == "ads":
+        receipt = read_json(project / ".gamewiki" / "ads.json")
+        return {
+            "taskType": "ads",
+            "domainName": receipt.get("domainName"),
+            "vercelProject": receipt.get("vercelProject"),
+            "verification": receipt.get("verification"),
+            "placementCount": len(receipt.get("placements") or []),
+        }
+    receipt = read_json(project / ".gamewiki" / "publish.json") if config.get("publish") else {}
+    stages = receipt.get("stages") or {}
+    plan_path = project / "intake" / "site-plan.json"
+    plan = read_json(plan_path) if plan_path.is_file() else {}
+    return {
+        "taskType": "site",
+        "articles": {
+            "english": len(list((project / "content" / "en").rglob("*.mdx"))),
+            "allLanguages": len(list((project / "content").rglob("*.mdx"))),
+        },
+        "categories": [
+            item.get("id") for item in plan.get("categories") or []
+            if item.get("status") == "published"
+        ],
+        "github": stages.get("github"),
+        "vercel": stages.get("vercel"),
+        "onlineVerification": stages.get("onlineVerification"),
+    }
+
+
 def _publish_command(config: dict[str, Any], slug: str) -> list[str]:
     publication = config.get("publication") or {}
     command = [sys.executable, str(ROOT / "gamewiki.py"), "publish", slug]
@@ -459,6 +501,7 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
         if backup:
             _event(db, job_id, "workspace.archived", path=str(backup))
     code = 1
+    completion_result: dict[str, Any] | None = None
     try:
         with log_path.open("w", encoding="utf-8") as log:
             log.write(f"job={job_id}\nattempt={attempt}\nstarted={_now()}\n")
@@ -472,6 +515,12 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                 with connect() as db:
                     db.execute("UPDATE jobs SET current_stage='publish',updated_at=? WHERE id=?", (_now(), job_id))
                 code = _run_process(_publish_command(config, job["slug"]), log, env, job_id)
+            if code == 0:
+                try:
+                    completion_result = _completion_result(config, job["slug"])
+                except (OSError, ValueError, KeyError) as exc:
+                    log.write(f"\n[failed] could not persist acceptance result: {exc}\n")
+                    code = 1
             if code == 0 and task_type == "site":
                 try:
                     pruned = _prune_success_build_artifacts(config, job["slug"])
@@ -505,7 +554,7 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                 status, available = "needs_attention", _now()
         db.execute(
             """UPDATE jobs SET status=?,available_at=?,lease_owner=NULL,lease_expires_at=NULL,
-               last_error=?,finished_at=?,updated_at=?,
+               last_error=?,finished_at=?,updated_at=?,result_json=?,
                current_stage=CASE WHEN ?='succeeded' THEN 'complete' ELSE current_stage END
                WHERE id=?""",
             (
@@ -514,6 +563,7 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                 None if code == 0 else tail[-2000:],
                 _now() if status in TERMINAL | {"needs_attention"} else None,
                 _now(),
+                json.dumps(completion_result, ensure_ascii=False) if completion_result is not None else None,
                 status,
                 job_id,
             ),
@@ -570,6 +620,9 @@ def worker_loop(concurrency: int, once: bool, poll_seconds: float = 3.0) -> int:
 def _job_dict(row: sqlite3.Row) -> dict[str, Any]:
     result = dict(row)
     result.pop("config_json", None)
+    raw_result = result.pop("result_json", None)
+    if raw_result:
+        result["result"] = json.loads(raw_result)
     return result
 
 
@@ -663,7 +716,7 @@ def jobs_cli(argv: list[str]) -> int:
                 return 1
             print("\n".join(path.read_text(encoding="utf-8", errors="replace").splitlines()[-args.tail:]))
         elif args.command == "retry":
-            db.execute("UPDATE jobs SET status='queued',available_at=?,cancel_requested=0,last_error=NULL,finished_at=NULL,updated_at=? WHERE id=?", (_now(), _now(), args.job_id))
+            db.execute("UPDATE jobs SET status='queued',available_at=?,cancel_requested=0,last_error=NULL,finished_at=NULL,result_json=NULL,updated_at=? WHERE id=?", (_now(), _now(), args.job_id))
             _event(db, args.job_id, "job.retried")
         elif args.command == "cancel":
             db.execute("UPDATE jobs SET cancel_requested=1,status=CASE WHEN status IN ('queued','retry_wait','needs_attention') THEN 'cancelled' ELSE status END,updated_at=? WHERE id=?", (_now(), args.job_id))

@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _execution_config, _prepare_full_build, _prune_success_build_artifacts, classify_failure, claim, connect, normalize_config, submit, submit_batch
+from job_system import _completion_result, _execution_config, _prepare_full_build, _prune_success_build_artifacts, classify_failure, claim, connect, normalize_config, submit, submit_batch
 
 
 class JobSystemTests(unittest.TestCase):
@@ -117,6 +117,35 @@ class JobSystemTests(unittest.TestCase):
 
             self.assertEqual(removed, ["node_modules", ".next"])
             self.assertTrue(marker.is_file())
+
+    def test_completion_result_persists_online_acceptance_without_secrets(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_PROJECTS_ROOT": temporary}):
+            project = Path(temporary) / "verified-game"
+            (project / ".gamewiki").mkdir(parents=True)
+            (project / "content" / "en" / "guide").mkdir(parents=True)
+            (project / "content" / "en" / "guide" / "one.mdx").write_text("# One", encoding="utf-8")
+            (project / "intake").mkdir()
+            (project / "intake" / "site-plan.json").write_text(json.dumps({
+                "categories": [{"id": "guide", "status": "published"}],
+            }), encoding="utf-8")
+            (project / ".gamewiki" / "publish.json").write_text(json.dumps({
+                "stages": {
+                    "github": {"visibility": "PRIVATE", "repo": "owner/verified-game"},
+                    "vercel": {"status": "complete", "deploymentUrl": "https://verified-game.vercel.app"},
+                    "onlineVerification": {"status": "complete", "origin": "https://verified.game"},
+                },
+            }), encoding="utf-8")
+            result = _completion_result({"taskType": "site", "publish": True}, "verified-game")
+        self.assertEqual(result["articles"]["english"], 1)
+        self.assertEqual(result["categories"], ["guide"])
+        self.assertEqual(result["onlineVerification"]["status"], "complete")
+        self.assertNotIn("token", json.dumps(result).casefold())
+
+    def test_database_migrates_persisted_result_column(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):
+            with connect() as db:
+                columns = {row["name"] for row in db.execute("PRAGMA table_info(jobs)").fetchall()}
+            self.assertIn("result_json", columns)
 
     def test_job_logs_are_utf8_safe_on_legacy_windows_console(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):

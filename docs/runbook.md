@@ -52,7 +52,7 @@ python gamewiki.py publish <slug>
 
 已存在的 GitHub/Vercel 项目会复用。GitHub integration 未授权读取 Private repo 时，完成授权后重复同一命令。Actions 中运行 `Generate and publish game wikis`，`games_json` 输入合法 JSON 数组，例如 `["Game A", "Game B"]`。
 
-Vercel 导入完成后，未传 `--site-url` 时 `.gamewiki/publish.json` 的 Vercel stage 会是 `awaiting_domain_configuration`，但模板会使用 Vercel 自动 production URL，绝不输出 `example.com`。已知正式域名时传 `--site-url`，发布器会配置 Production；随后绑定域名、触发生产部署并运行 `npm run verify:deploy`。
+未传 `--site-url` 时，模板使用并自动验证 Vercel 默认 production URL；已知正式域名时传 `--site-url`，发布器配置 Production 并以该域名验收。每次 production deployment 都用最终公开 origin 重新做一次确定性 production build 并自动运行 `verify:deploy`；它不调用 LLM/API。失败会阻止任务成功并把完整输出保存到 `.gamewiki/deploy-verification.log`。下面的手动命令只用于诊断或域名/DNS 修复后的独立复查。
 
 ## 排查顺序
 

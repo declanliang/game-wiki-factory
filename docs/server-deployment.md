@@ -108,6 +108,7 @@ sudo systemctl restart gamewiki-worker gamewiki-control
 4. Vercel production deployment 成功并关联指定项目。
 5. canonical、sitemap、robots 不包含 `example.com`。
 6. 未配置广告变量时页面不渲染广告；发布过程不删除已有广告或域名环境变量。
+7. `.gamewiki/publish.json` 的 `stages.onlineVerification.status` 为 `complete`；线上验证日志无错误。Vercel READY 本身不算完成。
 
 ## 2026-07-22 真实验收记录
 
@@ -115,7 +116,7 @@ sudo systemctl restart gamewiki-worker gamewiki-control
 |---|---|---|---|---|---|
 | Funnel Runners | Steam，本地 | `20260722T022228Z-funnel-runners-723a23` | 12 篇英文 + 60 篇翻译 | 120 loc / 840 hreflang 全部 200 | `succeeded`，按测试要求未发布 |
 | Zenith Inc | Roblox，本地完整重建 + 内容 V5 增量 | `20260722T041610Z-zenith-inc-1d45c6` | 22 篇英文 + 110 篇翻译 | 204 loc / 1428 hreflang 全部 200 | 原 Private GitHub/Vercel 原地替换；7 个广告位验证通过 |
-| Timebomb Duels | Roblox，服务器 | `20260722T023847Z-timebomb-duels-3a4676` | 6 篇英文 + 30 篇翻译 | 90 loc / 630 hreflang 全部 200 | Private GitHub + Vercel READY |
+| Timebomb Duels | Roblox，服务器 | `20260722T023847Z-timebomb-duels-3a4676` | 6 篇英文 + 30 篇翻译 | 90 loc / 630 hreflang 全部 200 | Private GitHub + Vercel production |
 
 线上验收：`https://zenith-inc-roblox.wiki/`、`https://timebomb-duels.wiki/`、各自 sitemap 和 robots 均返回 200；sitemap 不含 `example.com`。Zenith 的 7 个隔离广告路由返回 200 且精确代码哈希一致。OpenClaw 使用独立新 session 实时读取到了服务器任务 Job ID。
 

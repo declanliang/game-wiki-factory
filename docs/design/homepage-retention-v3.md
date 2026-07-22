@@ -55,7 +55,7 @@ The homepage should not repeat one full-width bordered panel for every section. 
 
 - GitHub repositories are Private-only and visibility is verified after creation and before update pushes.
 - Vercel automation imports/connects the project but never sets environment variables.
-- The publish receipt remains `awaiting_domain_configuration` until the owner binds the final domain, sets `NEXT_PUBLIC_SITE_URL`, deploys, and runs `npm run verify:deploy`.
+- Every production publish automatically verifies the configured domain, or the Vercel production alias when no custom domain was supplied. The receipt is complete only after the online gate passes.
 
 ## Acceptance cases
 

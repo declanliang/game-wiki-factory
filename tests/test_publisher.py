@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from publisher import _deploy_with_vercel_cli, _ensure_private_github_repo, _remove_vercel_oidc_env, _replace_remote_main, _resolve_git_author, _set_vercel_site_url, _validate_project, _vercel_project_payload
+from publisher import _deploy_with_vercel_cli, _ensure_private_github_repo, _remove_vercel_oidc_env, _replace_remote_main, _resolve_git_author, _set_vercel_site_url, _validate_project, _vercel_project_payload, _verify_online_deployment
 
 
 class PublisherValidationTests(unittest.TestCase):
@@ -121,6 +121,36 @@ class PublisherValidationTests(unittest.TestCase):
     def test_deploy_receipt_prefers_deployment_over_dashboard_url(self, run, _which) -> None:
         url = _deploy_with_vercel_cli(Path("C:/game"), "game", {})
         self.assertEqual(url, "https://game-abc.vercel.app")
+
+    @patch("publisher.shutil.which", return_value="npm")
+    @patch("publisher.subprocess.run")
+    def test_online_verification_is_a_logged_publish_postcondition(self, run, _which) -> None:
+        run.return_value.returncode = 0
+        run.return_value.stdout = "0 error(s).\n"
+        run.return_value.stderr = ""
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            result = _verify_online_deployment(project, "https://game.example/", {"TOKEN": "hidden"})
+            log = (project / ".gamewiki" / "deploy-verification.log").read_text(encoding="utf-8")
+        self.assertEqual(result["status"], "complete")
+        self.assertEqual(result["origin"], "https://game.example")
+        self.assertIn("0 error(s).", log)
+        command = run.call_args.args[0]
+        self.assertEqual(command, ["npm", "run", "verify:deploy"])
+        self.assertEqual(run.call_args.kwargs["env"]["NEXT_PUBLIC_SITE_URL"], "https://game.example")
+        self.assertNotIn("hidden", command)
+
+    @patch("publisher.shutil.which", return_value="npm")
+    @patch("publisher.subprocess.run")
+    def test_online_verification_failure_blocks_publish(self, run, _which) -> None:
+        run.return_value.returncode = 1
+        run.return_value.stdout = "online sitemap target returned 404"
+        run.return_value.stderr = ""
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            with self.assertRaisesRegex(RuntimeError, "online deployment verification failed"):
+                _verify_online_deployment(project, "https://game.example", {})
+            self.assertTrue((project / ".gamewiki" / "deploy-verification.log").is_file())
 
 
 if __name__ == "__main__":

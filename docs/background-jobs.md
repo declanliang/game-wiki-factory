@@ -27,6 +27,7 @@ gamewiki.py jobs submit/status/logs/retry/cancel
 ```
 
 - SQLite 保存任务、attempt、状态和非敏感发布信息，不保存 API key。
+- 成功时把文章/分类数量、Private repo、Vercel 和线上验收写入 `result_json`；`jobs status --json` 会返回为 `result`，因此 workspace 清理后 OpenClaw 仍能准确汇报。
 - 每个任务使用独立 sibling workspace 和 `.gamewiki` checkpoint。
 - Worker 通过原子 lease 防止两个进程领取同一任务。
 - 流水线内部 checkpoint 仍是阶段恢复的事实源；任务数据库不复制内容产物。
@@ -137,3 +138,4 @@ JINA_API_KEY_2=
 5. 新站创建 Private repo/Vercel；旧站复用目标并替换 repo 内容。
 6. 未提供广告变量时零广告渲染；已有 Vercel 环境变量不被发布器删除。
 7. 广告 JSON 的域名不属于目标 Vercel project，或标题与代码尺寸不一致时，任务必须在写入任何变量前失败。
+8. 每次 production deployment 后自动执行线上验收；只有 `publish.json` 中 `stages.onlineVerification.status=complete` 才能把站点任务标记成功。验证日志固定保存为项目 `.gamewiki/deploy-verification.log`。

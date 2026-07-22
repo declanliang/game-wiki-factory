@@ -113,7 +113,7 @@ python gamewiki.py --config jobs\my-game.json
 - 只有 `game` 必填；已知 `platform`、`officialUrl` 和正式域名时应同时填写，减少歧义和人工介入。
 - `platform` 只能是 `roblox`、`steam` 或 `auto`。
 - `siteUrl` 可以是裸域名或完整 HTTPS URL；已知正式域名时填写。
-- `publish: true` 会创建或更新 Private GitHub 仓库、Vercel 项目并执行 production deployment。
+- `publish: true` 会创建或更新 Private GitHub 仓库、Vercel production deployment，并强制执行线上验收。首页 metadata/canonical、sitemap、robots 和全部 loc/hreflang 目标未全部通过时，任务不会标记成功。
 - 日常配置不需要 GitHub repo 或 Vercel project。新站自动创建；旧站按本地 publish receipt 和默认 slug 复用。只有历史项目使用非标准名称且本地 receipt 已丢失时，才使用高级 `publication` 覆盖项。
 - `operation: rebuild` 用于旧半成品：完整重新采集、规划、生成和翻译，并原地替换旧 repo。
 - `refresh` 默认全部为 `false`。普通续跑不要开启，防止重复 API 成本。
@@ -129,6 +129,8 @@ Games/<slug>/.gamewiki/manifest.json
 ```
 
 Guide Search 还会生成 `.gamewiki/planning/guide-search/content-opportunity-report.json`，记录数据源返回量、研究机会数、入选页面、实体覆盖和拒绝原因。看到文章少时，先用它判断是公开资料确实少，还是机会在证据/编辑门被合并或拒绝。
+
+OpenClaw 的标准 JSON、指令和完成汇报契约见 [docs/openclaw-operator-guide.md](docs/openclaw-operator-guide.md)。日常只提交游戏资料或广告 JSON，不要让 Agent 在聊天进程内运行长流水线。
 
 ## 命令行兼容方式
 

@@ -36,7 +36,7 @@ python gamewiki.py --config jobs/<game>.json
 - 不手工补标签掩盖被截断的翻译。
 
 完成标准：只保留有证据的 published 分类；简单游戏允许少量页面，资料丰富的游戏要保留不同意图和实体入口；en/es/de/fr/ja/ko；六语言文章树一致；
-intake、MDX、TypeScript、production build、sitemap 直接 200、self-canonical、OG 和 hreflang 全部通过。
+intake、MDX、TypeScript、production build、线上首页、metadata、sitemap、robots、所有 loc/hreflang 直接 200、self-canonical、OG 全部通过。Vercel READY 不等于完成，必须确认 `publish.json` 的 `stages.onlineVerification.status=complete`。
 
 最终报告：网站根目录、分类、语言、文章数、首页视频来源、manifest、最新日志、API 是否复用、Private repo 状态、Vercel 待配置域名与环境变量。
 ```
@@ -75,3 +75,4 @@ C:\Users\liang\Documents\Games\<game-slug>，保留 intake 和 `.gamewiki` check
 4. 统计已存在的英文和翻译文件，避免重复 API。
 5. 修改跨模块契约时同步更新 schema、模板和测试。
 6. 完成后报告验证证据，不只说“代码已改”。
+7. 服务器/OpenClaw 接手时优先阅读 `docs/openclaw-operator-guide.md`，只通过后台队列控制长任务。
