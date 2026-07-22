@@ -88,8 +88,16 @@ def factory_release() -> dict[str, object]:
     return value
 
 
-def should_stamp_factory_release(project_dir: Path, is_resume: bool, release: str) -> bool:
+def should_stamp_factory_release(
+    project_dir: Path,
+    is_resume: bool,
+    release: str,
+    *,
+    force: bool = False,
+) -> bool:
     """Certify only new/full rebuilds or an already-certified resume."""
+    if force:
+        return True
     if not is_resume:
         return True
     stamp = project_dir / "intake" / "factory-release.json"
@@ -721,7 +729,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[log] {run_log_path}", flush=True)
     release = factory_release()
     release_name = str(release["release"])
-    release_certified = should_stamp_factory_release(project_dir, is_resume, release_name)
+    release_certified = should_stamp_factory_release(
+        project_dir,
+        is_resume,
+        release_name,
+        force=os.environ.get("GAMEWIKI_CERTIFY_RELEASE", "").strip() == "1",
+    )
     if is_resume and manifest_path.is_file():
         manifest = read_json(manifest_path)
         if manifest.get("slug") != slug:

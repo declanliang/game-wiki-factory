@@ -29,6 +29,14 @@ class OrchestratorTests(unittest.TestCase):
                 orchestrator.should_stamp_factory_release(Path(temporary), True, "v1_0722")
             )
 
+    def test_full_rebuild_retry_keeps_release_certification_intent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            self.assertTrue(
+                orchestrator.should_stamp_factory_release(
+                    Path(temporary), True, "v1_0722", force=True
+                )
+            )
+
     def test_certified_resume_keeps_matching_release(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary)

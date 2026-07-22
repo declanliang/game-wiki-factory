@@ -581,6 +581,11 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
         _ad_execution_config(config) if task_type == "ads" else _execution_config(config, attempt),
     )
     env = build_subprocess_env(ROOT)
+    if task_type == "site" and config.get("fullBuild"):
+        # Preserve the original paid full-rebuild certification intent across
+        # retries. The foreground resume heuristic alone cannot distinguish a
+        # legacy incremental resume from attempt 2+ of a new full rebuild.
+        env["GAMEWIKI_CERTIFY_RELEASE"] = "1"
     stop = threading.Event()
     heartbeat = threading.Thread(target=_heartbeat, args=(job_id, job["slug"], worker, stop, lease_seconds, task_type), daemon=True)
     heartbeat.start()
