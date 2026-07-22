@@ -76,6 +76,8 @@ openclaw agent --local --agent game-wiki-operator --message \
   '请先实时查询任务队列，告诉我每个任务的阶段；不要启动前台流水线。'
 ```
 
+自动化验收或脚本查询应附加一个新的 `--session-key agent:game-wiki-operator:ops-<日期或批次>`，避免复用很久以前的聊天上下文。实际聊天渠道可以保留自己的连续会话，但 Agent 仍必须每次执行实时 `jobs list --json`。
+
 尚未给 Agent 绑定聊天渠道，这是有意的：绑定错误会抢占现有 OpenClaw 渠道路由。需要从微信、飞书或其他渠道下达任务时，应先决定专用账号/路由，再只把该路由绑定给 `game-wiki-operator`。
 
 推荐提交 Prompt：
@@ -112,3 +114,15 @@ sudo systemctl restart gamewiki-worker gamewiki-control
 4. Vercel production deployment 成功并关联指定项目。
 5. canonical、sitemap、robots 不包含 `example.com`。
 6. 未配置广告变量时页面不渲染广告；发布过程不删除已有广告或域名环境变量。
+
+## 2026-07-22 真实验收记录
+
+| 游戏 | 平台 | Job ID | 内容产出 | 生产 QA | 发布结果 |
+|---|---|---|---|---|---|
+| Funnel Runners | Steam，本地 | `20260722T022228Z-funnel-runners-723a23` | 12 篇英文 + 60 篇翻译 | 120 loc / 840 hreflang 全部 200 | `succeeded`，按测试要求未发布 |
+| Zenith Inc | Roblox，服务器 | `20260722T023847Z-zenith-inc-163359` | 10 篇英文 + 50 篇翻译 | 126 loc / 882 hreflang 全部 200 | Private GitHub + Vercel READY |
+| Timebomb Duels | Roblox，服务器 | `20260722T023847Z-timebomb-duels-3a4676` | 6 篇英文 + 30 篇翻译 | 90 loc / 630 hreflang 全部 200 | Private GitHub + Vercel READY |
+
+线上验收：`https://zenith-inc-roblox.wiki/`、`https://timebomb-duels.wiki/`、各自 sitemap 和 robots 均返回 200；sitemap 不含 `example.com`。OpenClaw 使用独立新 session 实时读取到了两个 `succeeded` Job ID。
+
+本次真实任务发现并修复了 Windows UTF-8 日志、随机验证端口、Next.js standalone 启动、默认语言根路径循环、旧 `.next/types`、Vercel token 进程参数、Git 提交作者关联、Vercel OIDC 临时文件和成功构建缓存占盘等问题。失败均停在 QA/发布边界，内容阶段通过 checkpoint 复用，没有重复调研与翻译。

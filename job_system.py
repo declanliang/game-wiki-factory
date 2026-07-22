@@ -402,8 +402,18 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                 status, available = "needs_attention", _now()
         db.execute(
             """UPDATE jobs SET status=?,available_at=?,lease_owner=NULL,lease_expires_at=NULL,
-               last_error=?,finished_at=?,updated_at=? WHERE id=?""",
-            (status, available, None if code == 0 else tail[-2000:], _now() if status in TERMINAL | {"needs_attention"} else None, _now(), job_id),
+               last_error=?,finished_at=?,updated_at=?,
+               current_stage=CASE WHEN ?='succeeded' THEN 'complete' ELSE current_stage END
+               WHERE id=?""",
+            (
+                status,
+                available,
+                None if code == 0 else tail[-2000:],
+                _now() if status in TERMINAL | {"needs_attention"} else None,
+                _now(),
+                status,
+                job_id,
+            ),
         )
         db.execute(
             """UPDATE attempts SET status=?,finished_at=?,exit_code=?,error_class=?

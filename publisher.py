@@ -334,6 +334,7 @@ def publish(argv: list[str]) -> int:
         receipt["stages"]["vercel"].update({
             "status": "complete",
             "deploymentUrl": deployment_url,
+            "requiredEnvironmentVariables": [],
             "nextAction": "Add or verify the custom domain in Vercel when one is planned.",
             "updatedAt": _now(),
         })
