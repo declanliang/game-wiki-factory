@@ -34,6 +34,7 @@ yarn-error.log*
 # Per-game pipeline checkpoints, raw research, caches, and logs stay local.
 # The final, deployable input contract under intake/ is intentionally tracked.
 /.gamewiki/
+/ad.txt
 
 # vercel
 .vercel

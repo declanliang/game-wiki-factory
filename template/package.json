@@ -23,6 +23,7 @@
     "verify:deploy": "node scripts/verify-site.mjs --deploy",
     "test:site-url": "node scripts/test-site-url.mjs",
     "validate:articles": "node scripts/validate-articles.mjs",
+    "ads:import": "node scripts/import-adsterra.mjs",
     "apply:content": "node scripts/apply-content.mjs",
     "process:assets": "node scripts/process-assets.mjs",
     "ingest:articles": "node scripts/ingest-articles.mjs",

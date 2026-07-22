@@ -194,6 +194,12 @@ npm run verify:deploy
 
 未提供 `siteUrl` 时，线上 canonical、sitemap 和 robots 使用 Vercel production URL。提供 `siteUrl` 时，发布器先设置 Production 的 `NEXT_PUBLIC_SITE_URL`，再部署；仍需在 Vercel 添加正式域名并完成 DNS 配置。
 
+## 可选 Adsterra 广告
+
+每个网站使用自己申请的 Adsterra ad units。生成站点后，可把七段带标题的广告代码保存为站点根目录 `ad.txt` 并运行 `npm run ads:import`；脚本会自动校验和编码，不需要手工 Base64。也可以把原始代码直接粘贴到 Vercel 的 server-only `AD_*` 环境变量。所有广告变量均可留空，未配置时不会展示广告或保留空白。完整变量表和位置说明见生成站点的 `README.md`。
+
+旧站点升级到最新模板时，重新执行相同游戏配置即可复用 Basic Info、关键词、文章和翻译 checkpoint；不要添加 refresh/overwrite 参数。
+
 ## 出错时交给 AI
 
 不需要粘贴完整日志。提供游戏名或项目目录，并使用下面的提示词：

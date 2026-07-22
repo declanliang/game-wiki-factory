@@ -7,11 +7,13 @@ import { notFound } from "next/navigation";
 import { ThemeProvider } from "next-themes";
 import { SiteFooter, SiteHeader } from "@/components/site";
 import { JsonLd } from "@/components/site-widgets";
-import { AdSlot } from "@/components/ad-slot";
+import { AdProvider } from "@/components/ad-slot";
+import { GlobalFooterAds, TopStickyAd } from "@/components/ad-placements";
 import { Analytics } from "@/components/analytics";
 import { getSiteName, localizedSiteUrl, SITE_URL } from "@/config/site";
 import { routing } from "@/i18n/routing";
 import { buildOpenGraph, buildSiteGraph, buildTwitter, shouldIndex } from "@/lib/seo";
+import { getAdAvailability } from "@/lib/ad-config";
 import en from "@/locales/en.json";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -52,18 +54,22 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   if (!hasLocale(routing.locales, locale)) notFound();
   const messages = (await getMessages()) as Messages;
   const siteGraph = buildSiteGraph(messages, locale);
+  const adAvailability = getAdAvailability();
 
   return (
     <html lang={locale} className={`${inter.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <NextIntlClientProvider messages={messages}>
-            <JsonLd data={siteGraph} />
-            <SiteHeader locale={locale} />
-            {children}
-            <SiteFooter locale={locale} />
-            <AdSlot format="socialBar" className="sticky bottom-0 z-40 w-full bg-background" />
-            <Analytics />
+            <AdProvider availability={adAvailability}>
+              <JsonLd data={siteGraph} />
+              <TopStickyAd />
+              <SiteHeader locale={locale} />
+              {children}
+              <GlobalFooterAds />
+              <SiteFooter locale={locale} />
+              <Analytics />
+            </AdProvider>
           </NextIntlClientProvider>
         </ThemeProvider>
       </body>

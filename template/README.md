@@ -81,6 +81,20 @@ npx tsc --noEmit
 npm run build
 ```
 
+## Adsterra 广告
+
+广告是可选功能。每个网站使用自己在 Adsterra 申请的 7 个 ad unit；未填写的格式不会渲染 iframe、占位容器或空白间距。
+
+本地最省事的方式是把 Adsterra 原始代码按 `Native Banner`、`Banner 468x60`、`Banner 300x250`、`Banner 160x300`、`Banner 160x600`、`Banner 320x50`、`Banner 728x90` 七个标题保存到项目根目录 `ad.txt`，然后执行：
+
+```powershell
+npm run ads:import
+```
+
+脚本会校验尺寸并自动写入 `.env.local`，不需要手工转换 Base64。`ad.txt` 和 `.env.local` 均不会上传 GitHub。也可以直接把原始代码粘贴到 Vercel 的 `AD_NATIVE_BANNER`、`AD_BANNER_728X90` 等 server-only 环境变量；Base64 变量只是多行代码在本地 env 中的可靠传输格式，不参与广告网络请求。
+
+广告代码在同源隔离 iframe 内执行，位置包括顶部 Sticky、Hero 后 Native、首页/分类卡片流、文章正文、宽屏侧栏和全站 Footer。修改 Vercel 环境变量后必须重新部署，Adsterra 新建或刚批准的 ad unit 还可能存在平台同步延迟。
+
 ## 设计边界
 
 - 本仓库不调用 LLM、不搜索、不翻译；上游必须提供成品。
@@ -93,3 +107,4 @@ npm run build
 - 分类标签和描述来自 site-plan 的六语言 `labels` / `descriptions`，模板只负责机械使用。
 - 根 URL 固定为英语/x-default；非英语页面、JSON-LD 和 sitemap 使用 locale 前缀。缺少译文时构建失败，不做英语回退。
 - 具体游戏仓库必须提交 `intake/`；原始调研、cache 和日志位于被 Git 忽略的 `.gamewiki/`。
+- 广告变量全部可选；环境变量未配置时页面保持原布局，不展示广告，也不预留空白。

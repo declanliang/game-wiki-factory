@@ -128,3 +128,9 @@ npm run verify:deploy
 ## 工厂升级已有网站
 
 修复通用模板或编排器后，从工厂再次执行同一游戏名。同步模板不会覆盖游戏的 `intake/`、`content/`、`.gamewiki/`、`node_modules/` 或本地环境文件，随后会重新物化并验证站点。
+
+模板升级不需要重做 Basic Info、关键词、文章生成或翻译，也不应使用 refresh/overwrite 参数。正常续跑会复用这些 checkpoint，只同步模板并重新构建；因此升级旧站点没有 LLM/API 内容成本。
+
+## Adsterra 配置
+
+每个网站单独申请 Adsterra app/ad units。广告配置全部可选：缺少某一格式时，该格式及其外层间距均不渲染。原始代码可直接填写 Vercel 的 server-only `AD_*` 变量；本地推荐把七段带标题的代码保存为 `ad.txt` 后运行 `npm run ads:import`，由脚本自动生成 `.env.local` 中的 `AD_*_B64`，禁止手工转换。环境变量更新后重新部署。

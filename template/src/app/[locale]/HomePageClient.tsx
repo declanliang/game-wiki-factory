@@ -1,5 +1,6 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRight, BookOpen, ChevronRight, type LucideIcon } from "lucide-react";
@@ -9,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TrailerButton } from "@/components/trailer";
 import { localizeHref } from "@/lib/locale-path";
-import { AdSlot } from "@/components/ad-slot";
+import { useAdEnabled } from "@/components/ad-slot";
+import { DesktopBanner728, NativeFlowAd, ResponsiveContentAd } from "@/components/ad-placements";
 import { NAVIGATION_CONFIG } from "@/config/navigation";
 import { HOME_SECTION_ORDER, type HomeSection } from "@/config/home";
 import type { ContentItem } from "@/lib/content";
@@ -83,7 +85,7 @@ function LightCard({ item, locale }: { item: LightItem; locale: string }) {
   );
 }
 
-function LightSectionBlock({ section, locale }: { section: LightSection; locale: string }) {
+function LightSectionBlock({ section, locale, insertAd = false }: { section: LightSection; locale: string; insertAd?: boolean }) {
   if (!section.items || section.items.length === 0) return null;
   return (
     <section className="mx-auto max-w-5xl">
@@ -92,7 +94,12 @@ function LightSectionBlock({ section, locale }: { section: LightSection; locale:
         <p className="mx-auto mt-4 max-w-3xl text-center text-lg text-muted-foreground">{section.description}</p>
       )}
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {section.items.map((item) => <LightCard key={item.href} item={item} locale={locale} />)}
+        {section.items.map((item, index) => (
+          <Fragment key={item.href}>
+            <LightCard item={item} locale={locale} />
+            {insertAd && index === 2 && section.items.length > 3 ? <div className="py-4 sm:col-span-2 lg:col-span-3"><ResponsiveContentAd /></div> : null}
+          </Fragment>
+        ))}
       </div>
       {section.viewAllHref && (
         <div className="mt-6 text-center">
@@ -147,6 +154,9 @@ function GuideSectionsBlock({ sections, locale }: { sections: GuideSection[]; lo
 }
 
 export default function HomePageClient({ home, quickFactsLabel, videoLabels, locale, recentArticles, categories }: { home: Home; quickFactsLabel: string; videoLabels: VideoLabels; locale: string; recentArticles: ContentItem[]; categories: Category[] }) {
+  const nativeEnabled = useAdEnabled("nativeBanner");
+  const banner728Enabled = useAdEnabled("banner728x90");
+  const banner300Enabled = useAdEnabled("banner300x250");
   function renderSection(section: HomeSection) {
     switch (section) {
       case "hero":
@@ -180,12 +190,10 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
         );
 
       case "ads":
-        return (
-          <>
-            <AdSlot format="banner728x90" className="hidden sm:block" />
-            <AdSlot format="mobile320x50" className="sm:hidden" />
-          </>
-        );
+        return nativeEnabled ? <NativeFlowAd /> : null;
+
+      case "bottomAd":
+        return banner728Enabled ? <DesktopBanner728 /> : null;
 
       case "about":
         return (
@@ -232,15 +240,18 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
           <section className="mx-auto max-w-6xl">
             <h2 className="text-center text-3xl font-bold tracking-tight text-foreground sm:text-5xl">{home.categories.title}</h2>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              {categories.map((category) => {
+              {categories.map((category, index) => {
                 const Icon = iconByKey[category.key] ?? BookOpen;
                 return (
-                  <Link key={category.key} href={localizeHref(category.path, locale)} className="group flex w-full max-w-[19rem] flex-col rounded-2xl border border-border bg-card/70 p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">
+                  <Fragment key={category.key}>
+                  <Link href={localizeHref(category.path, locale)} className="group flex w-full max-w-[19rem] flex-col rounded-2xl border border-border bg-card/70 p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">
                     <span className="grid h-11 w-11 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]"><Icon className="h-5 w-5" /></span>
                     <h3 className="mt-4 text-xl font-bold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{category.title}</h3>
                     {category.description ? <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">{category.description}</p> : null}
                     <p className="mt-auto pt-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{category.count} {category.count === 1 ? "Article" : "Articles"}</p>
                   </Link>
+                  {nativeEnabled && index === 3 && categories.length > 4 ? <div className="basis-full py-4"><NativeFlowAd /></div> : null}
+                  </Fragment>
                 );
               })}
             </div>
@@ -249,7 +260,7 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
 
       case "featured":
         // Lightweight editor-picked cards, pointing at specific articles (not a repeat of the category cards above)
-        return <LightSectionBlock section={home.featured} locale={locale} />;
+        return <LightSectionBlock section={home.featured} locale={locale} insertAd={banner728Enabled || banner300Enabled} />;
 
       case "liveTools":
         // Only renders if the game actually has time-sensitive content configured
@@ -328,10 +339,12 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
   }
 
   return (
-    <div className="space-y-24 sm:space-y-28">
+    <div>
       {HOME_SECTION_ORDER.map((section) => {
         const rendered = renderSection(section);
-        return rendered ? <div key={section}>{rendered}</div> : null;
+        if (!rendered) return null;
+        const spacing = section === "hero" ? "" : section === "ads" ? "mt-5 sm:mt-6" : "mt-24 sm:mt-28";
+        return <div key={section} className={spacing}>{rendered}</div>;
       })}
     </div>
   );
