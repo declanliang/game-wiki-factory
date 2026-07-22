@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import orchestrate_wiki as orchestrator
 
@@ -67,7 +68,9 @@ class OrchestratorTests(unittest.TestCase):
             self.assertEqual(marker.read_text(encoding="utf-8"), "checkpoint")
 
     def test_factory_defaults_use_bundled_modules_and_sibling_output(self) -> None:
-        args = orchestrator.build_parser().parse_args(["Test Game"])
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("GAMEWIKI_PROJECTS_ROOT", None)
+            args = orchestrator.build_parser().parse_args(["Test Game"])
         self.assertEqual(args.template_dir, orchestrator.ROOT / "template")
         self.assertEqual(
             args.seo_scout_dir,
