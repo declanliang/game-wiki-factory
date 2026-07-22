@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from publisher import _ensure_private_github_repo, _replace_remote_main, _set_vercel_site_url, _validate_project, _vercel_project_payload
+from publisher import _deploy_with_vercel_cli, _ensure_private_github_repo, _replace_remote_main, _set_vercel_site_url, _validate_project, _vercel_project_payload
 
 
 class PublisherValidationTests(unittest.TestCase):
@@ -70,6 +70,15 @@ class PublisherValidationTests(unittest.TestCase):
         commands = [call.args[0] for call in run.call_args_list]
         self.assertEqual(commands[0][:4], ["vercel", "link", "--yes", "--project"])
         self.assertEqual(commands[1][4], "production")
+
+    @patch("publisher.shutil.which", return_value="vercel")
+    @patch("publisher._run", side_effect=["", "https://game.vercel.app"])
+    def test_deploy_links_existing_vercel_project_before_production(self, run, _which) -> None:
+        url = _deploy_with_vercel_cli(Path("C:/game"), "existing-project", {"VERCEL_TOKEN": "hidden"})
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(commands[0][:5], ["vercel", "link", "--yes", "--project", "existing-project"])
+        self.assertIn("--prod", commands[1])
+        self.assertEqual(url, "https://game.vercel.app")
 
 
 if __name__ == "__main__":

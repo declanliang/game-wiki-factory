@@ -106,13 +106,14 @@ def _set_vercel_site_url(
     return origin
 
 
-def _deploy_with_vercel_cli(project: Path, env: dict[str, str]) -> str:
+def _deploy_with_vercel_cli(project: Path, project_name: str, env: dict[str, str]) -> str:
     """Create a production deployment after linking and environment setup."""
     vercel = shutil.which("vercel.cmd") or shutil.which("vercel")
     if not vercel:
         raise RuntimeError("Vercel CLI is required to create the production deployment")
     token = env.get("VERCEL_TOKEN", "").strip()
     auth = ["--token", token] if token else []
+    _run([vercel, "link", "--yes", "--project", project_name, *auth], project, env)
     output = _run([vercel, "--prod", "--yes", *auth], project, env)
     urls = re.findall(r"https://[^\s]+", output)
     return urls[-1].rstrip(".,") if urls else ""
@@ -289,7 +290,7 @@ def publish(argv: list[str]) -> int:
                 "nextAction": "Trigger a production deployment, then run npm run verify:deploy.",
                 "updatedAt": _now(),
             })
-        deployment_url = _deploy_with_vercel_cli(project, env)
+        deployment_url = _deploy_with_vercel_cli(project, project_name, env)
         receipt["stages"]["vercel"].update({
             "status": "complete",
             "deploymentUrl": deployment_url,
