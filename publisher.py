@@ -156,7 +156,25 @@ def _vercel_project_payload(project_name: str, full_repo: str) -> dict:
     }
 
 
-def _replace_remote_main(project: Path, full_repo: str, env: dict[str, str]) -> str:
+def _resolve_git_author(project: Path, env: dict[str, str]) -> tuple[str, str]:
+    """Return a Vercel-recognizable author without exposing the GitHub token."""
+    name = env.get("FACTORY_GIT_AUTHOR_NAME", "").strip()
+    email = env.get("FACTORY_GIT_AUTHOR_EMAIL", "").strip()
+    if name and email:
+        return name, email
+    identity = _run(["gh", "api", "user", "--jq", "[.login,.id]|@tsv"], project, env).strip().split("\t")
+    if len(identity) != 2 or not identity[0] or not identity[1].isdigit():
+        raise RuntimeError("Could not resolve the authenticated GitHub user for commit attribution")
+    login, user_id = identity
+    return name or login, email or f"{user_id}+{login}@users.noreply.github.com"
+
+
+def _commit(project: Path, message: str, env: dict[str, str], author: tuple[str, str]) -> None:
+    name, email = author
+    _run(["git", "-c", f"user.name={name}", "-c", f"user.email={email}", "commit", "-m", message], project, env)
+
+
+def _replace_remote_main(project: Path, full_repo: str, env: dict[str, str], author: tuple[str, str]) -> str:
     """Replace remote tracked content with one clean generated commit, preserving a backup tag."""
     _run(["git", "fetch", "origin", "main"], project, env)
     remote_sha = _run(["git", "rev-parse", "refs/remotes/origin/main"], project, env)
@@ -167,7 +185,7 @@ def _replace_remote_main(project: Path, full_repo: str, env: dict[str, str]) -> 
     _run(["git", "checkout", "--orphan", branch], project, env)
     subprocess.run(["git", "rm", "--cached", "-r", "--ignore-unmatch", "."], cwd=project, env=env, capture_output=True)
     _run(["git", "add", "--all"], project, env)
-    _run(["git", "-c", "user.name=game-wiki-factory", "-c", "user.email=factory@local.invalid", "commit", "-m", "Rebuild game wiki from latest factory"], project, env)
+    _commit(project, "Rebuild game wiki from latest factory", env, author)
     _run(["git", "branch", "-M", "main"], project, env)
     _run(["git", "push", "--force-with-lease=main:" + remote_sha, "-u", "origin", "main"], project, env)
     return backup_tag
@@ -217,6 +235,7 @@ def publish(argv: list[str]) -> int:
         # Local operators commonly authenticate once with `gh auth login`.
         # Reuse that credential store when no explicit automation token exists.
         _run(["gh", "auth", "status"], project, env)
+    author = _resolve_git_author(project, env)
     full_repo = f"{args.owner}/{repo}"
     exists = subprocess.run(["gh", "repo", "view", full_repo], cwd=project, env=env, capture_output=True).returncode == 0
     if not (project / ".git").is_dir():
@@ -224,7 +243,7 @@ def publish(argv: list[str]) -> int:
     if not exists:
         _run(["git", "add", "--all"], project)
         if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project).returncode != 0:
-            _run(["git", "-c", "user.name=game-wiki-factory", "-c", "user.email=factory@local.invalid", "commit", "-m", "Generate game wiki site"], project)
+            _commit(project, "Generate game wiki site", env, author)
         _run(["gh", "repo", "create", full_repo, "--private", "--source", ".", "--remote", "origin", "--push"], project, env)
     else:
         _ensure_private_github_repo(full_repo, project, env)
@@ -233,12 +252,12 @@ def publish(argv: list[str]) -> int:
             _run(["git", "remote", "add", "origin", f"https://github.com/{full_repo}.git"], project)
         _run(["gh", "auth", "setup-git"], project, env)
         if args.replace_existing:
-            backup_tag = _replace_remote_main(project, full_repo, env)
+            backup_tag = _replace_remote_main(project, full_repo, env, author)
             receipt["backupTag"] = backup_tag
         else:
             _run(["git", "add", "--all"], project)
             if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project).returncode != 0:
-                _run(["git", "-c", "user.name=game-wiki-factory", "-c", "user.email=factory@local.invalid", "commit", "-m", "Generate game wiki site"], project)
+                _commit(project, "Generate game wiki site", env, author)
             _run(["git", "push", "-u", "origin", "main"], project, env)
     _ensure_private_github_repo(full_repo, project, env)
     receipt["stages"]["github"] = {
