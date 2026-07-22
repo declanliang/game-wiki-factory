@@ -105,6 +105,20 @@ def connect() -> sqlite3.Connection:
           event TEXT NOT NULL,
           detail_json TEXT NOT NULL DEFAULT '{}'
         );
+        CREATE TABLE IF NOT EXISTS notifications (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          event_id INTEGER NOT NULL UNIQUE,
+          status TEXT NOT NULL DEFAULT 'pending',
+          attempts INTEGER NOT NULL DEFAULT 0,
+          available_at TEXT NOT NULL,
+          delivered_at TEXT,
+          last_error TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY(event_id) REFERENCES events(id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_notifications_pending
+          ON notifications(status, available_at, id);
         """
     )
     columns = {row["name"] for row in db.execute("PRAGMA table_info(jobs)").fetchall()}
@@ -117,11 +131,67 @@ def connect() -> sqlite3.Connection:
     return db
 
 
-def _event(db: sqlite3.Connection, job_id: str, event: str, **detail: Any) -> None:
-    db.execute(
+def _event(
+    db: sqlite3.Connection,
+    job_id: str,
+    event: str,
+    *,
+    notify: bool = False,
+    **detail: Any,
+) -> int:
+    cursor = db.execute(
         "INSERT INTO events(job_id,timestamp,event,detail_json) VALUES(?,?,?,?)",
         (job_id, _now(), event, json.dumps(detail, ensure_ascii=False)),
     )
+    event_id = int(cursor.lastrowid)
+    if notify:
+        now = _now()
+        db.execute(
+            """INSERT OR IGNORE INTO notifications(event_id,status,available_at,created_at,updated_at)
+               VALUES(?,'pending',?,?,?)""",
+            (event_id, now, now, now),
+        )
+    return event_id
+
+
+def pending_notifications(limit: int = 50) -> list[dict[str, Any]]:
+    """Return durable, non-secret state changes awaiting operator delivery."""
+    with connect() as db:
+        rows = db.execute(
+            """SELECT n.id AS notification_id,n.attempts,e.id AS event_id,e.job_id,
+                      e.timestamp,e.event,e.detail_json,j.game,j.status AS current_status,j.current_stage,
+                      j.attempts AS job_attempts,j.max_attempts,j.log_path,j.result_json
+               FROM notifications n
+               JOIN events e ON e.id=n.event_id
+               JOIN jobs j ON j.id=e.job_id
+               WHERE n.status='pending' AND n.available_at <= ?
+               ORDER BY n.id LIMIT ?""",
+            (_now(), max(1, min(limit, 200))),
+        ).fetchall()
+    result: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row)
+        item["detail"] = json.loads(item.pop("detail_json") or "{}")
+        item["event_status"] = item["detail"].get("status", item["current_status"])
+        raw_result = item.pop("result_json", None)
+        if raw_result:
+            item["result"] = json.loads(raw_result)
+        item["needsAttention"] = item["event_status"] in {"needs_attention", "failed"}
+        result.append(item)
+    return result
+
+
+def acknowledge_notifications(notification_ids: list[int]) -> int:
+    if not notification_ids:
+        return 0
+    placeholders = ",".join("?" for _ in notification_ids)
+    now = _now()
+    with connect() as db:
+        return db.execute(
+            f"""UPDATE notifications SET status='delivered',delivered_at=?,updated_at=?
+                WHERE status='pending' AND id IN ({placeholders})""",
+            (now, now, *notification_ids),
+        ).rowcount
 
 
 def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
@@ -576,7 +646,16 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                WHERE job_id=? AND number=?""",
             (status, _now(), code, error_class, job_id, attempt),
         )
-        _event(db, job_id, "attempt.finished", attempt=attempt, status=status, exitCode=code, errorClass=error_class)
+        _event(
+            db,
+            job_id,
+            "attempt.finished",
+            notify=status in {"succeeded", "failed", "needs_attention", "cancelled"},
+            attempt=attempt,
+            status=status,
+            exitCode=code,
+            errorClass=error_class,
+        )
 
 
 def worker_loop(concurrency: int, once: bool, poll_seconds: float = 3.0) -> int:
@@ -650,6 +729,10 @@ def jobs_cli(argv: list[str]) -> int:
     batch.add_argument("--max-attempts", type=int, default=4)
     list_parser = sub.add_parser("list")
     list_parser.add_argument("--json", action="store_true")
+    notifications = sub.add_parser("notifications")
+    notifications.add_argument("--json", action="store_true")
+    notifications.add_argument("--limit", type=int, default=50)
+    notifications.add_argument("--ack", type=int, nargs="+")
     for name in ("status", "retry", "cancel"):
         command = sub.add_parser(name)
         command.add_argument("job_id")
@@ -697,6 +780,21 @@ def jobs_cli(argv: list[str]) -> int:
                     shutil.rmtree(candidate)
         print(json.dumps({"dryRun": args.dry_run, "projects": removed}, ensure_ascii=False, indent=2))
         return 0
+    if args.command == "notifications":
+        if args.ack:
+            count = acknowledge_notifications(args.ack)
+            print(json.dumps({"acknowledged": count}, ensure_ascii=False) if args.json else count)
+            return 0
+        items = pending_notifications(args.limit)
+        if args.json:
+            print(json.dumps(items, ensure_ascii=False, indent=2))
+        else:
+            for item in items:
+                print(
+                    f"{item['notification_id']:6} {item['event_status']:16} "
+                    f"{item['job_id']} {item['game']}"
+                )
+        return 0
     with connect() as db:
         if args.command == "list":
             rows = db.execute("SELECT * FROM jobs ORDER BY created_at DESC").fetchall()
@@ -723,7 +821,14 @@ def jobs_cli(argv: list[str]) -> int:
             _event(db, args.job_id, "job.retried")
         elif args.command == "cancel":
             db.execute("UPDATE jobs SET cancel_requested=1,status=CASE WHEN status IN ('queued','retry_wait','needs_attention') THEN 'cancelled' ELSE status END,updated_at=? WHERE id=?", (_now(), args.job_id))
-            _event(db, args.job_id, "job.cancel_requested")
+            cancelled = db.execute("SELECT status FROM jobs WHERE id=?", (args.job_id,)).fetchone()
+            _event(
+                db,
+                args.job_id,
+                "job.cancel_requested",
+                notify=bool(cancelled and cancelled["status"] == "cancelled"),
+                status=cancelled["status"] if cancelled else None,
+            )
     return 0
 
 

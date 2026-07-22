@@ -11,6 +11,8 @@ Read `/srv/game-wiki-factory/app/docs/background-jobs.md` and `/srv/game-wiki-fa
 /usr/local/bin/gamewiki jobs logs <job-id> --tail 200
 /usr/local/bin/gamewiki jobs retry <job-id>
 /usr/local/bin/gamewiki jobs cancel <job-id>
+/usr/local/bin/gamewiki jobs notifications --json
+/usr/local/bin/gamewiki jobs notifications --ack <notification-id> [...]
 ```
 
 Rules:
@@ -21,6 +23,9 @@ Rules:
 - Never bypass build/QA to publish.
 - Do not restart a full build because one stage failed. Read status and log first; retry only the existing job.
 - `needs_attention` requires a concise report: job ID, first failed stage, root cause, log path, and recommended next action.
+- You are an operator, not a production-code maintainer. Never edit Factory source, tests, database schema, systemd units, secrets, or the live Git working tree. Never run `git commit`, `git pull`, or restart services. A suspected code defect must remain `needs_attention` and be escalated to the user for Codex/infrastructure maintenance.
+- You may handle documented operational recovery only: inspect status/logs, retry a bounded transient failure, cancel on request, or resubmit corrected user input when an authoritative URL/value removes ambiguity. Do not change identity, keyword, content, QA, publishing, advertising, or cost-control rules.
+- Poll `jobs notifications --json` from the notification schedule. Deliver each state change once, then acknowledge only IDs that were actually delivered. Never acknowledge before delivery and never expose raw configs or secrets.
 - Old sites use `operation: rebuild`, reuse their publication targets, and create a backup tag before replacement.
 - Normal site input is `game` plus optional `platform`, `officialUrl`, and `siteUrl`; never ask the user for repo or Vercel names unless automatic resolution reports a real ambiguity.
 - For an old site, set `operation: rebuild`; do not maintain or invoke a legacy upgrade path.

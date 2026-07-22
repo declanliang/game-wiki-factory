@@ -103,6 +103,27 @@ Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status
 
 `needs_attention` 固定汇报：第一个失败阶段、根因、日志路径、是否需要用户动作、是否会重复 API 成本。网络/429/5xx 由 Worker 有界重试；不要创建第二个同游戏任务。用户修复密钥、余额、DNS 或权限后，重试原 job，复用 checkpoint。
 
+## 状态变化通知
+
+任务终态会进入持久化 notification outbox。通知轮询只能读取非敏感摘要：
+
+```bash
+/usr/local/bin/gamewiki jobs notifications --json
+/usr/local/bin/gamewiki jobs notifications --ack 12 13
+```
+
+OpenClaw 的通知 cron 建议每 2–5 分钟运行一次。它必须先读取待通知项，将 `succeeded`、`failed`、`cancelled` 或 `needs_attention` 消息送达绑定渠道，然后只确认已经成功送达的 notification ID。对话断线、Agent 重启和重复轮询都不会丢消息；未确认消息会保留。每日汇总可以另设 cron，但不能代替终态通知。
+
+在尚未绑定具体聊天渠道前，只部署 outbox，不得假装已经具备主动送达能力。渠道绑定完成后，应做一次“生成测试事件 → 收到消息 → acknowledge → 再次查询为空”的端到端验收。
+
+## 故障处理权限
+
+- **Worker 自动处理**：429、常见 5xx、SSL/网络超时等已分类的瞬时错误；使用有界重试和 checkpoint。
+- **Agent 可以处理**：查询、读日志、按现有 runbook 重试/取消，以及权威官网 URL 明确消除歧义后的输入修正。Agent 不得扩大 API 重试次数。
+- **必须升级给 Codex/基础设施维护者**：任何源代码、测试、数据库、任务状态机、Basic Info、关键词、内容/QA、GitHub/Vercel 发布、广告匹配或成本控制逻辑问题。
+
+Agent 发现疑似代码 bug 时只能报告证据并保持任务为 `needs_attention`。禁止直接修改服务器工作树、提交 Git、拉取代码或重启服务。正式修复必须在 Factory 本地完成回归测试、提交 GitHub，再在无运行任务的维护窗口部署。
+
 ## Agent 的安全边界与经验
 
 - 每次从数据库、manifest、receipt 和日志重新建立事实，不依赖聊天上下文。

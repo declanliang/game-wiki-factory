@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _completion_result, _execution_config, _prepare_full_build, _prune_success_build_artifacts, classify_failure, claim, connect, normalize_config, submit, submit_batch
+from job_system import _completion_result, _event, _execution_config, _prepare_full_build, _prune_success_build_artifacts, acknowledge_notifications, classify_failure, claim, connect, normalize_config, pending_notifications, submit, submit_batch
 
 
 class JobSystemTests(unittest.TestCase):
@@ -149,7 +149,47 @@ class JobSystemTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):
             with connect() as db:
                 columns = {row["name"] for row in db.execute("PRAGMA table_info(jobs)").fetchall()}
+                notification_columns = {
+                    row["name"] for row in db.execute("PRAGMA table_info(notifications)").fetchall()
+                }
             self.assertIn("result_json", columns)
+            self.assertIn("delivered_at", notification_columns)
+
+    def test_terminal_event_creates_durable_acknowledgeable_notification(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ, {"GAMEWIKI_DATA_DIR": temporary}
+        ):
+            config_path = Path(temporary) / "game.json"
+            config_path.write_text(
+                json.dumps({"game": "Notify Game", "platform": "roblox"}),
+                encoding="utf-8",
+            )
+            job_id = submit(config_path)
+            with connect() as db:
+                db.execute(
+                    "UPDATE jobs SET status='needs_attention',current_stage='pipeline' WHERE id=?",
+                    (job_id,),
+                )
+                _event(
+                    db,
+                    job_id,
+                    "attempt.finished",
+                    notify=True,
+                    attempt=1,
+                    status="needs_attention",
+                    errorClass="needs_attention",
+                )
+
+            pending = pending_notifications()
+            self.assertEqual(len(pending), 1)
+            self.assertEqual(pending[0]["job_id"], job_id)
+            self.assertEqual(pending[0]["event_status"], "needs_attention")
+            self.assertTrue(pending[0]["needsAttention"])
+            self.assertNotIn("config_json", pending[0])
+            self.assertEqual(
+                acknowledge_notifications([pending[0]["notification_id"]]), 1
+            )
+            self.assertEqual(pending_notifications(), [])
 
     def test_job_logs_are_utf8_safe_on_legacy_windows_console(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):

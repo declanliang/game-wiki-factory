@@ -45,6 +45,15 @@ gamewiki.py jobs submit/status/logs/retry/cancel
 
 Worker 启动时会回收过期 lease。网络、429、5xx、连接重置等瞬时错误按 30 秒、120 秒、600 秒退避；身份歧义、认证/余额、配置、内容契约和构建代码错误进入 `needs_attention`，避免无意义重复付费。
 
+终态 `succeeded`、`failed`、`needs_attention`、`cancelled` 会原子写入 notification outbox。读取不等于送达，只有渠道成功发送后才能 acknowledge，因此轮询和 Agent 重启不会造成消息永久丢失：
+
+```bash
+python gamewiki.py jobs notifications --json
+python gamewiki.py jobs notifications --ack 12 13
+```
+
+通知 outbox 是渠道无关的基础设施。OpenClaw、微信、飞书等具体渠道通过短周期 cron 或独立 dispatcher 消费它；未配置渠道时不会发送，也不会伪造成功通知。
+
 ## 配置契约
 
 站点任务只要求 `game`。平台、官网和域名已知时应填写；GitHub repo 与 Vercel project 由系统创建或解析，不属于日常输入：

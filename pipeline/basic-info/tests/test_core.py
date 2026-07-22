@@ -11,7 +11,7 @@ from jsonschema import Draft202012Validator
 from gamewiki_automation.config import Settings
 from gamewiki_automation.llm import LlmClient, _compact_schema_strings, _provider_schema, _responses_text, _web_search_calls
 from gamewiki_automation.pipeline import Pipeline, _generation_evidence, _generation_facts, _module_facts, _normalize_modules, _research_facts, _select_language_codes
-from gamewiki_automation.roblox import IdentityError, RobloxClient, clean_roblox_display_name, roblox_place_id
+from gamewiki_automation.roblox import IdentityError, RobloxClient, clean_roblox_display_name, identity_match_confidence, roblox_place_id
 from gamewiki_automation.steam import SteamClient, steam_app_id
 from gamewiki_automation.schemas import HOMEPAGE_SCHEMA, LANGUAGE_MARKET_SCHEMA, MODULES_SCHEMA, RESEARCH_SCHEMA, TEMPLATE_SITE_CONTENT_SCHEMA, TEMPLATE_SITE_IDENTITY_SCHEMA
 from gamewiki_automation.template_contract import build_site_content, export_existing_output, validate_localized_site_content, validate_template_contract
@@ -155,7 +155,14 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(selected["placeId"], "78515283254292")
         self.assertEqual(selected["identitySelection"], "explicit-place-id")
         self.assertLess(selected["matchScore"], 0.72)
+        self.assertEqual(identity_match_confidence(selected), 1.0)
         self.assertEqual(len(candidates), 1)
+
+    def test_name_selected_identity_preserves_semantic_confidence(self):
+        self.assertEqual(
+            identity_match_confidence({"matchScore": 0.91, "identitySelection": "name-confidence"}),
+            0.91,
+        )
 
     def test_clean_roblox_name_keeps_disambiguator_but_drops_emoji(self):
         self.assertEqual(

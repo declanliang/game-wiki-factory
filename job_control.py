@@ -10,7 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from job_system import _job_dict, _now, connect, submit
+from job_system import _event, _job_dict, _now, connect, submit
 
 
 def _handler(token: str):
@@ -83,9 +83,18 @@ def _handler(token: str):
                             self._json(404, {"error": "job not found"})
                             return
                         if action == "retry":
-                            db.execute("UPDATE jobs SET status='queued',available_at=?,cancel_requested=0,last_error=NULL,finished_at=NULL,updated_at=? WHERE id=?", (_now(), _now(), job_id))
+                            db.execute("UPDATE jobs SET status='queued',available_at=?,cancel_requested=0,last_error=NULL,finished_at=NULL,result_json=NULL,updated_at=? WHERE id=?", (_now(), _now(), job_id))
+                            _event(db, job_id, "job.retried")
                         else:
                             db.execute("UPDATE jobs SET cancel_requested=1,status=CASE WHEN status IN ('queued','retry_wait','needs_attention') THEN 'cancelled' ELSE status END,updated_at=? WHERE id=?", (_now(), job_id))
+                            cancelled = db.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
+                            _event(
+                                db,
+                                job_id,
+                                "job.cancel_requested",
+                                notify=bool(cancelled and cancelled["status"] == "cancelled"),
+                                status=cancelled["status"] if cancelled else None,
+                            )
                     self._json(200, {"jobId": job_id, "action": action})
                     return
                 self._json(404, {"error": "not found"})

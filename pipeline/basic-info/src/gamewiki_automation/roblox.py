@@ -46,6 +46,18 @@ def roblox_place_id(value: str | None) -> str | None:
     return match.group(1) if match else None
 
 
+def identity_match_confidence(selected: dict[str, Any]) -> float:
+    """Return the confidence exposed to validators and downstream consumers.
+
+    An explicit official URL resolves an immutable Roblox Place ID through the
+    Roblox API.  Its name similarity remains useful audit data in ``matchScore``,
+    but it must not downgrade the confidence of the resolved identity.
+    """
+    if selected.get("identitySelection") == "explicit-place-id":
+        return 1.0
+    return float(selected["matchScore"])
+
+
 class RobloxClient:
     def __init__(self, http: CachedHttpClient):
         self.http = http
@@ -199,7 +211,7 @@ class RobloxClient:
                 "placeId": place_id,
                 "universeId": universe_id,
                 "canonicalUrl": canonical_url,
-                "matchConfidence": selected["matchScore"],
+                "matchConfidence": identity_match_confidence(selected),
                 "selectionMethod": selected.get("identitySelection", "name-confidence"),
             },
             "developer": {
