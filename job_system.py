@@ -387,8 +387,11 @@ def _completion_result(config: dict[str, Any], slug: str) -> dict[str, Any]:
     stages = receipt.get("stages") or {}
     plan_path = project / "intake" / "site-plan.json"
     plan = read_json(plan_path) if plan_path.is_file() else {}
+    release_path = project / "intake" / "factory-release.json"
+    release = read_json(release_path) if release_path.is_file() else {}
     return {
         "taskType": "site",
+        "factoryRelease": release.get("release"),
         "articles": {
             "english": len(list((project / "content" / "en").rglob("*.mdx"))),
             "allLanguages": len(list((project / "content").rglob("*.mdx"))),

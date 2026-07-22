@@ -29,6 +29,9 @@ class PublisherValidationTests(unittest.TestCase):
         (root / "package.json").write_text("{}", encoding="utf-8")
         for name in ("site-identity.json", "site-content.json", "site-plan.json"):
             (root / "intake" / name).write_text("{}", encoding="utf-8")
+        (root / "intake" / "factory-release.json").write_text(
+            json.dumps({"release": "v1_0722"}), encoding="utf-8"
+        )
         return root
 
     def test_complete_project_is_publishable(self) -> None:
@@ -41,6 +44,13 @@ class PublisherValidationTests(unittest.TestCase):
             project = self._project(Path(temporary))
             (project / ".env.production").write_text("TOKEN=secret", encoding="utf-8")
             with self.assertRaisesRegex(RuntimeError, "Secret-like"):
+                _validate_project(project)
+
+    def test_unstamped_legacy_project_cannot_publish(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = self._project(Path(temporary))
+            (project / "intake" / "factory-release.json").unlink()
+            with self.assertRaisesRegex(RuntimeError, "factory-release"):
                 _validate_project(project)
 
     @patch("publisher._run")

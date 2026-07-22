@@ -8,9 +8,6 @@
 
 ```json
 {
-  "schemaVersion": 3,
-  "taskType": "site",
-  "operation": "new",
   "game": "GAME NAME",
   "platform": "roblox",
   "officialUrl": "https://www.roblox.com/games/PLACE_ID/SLUG",
@@ -22,8 +19,20 @@
 - `platform`：`roblox`、`steam` 或 `auto`。
 - Steam 的 `officialUrl` 必须是 Steam Store App URL。
 - `siteUrl` 可省略；省略时使用并验证 Vercel 默认 production 域名。
-- 新站用 `operation: new`；失败续跑仍提交/重试原 job，不改成 rebuild。
-- 旧半成品彻底重做用 `operation: rebuild`。它会完整重新付费采集/生成，创建 repo 备份 tag 后替换原站。
+- 单站的 `schemaVersion`、`taskType: site` 和默认 operation 由系统自动补齐，用户无需填写。
+- 新站不填写 `operation`；失败续跑仍提交/重试原 job。
+- 旧半成品彻底重做时，在与 `game` 同级的顶层填写 `"operation": "rebuild"`。它会完整重新付费采集/生成，创建 repo 备份 tag 后替换原站：
+
+```json
+{
+  "operation": "rebuild",
+  "game": "OLD GAME NAME",
+  "platform": "roblox",
+  "officialUrl": "https://www.roblox.com/games/PLACE_ID/SLUG",
+  "siteUrl": "https://existing-domain.example",
+  "publish": true
+}
+```
 
 推荐给 OpenClaw 的话：
 
@@ -40,7 +49,7 @@
   "schemaVersion": 1,
   "taskType": "siteBatch",
   "batchName": "daily-10",
-  "defaults": {"operation": "new", "platform": "roblox", "publish": true},
+  "defaults": {"platform": "roblox", "publish": true},
   "games": [
     {"game": "Game One", "officialUrl": "https://www.roblox.com/games/1/x", "siteUrl": "https://one.example"},
     {"game": "Game Two", "officialUrl": "https://www.roblox.com/games/2/y"}
@@ -66,6 +75,10 @@ Prompt：
 ```
 
 广告任务不重跑内容。缺少广告变量时站点不展示广告、不保留空白；配置后必须验证七个 `/api/ads/<format>` 路由的代码哈希。
+
+## 生产版本认定
+
+当前稳定版本读取根目录 `release.json`。普通 Git commit 不改变产品版本。OpenClaw 不得按日期、外观或文章数量推断版本；必须检查任务结果中的 `factoryRelease`、站点的 `intake/factory-release.json`，并以 `docs/releases/v1_0722-sites.json` 为最终登记依据。旧站普通续跑不会获得版本标记，必须提交顶层 `operation: rebuild`。
 
 ## 查询、异常和完成汇报
 

@@ -24,6 +24,7 @@ from permit_client import shared_permit
 
 
 ROOT = Path(__file__).resolve().parent
+FACTORY_RELEASE_FILE = ROOT / "release.json"
 FAVICON_FILES = {
     "favicon.ico",
     "favicon-16x16.png",
@@ -77,6 +78,27 @@ def write_json(path: Path, value: object) -> None:
         encoding="utf-8",
     )
     temporary.replace(path)
+
+
+def factory_release() -> dict[str, object]:
+    value = read_json(FACTORY_RELEASE_FILE)
+    release = str(value.get("release") or "").strip()
+    if not release:
+        raise PipelineError("release.json must declare a non-empty release")
+    return value
+
+
+def should_stamp_factory_release(project_dir: Path, is_resume: bool, release: str) -> bool:
+    """Certify only new/full rebuilds or an already-certified resume."""
+    if not is_resume:
+        return True
+    stamp = project_dir / "intake" / "factory-release.json"
+    if not stamp.is_file():
+        return False
+    try:
+        return str(read_json(stamp).get("release") or "").strip() == release
+    except PipelineError:
+        return False
 
 
 def parse_dotenv(path: Path) -> dict[str, str]:
@@ -697,6 +719,9 @@ def main(argv: list[str] | None = None) -> int:
     latest_pointer.parent.mkdir(parents=True, exist_ok=True)
     latest_pointer.write_text(str(project_dir) + "\n", encoding="utf-8")
     print(f"[log] {run_log_path}", flush=True)
+    release = factory_release()
+    release_name = str(release["release"])
+    release_certified = should_stamp_factory_release(project_dir, is_resume, release_name)
     if is_resume and manifest_path.is_file():
         manifest = read_json(manifest_path)
         if manifest.get("slug") != slug:
@@ -721,6 +746,12 @@ def main(argv: list[str] | None = None) -> int:
     # this point onward the game root is the deployable site and local factory
     # state lives under .gamewiki/.
     manifest["version"] = 3
+    if release_certified:
+        manifest["factoryRelease"] = release_name
+        manifest.pop("factoryReleaseStatus", None)
+    else:
+        manifest.pop("factoryRelease", None)
+        manifest["factoryReleaseStatus"] = "uncertified_legacy_resume"
     manifest["keywordTopic"] = search_topic
     manifest["currentAttempt"] = {"id": attempt_id, "log": str(run_log_path)}
     paths = manifest.setdefault("paths", {})
@@ -941,6 +972,16 @@ def main(argv: list[str] | None = None) -> int:
             languages,
         )
         shutil.copy2(site_plan_path, intake_dir / "site-plan.json")
+        if release_certified:
+            write_json(
+                intake_dir / "factory-release.json",
+                {
+                    "release": release_name,
+                    "contractVersion": release.get("contractVersion", 1),
+                    "game": canonical_name,
+                    "slug": slug,
+                },
+            )
         featured_video = reconcile_featured_video(intake_dir, keyword_run_dir, planning_dir, resolved_platform)
         record(
             "featuredVideo",

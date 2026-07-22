@@ -250,9 +250,15 @@ def _validate_project(project: Path) -> dict:
     manifest = read_json(project / ".gamewiki" / "manifest.json")
     if manifest.get("status") != "complete":
         raise RuntimeError("Project pipeline manifest is not complete")
-    for relative in ("package.json", "intake/site-identity.json", "intake/site-content.json", "intake/site-plan.json"):
+    for relative in ("package.json", "intake/site-identity.json", "intake/site-content.json", "intake/site-plan.json", "intake/factory-release.json"):
         if not (project / relative).is_file():
             raise RuntimeError(f"Required publish file is missing: {relative}")
+    expected_release = str(read_json(ROOT / "release.json").get("release") or "").strip()
+    stamped_release = str(read_json(project / "intake" / "factory-release.json").get("release") or "").strip()
+    if not expected_release or stamped_release != expected_release:
+        raise RuntimeError(
+            f"Project is not certified for the current Factory release: expected {expected_release!r}, got {stamped_release!r}"
+        )
     forbidden_names = {".env", ".env.local", ".env.production"}
     for path in project.rglob("*"):
         if ".git" in path.parts or "node_modules" in path.parts or ".gamewiki" in path.parts:

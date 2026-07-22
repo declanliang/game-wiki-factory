@@ -128,6 +128,9 @@ class JobSystemTests(unittest.TestCase):
             (project / "intake" / "site-plan.json").write_text(json.dumps({
                 "categories": [{"id": "guide", "status": "published"}],
             }), encoding="utf-8")
+            (project / "intake" / "factory-release.json").write_text(
+                json.dumps({"release": "v1_0722"}), encoding="utf-8",
+            )
             (project / ".gamewiki" / "publish.json").write_text(json.dumps({
                 "stages": {
                     "github": {"visibility": "PRIVATE", "repo": "owner/verified-game"},
@@ -137,6 +140,7 @@ class JobSystemTests(unittest.TestCase):
             }), encoding="utf-8")
             result = _completion_result({"taskType": "site", "publish": True}, "verified-game")
         self.assertEqual(result["articles"]["english"], 1)
+        self.assertEqual(result["factoryRelease"], "v1_0722")
         self.assertEqual(result["categories"], ["guide"])
         self.assertEqual(result["onlineVerification"]["status"], "complete")
         self.assertNotIn("token", json.dumps(result).casefold())

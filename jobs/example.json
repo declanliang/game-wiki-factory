@@ -1,15 +1,7 @@
 {
-  "schemaVersion": 3,
-  "taskType": "site",
-  "operation": "auto",
   "game": "GAME NAME",
   "platform": "roblox",
   "officialUrl": "https://www.roblox.com/games/PLACE_ID/GAME-SLUG",
   "siteUrl": "https://game-domain.example",
-  "publish": true,
-  "refresh": {
-    "basicInfo": false,
-    "keywords": false,
-    "articles": false
-  }
+  "publish": true
 }

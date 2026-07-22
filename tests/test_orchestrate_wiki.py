@@ -11,6 +11,34 @@ import orchestrate_wiki as orchestrator
 
 
 class OrchestratorTests(unittest.TestCase):
+    def test_factory_release_is_explicit_and_independent_of_git_commit(self) -> None:
+        release = orchestrator.factory_release()
+        self.assertEqual(release["release"], "v1_0722")
+        self.assertEqual(release["contractVersion"], 1)
+
+    def test_new_project_receives_current_release_stamp(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            self.assertTrue(
+                orchestrator.should_stamp_factory_release(Path(temporary), False, "v1_0722")
+            )
+
+    def test_legacy_resume_does_not_gain_release_by_merely_resuming(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            self.assertFalse(
+                orchestrator.should_stamp_factory_release(Path(temporary), True, "v1_0722")
+            )
+
+    def test_certified_resume_keeps_matching_release(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            (project / "intake").mkdir()
+            (project / "intake" / "factory-release.json").write_text(
+                json.dumps({"release": "v1_0722"}), encoding="utf-8"
+            )
+            self.assertTrue(
+                orchestrator.should_stamp_factory_release(project, True, "v1_0722")
+            )
+
     def test_template_sync_removes_obsolete_root_redirect(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

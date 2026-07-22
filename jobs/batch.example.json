@@ -3,7 +3,6 @@
   "taskType": "siteBatch",
   "batchName": "daily-games",
   "defaults": {
-    "operation": "auto",
     "platform": "auto",
     "publish": true
   },

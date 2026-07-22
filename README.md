@@ -62,23 +62,17 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 旧站不维护升级分支。把 `operation` 设为 `rebuild` 后，Worker 会从空目录按当前完整流程重做，自动从旧 receipt 复用非标准 GitHub/Vercel 名称；没有特殊名称时按游戏 slug 复用原项目。发布前创建远端备份 tag，再用已通过 QA 的新 `main` 替换旧 Private repo。完整状态机、服务器和 OpenClaw 说明见 [docs/background-jobs.md](docs/background-jobs.md)。
 
+当前稳定生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。认证规则和已上线站点清单见 [docs/releases/v1_0722.md](docs/releases/v1_0722.md)。
+
 Roblox 配置：
 
 ```json
 {
-  "schemaVersion": 3,
-  "taskType": "site",
-  "operation": "auto",
   "game": "Blox Monsters",
   "platform": "roblox",
   "officialUrl": "https://www.roblox.com/games/106763540857326/Blox-Monsters",
   "siteUrl": "https://blox-monsters-roblox.wiki",
-  "publish": true,
-  "refresh": {
-    "basicInfo": false,
-    "keywords": false,
-    "articles": false
-  }
+  "publish": true
 }
 ```
 
@@ -86,21 +80,15 @@ Steam 配置：
 
 ```json
 {
-  "schemaVersion": 3,
-  "taskType": "site",
-  "operation": "auto",
   "game": "Funnel Runners",
   "platform": "steam",
   "officialUrl": "https://store.steampowered.com/app/3712080/Funnel_Runners/",
   "siteUrl": "https://funnelrunners.com",
-  "publish": true,
-  "refresh": {
-    "basicInfo": false,
-    "keywords": false,
-    "articles": false
-  }
+  "publish": true
 }
 ```
+
+单站配置不必填写 `schemaVersion`、`taskType` 或默认 `operation`，系统会自动补齐。只有把旧站按当前完整流程重做时，才在顶层增加 `"operation": "rebuild"`。
 
 执行：
 
