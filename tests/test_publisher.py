@@ -78,6 +78,10 @@ class PublisherValidationTests(unittest.TestCase):
         commands = [call.args[0] for call in run.call_args_list]
         self.assertEqual(commands[0][:5], ["vercel", "link", "--yes", "--project", "existing-project"])
         self.assertIn("--prod", commands[1])
+        self.assertNotIn("hidden", commands[0])
+        self.assertNotIn("hidden", commands[1])
+        self.assertNotIn("--token", commands[0])
+        self.assertNotIn("--token", commands[1])
         self.assertEqual(url, "https://game.vercel.app")
 
 

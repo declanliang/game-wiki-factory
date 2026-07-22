@@ -94,12 +94,12 @@ def _set_vercel_site_url(
     if not vercel:
         raise RuntimeError("Vercel CLI is required when --site-url is supplied")
     command_env = env or dict(os.environ)
-    token = command_env.get("VERCEL_TOKEN", "").strip()
-    auth = ["--token", token] if token else []
-    _run([vercel, "link", "--yes", "--project", project_name, *auth], project, command_env)
+    # Vercel CLI natively consumes VERCEL_TOKEN.  Never append it to argv:
+    # command-line arguments are visible to other users through the process list.
+    _run([vercel, "link", "--yes", "--project", project_name], project, command_env)
     _run(
         [vercel, "env", "add", "NEXT_PUBLIC_SITE_URL", "production", "--value", origin,
-         "--force", "--yes", "--no-sensitive", *auth],
+         "--force", "--yes", "--no-sensitive"],
         project,
         command_env,
     )
@@ -111,10 +111,8 @@ def _deploy_with_vercel_cli(project: Path, project_name: str, env: dict[str, str
     vercel = shutil.which("vercel.cmd") or shutil.which("vercel")
     if not vercel:
         raise RuntimeError("Vercel CLI is required to create the production deployment")
-    token = env.get("VERCEL_TOKEN", "").strip()
-    auth = ["--token", token] if token else []
-    _run([vercel, "link", "--yes", "--project", project_name, *auth], project, env)
-    output = _run([vercel, "--prod", "--yes", *auth], project, env)
+    _run([vercel, "link", "--yes", "--project", project_name], project, env)
+    output = _run([vercel, "--prod", "--yes"], project, env)
     urls = re.findall(r"https://[^\s]+", output)
     return urls[-1].rstrip(".,") if urls else ""
 
