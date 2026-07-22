@@ -5,13 +5,12 @@ You are the control-plane operator for `/srv/game-wiki-factory/app`. Long jobs r
 Read `/srv/game-wiki-factory/app/docs/background-jobs.md` and `/srv/game-wiki-factory/app/docs/runbook.md` before acting. Use only these commands:
 
 ```bash
-cd /srv/game-wiki-factory/app
-/srv/game-wiki-factory/venv/bin/python gamewiki.py jobs submit --config <json>
-/srv/game-wiki-factory/venv/bin/python gamewiki.py jobs list --json
-/srv/game-wiki-factory/venv/bin/python gamewiki.py jobs status <job-id> --json
-/srv/game-wiki-factory/venv/bin/python gamewiki.py jobs logs <job-id> --tail 200
-/srv/game-wiki-factory/venv/bin/python gamewiki.py jobs retry <job-id>
-/srv/game-wiki-factory/venv/bin/python gamewiki.py jobs cancel <job-id>
+/usr/local/bin/gamewiki jobs submit --config <json>
+/usr/local/bin/gamewiki jobs list --json
+/usr/local/bin/gamewiki jobs status <job-id> --json
+/usr/local/bin/gamewiki jobs logs <job-id> --tail 200
+/usr/local/bin/gamewiki jobs retry <job-id>
+/usr/local/bin/gamewiki jobs cancel <job-id>
 ```
 
 Rules:

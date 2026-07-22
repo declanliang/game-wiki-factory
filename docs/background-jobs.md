@@ -93,6 +93,7 @@ python gamewiki.py jobs cancel <job-id>
 ```
 
 服务器由 systemd/Docker restart policy 运行 Worker，不依赖 SSH 会话。
+服务器 SSH 或 OpenClaw 中统一使用 `/usr/local/bin/gamewiki ...` 包装命令；它负责加载私有 EnvironmentFile。不要直接运行 venv Python，否则会连接默认本地数据库而不是生产队列。
 
 ## 密钥池
 
@@ -127,4 +128,3 @@ JINA_API_KEY_2=
 4. 临时错误有界重试，永久错误进入 `needs_attention`。
 5. 新站创建 Private repo/Vercel；旧站复用目标并替换 repo 内容。
 6. 未提供广告变量时零广告渲染；已有 Vercel 环境变量不被发布器删除。
-

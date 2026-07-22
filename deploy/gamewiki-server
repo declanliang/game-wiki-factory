@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+set -a
+source /srv/game-wiki-factory/secrets/factory.env
+set +a
+export PATH="/srv/game-wiki-factory/venv/bin:/home/ubuntu/.nvm/versions/node/v22.22.3/bin:/usr/local/bin:/usr/bin:/bin"
+cd /srv/game-wiki-factory/app
+exec /srv/game-wiki-factory/venv/bin/python gamewiki.py "$@"
