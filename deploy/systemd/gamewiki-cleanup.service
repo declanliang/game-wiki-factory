@@ -1,0 +1,10 @@
+[Unit]
+Description=Clean expired Game Wiki Factory workspaces
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/srv/game-wiki-factory/app
+EnvironmentFile=/srv/game-wiki-factory/secrets/factory.env
+ExecStart=/srv/game-wiki-factory/venv/bin/python gamewiki.py jobs cleanup
+NoNewPrivileges=true

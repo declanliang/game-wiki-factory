@@ -22,7 +22,7 @@ from orchestrate_wiki import read_json, slugify, write_json
 
 
 ROOT = Path(__file__).resolve().parent
-PROJECTS_ROOT = ROOT.parent
+PROJECTS_ROOT = Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)).expanduser().resolve()
 RUNTIME_ROOT = ROOT / ".gamewiki" / "runs"
 
 

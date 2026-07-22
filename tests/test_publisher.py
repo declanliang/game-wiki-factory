@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from publisher import _ensure_private_github_repo, _set_vercel_site_url, _validate_project, _vercel_project_payload
+from publisher import _ensure_private_github_repo, _replace_remote_main, _set_vercel_site_url, _validate_project, _vercel_project_payload
 
 
 class PublisherValidationTests(unittest.TestCase):
@@ -51,6 +51,16 @@ class PublisherValidationTests(unittest.TestCase):
         payload = _vercel_project_payload("game", "owner/game")
         self.assertNotIn("environmentVariables", payload)
         self.assertEqual(payload["gitRepository"]["repo"], "owner/game")
+
+    @patch("publisher.subprocess.run")
+    @patch("publisher._run")
+    def test_replace_remote_main_backs_up_then_uses_force_with_lease(self, run, subprocess_run) -> None:
+        run.side_effect = lambda command, *_args, **_kwargs: "abc123" if command[:3] == ["git", "rev-parse", "refs/remotes/origin/main"] else ""
+        tag = _replace_remote_main(Path("C:/game"), "owner/game", {})
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertTrue(tag.startswith("pre-rebuild-"))
+        self.assertTrue(any(command[:3] == ["git", "push", "origin"] and "refs/tags/" in command[3] for command in commands))
+        self.assertTrue(any(command[:2] == ["git", "push"] and "--force-with-lease=main:abc123" in command for command in commands))
 
     @patch("publisher.shutil.which", return_value="vercel")
     @patch("publisher._run")

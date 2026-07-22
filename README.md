@@ -40,6 +40,21 @@ vercel login
 Copy-Item jobs\example.json jobs\my-game.json
 ```
 
+## 后台批量生产
+
+需要关闭终端后继续、每天排队多个站点或交给 OpenClaw 时，使用 SQLite Worker，不要让 Agent 会话承载长任务：
+
+```powershell
+python gamewiki.py jobs submit --config jobs\game.json
+python gamewiki.py worker --concurrency 2
+python gamewiki.py jobs list
+python gamewiki.py jobs status <job-id>
+python gamewiki.py jobs logs <job-id> --tail 200
+python gamewiki.py jobs retry <job-id>
+```
+
+旧半成品也使用相同的 `fullBuild: true` 完整生产逻辑；`publication.replaceRepositoryContents: true` 会在创建远端备份 tag 后替换原 Private repo 的内容，并复用指定 Vercel project。完整状态机、服务器和 OpenClaw 说明见 [docs/background-jobs.md](docs/background-jobs.md)，实施计划见 [docs/design/background-production-v1.md](docs/design/background-production-v1.md)，换 AI 时使用 [docs/ai-takeover-background-worker.md](docs/ai-takeover-background-worker.md)。
+
 Roblox 配置：
 
 ```json

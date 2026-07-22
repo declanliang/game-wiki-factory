@@ -200,8 +200,20 @@ class Config:
         os.makedirs(cls.LOG_DIR, exist_ok=True)
 
         # API Keys (secrets — .env only)
-        cls.SERPER_API_KEY = os.getenv("SERPER_API_KEY", "")
-        cls.JINA_API_KEY = os.getenv("JINA_API_KEY", "")
+        def numbered_keys(prefix: str, legacy: str) -> list[str]:
+            found = []
+            for name, value in os.environ.items():
+                match = re.fullmatch(rf"{re.escape(prefix)}_(\d+)", name)
+                if match and value.strip():
+                    found.append((int(match.group(1)), value.strip()))
+            keys = [value for _slot, value in sorted(found)]
+            fallback = os.getenv(legacy, "").strip()
+            return keys or ([fallback] if fallback else [])
+
+        cls.SERPER_API_KEYS = numbered_keys("SERPER_API_KEY", "SERPER_API_KEY")
+        cls.JINA_API_KEYS = numbered_keys("JINA_API_KEY", "JINA_API_KEY")
+        cls.SERPER_API_KEY = cls.SERPER_API_KEYS[0] if cls.SERPER_API_KEYS else ""
+        cls.JINA_API_KEY = cls.JINA_API_KEYS[0] if cls.JINA_API_KEYS else ""
 
         # YouTube
         cls.YOUTUBE_INITIAL_RESULTS = int(yt_cfg.get("initial_search_results", 2))

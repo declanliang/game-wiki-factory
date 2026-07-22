@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily Game Wiki Factory workspace cleanup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=900
+
+[Install]
+WantedBy=timers.target

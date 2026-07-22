@@ -55,6 +55,19 @@ class Web:
     def __init__(self):
         self.config = Config
         self.cleaner = ContentCleaner()  # 初始化内容清理器
+        self._serper_index = 0
+        self._jina_index = 0
+        self._key_lock = asyncio.Lock()
+
+    async def _next_key(self, kind: str) -> Tuple[int, str]:
+        keys = list(getattr(self.config, f"{kind}_API_KEYS", []))
+        if not keys:
+            return (0, "")
+        async with self._key_lock:
+            attribute = f"_{kind.casefold()}_index"
+            index = getattr(self, attribute) % len(keys)
+            setattr(self, attribute, index + 1)
+        return (index + 1, keys[index])
 
     async def search_batch(self, keywords: List[str], filter_keyword: str = '') -> Dict[str, List[WebItem]]:
         """
@@ -109,23 +122,30 @@ class Web:
                 # 后做过滤——这样 Google 自己的相关性排序就能把撞名的现实世界
                 # 内容排开，不需要事后从矮子里拔将军
                 url = "https://google.serper.dev/search"
-                headers = {
-                    "X-API-KEY": self.config.SERPER_API_KEY,
-                    "Content-Type": "application/json"
-                }
                 search_query = build_disambiguated_query(keyword, filter_keyword)
                 payload = {
                     "q": search_query,
                     "num": self.config.WEB_SEARCH_TOP_N
                 }
 
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url, json=payload, headers=headers, timeout=30) as response:
-                        if response.status != 200:
-                            raise Exception(f"Serper API 返回错误: {response.status}")
-
-                        data = await response.json()
-                        results = data.get("organic", [])
+                keys = list(getattr(self.config, "SERPER_API_KEYS", []))
+                last_status = 0
+                data = None
+                for _ in range(max(1, len(keys))):
+                    slot, key = await self._next_key("SERPER")
+                    headers = {"X-API-KEY": key, "Content-Type": "application/json"}
+                    async with aiohttp.ClientSession() as session:
+                        async with session.post(url, json=payload, headers=headers, timeout=30) as response:
+                            last_status = response.status
+                            if response.status == 200:
+                                data = await response.json()
+                                break
+                            if response.status not in {402, 403, 429}:
+                                break
+                            print(f"  ↻ Serper keySlot={slot} unavailable ({response.status}); trying next slot")
+                if data is None:
+                    raise Exception(f"Serper API 返回错误: {last_status}")
+                results = data.get("organic", [])
 
                 # 过滤屏蔽域名
                 # 不再按 filter_keyword 过滤标题/摘要：Serper 关键词本身已经是
@@ -207,15 +227,15 @@ class Web:
                 try:
                     # 使用 Jina Reader
                     jina_url = f"https://r.jina.ai/{item.url}"
-                    headers = {}
-
-                    if self.config.JINA_API_KEY:
-                        headers["Authorization"] = f"Bearer {self.config.JINA_API_KEY}"
+                    slot, key = await self._next_key("JINA")
+                    headers = {"Authorization": f"Bearer {key}"} if key else {}
 
                     async with aiohttp.ClientSession() as session:
                         async with session.get(jina_url, headers=headers, timeout=30) as response:
                             # HTTP 错误处理
                             if response.status != 200:
+                                if response.status in {402, 403, 429}:
+                                    print(f"  ↻ Jina keySlot={slot} unavailable ({response.status}); trying next slot")
                                 if attempt < self.config.WEB_EXTRACT_RETRIES - 1:
                                     await asyncio.sleep(2 ** attempt)  # 指数退避：2s, 4s, 8s
                                     continue

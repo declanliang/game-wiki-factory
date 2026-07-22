@@ -627,7 +627,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--projects-dir",
         dest="output_root",
         type=Path,
-        default=ROOT.parent,
+        default=Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)),
         help="Parent directory for deployable per-game repositories (default: the factory's parent).",
     )
     parser.add_argument("--runs-dir", type=Path, help=argparse.SUPPRESS)

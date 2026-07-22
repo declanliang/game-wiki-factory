@@ -1,0 +1,21 @@
+[Unit]
+Description=Game Wiki Factory background worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/srv/game-wiki-factory/app
+EnvironmentFile=/srv/game-wiki-factory/secrets/factory.env
+Environment=PATH=/srv/game-wiki-factory/venv/bin:/home/ubuntu/.nvm/versions/node/v22.22.3/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/srv/game-wiki-factory/venv/bin/python gamewiki.py worker --concurrency 2 --build-concurrency 1
+Restart=always
+RestartSec=10
+TimeoutStopSec=45
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

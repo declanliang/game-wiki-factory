@@ -1,0 +1,18 @@
+[Unit]
+Description=Game Wiki Factory loopback control API
+After=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/srv/game-wiki-factory/app
+EnvironmentFile=/srv/game-wiki-factory/secrets/factory.env
+Environment=PATH=/srv/game-wiki-factory/venv/bin:/home/ubuntu/.nvm/versions/node/v22.22.3/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/srv/game-wiki-factory/venv/bin/python gamewiki.py control-server --host 127.0.0.1 --port 8787
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
