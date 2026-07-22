@@ -23,6 +23,17 @@ def _name_tokens(value: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", value)
 
 
+def clean_roblox_display_name(value: str) -> str:
+    """Remove update tags and decorative emoji without losing disambiguators."""
+    value = re.sub(r"\s*\[[^]]+]\s*", " ", value)
+    value = re.sub(
+        "[\U0001F000-\U0001FAFF\U00002600-\U000027BF\uFE0F\u200D]",
+        "",
+        value,
+    )
+    return re.sub(r"\s+", " ", value).strip()
+
+
 def roblox_place_id(value: str | None) -> str | None:
     if not value:
         return None
@@ -118,6 +129,14 @@ class RobloxClient:
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         candidates = self.discover(game_name, official_url=official_url)
         best = candidates[0]
+        # A valid official URL supplies the immutable Place ID. The Roblox API
+        # resolution of that ID is authoritative even when the user's search
+        # label intentionally expands the shorter official title for
+        # disambiguation (for example "Animal Hospital Anomaly"). Keep the
+        # semantic score as an audit signal, but do not reject the exact ID.
+        if best.get("source") == "explicit-official-url":
+            best["identitySelection"] = "explicit-place-id"
+            return best, candidates
         if best["matchScore"] < 0.72:
             raise IdentityError(
                 f"Top candidate confidence {best['matchScore']:.2f} is below 0.72; "
@@ -168,18 +187,20 @@ class RobloxClient:
         total_votes = (votes.get("upVotes") or 0) + (votes.get("downVotes") or 0)
         approval = round((votes.get("upVotes", 0) / total_votes) * 100, 1) if total_votes else None
         retrieved = utc_now()
-        canonical_url = f"https://www.roblox.com/games/{place_id}/{slugify(game['name'])}"
+        canonical_name = clean_roblox_display_name(game["name"])
+        canonical_url = f"https://www.roblox.com/games/{place_id}/{slugify(canonical_name)}"
         facts = {
             "identity": {
                 "query": query,
-                "canonicalName": re.sub(r"\s*\[[^]]+]\s*", "", game["name"]).strip(),
+                "canonicalName": canonical_name,
                 "currentRobloxName": game["name"],
-                "slug": slugify(re.sub(r"\s*\[[^]]+]\s*", "", game["name"])),
+                "slug": slugify(canonical_name),
                 "platform": "Roblox",
                 "placeId": place_id,
                 "universeId": universe_id,
                 "canonicalUrl": canonical_url,
                 "matchConfidence": selected["matchScore"],
+                "selectionMethod": selected.get("identitySelection", "name-confidence"),
             },
             "developer": {
                 "name": creator.get("name"),

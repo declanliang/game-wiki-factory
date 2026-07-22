@@ -11,7 +11,7 @@ from jsonschema import Draft202012Validator
 from gamewiki_automation.config import Settings
 from gamewiki_automation.llm import LlmClient, _compact_schema_strings, _provider_schema, _responses_text, _web_search_calls
 from gamewiki_automation.pipeline import Pipeline, _generation_evidence, _generation_facts, _module_facts, _normalize_modules, _research_facts, _select_language_codes
-from gamewiki_automation.roblox import IdentityError, RobloxClient, roblox_place_id
+from gamewiki_automation.roblox import IdentityError, RobloxClient, clean_roblox_display_name, roblox_place_id
 from gamewiki_automation.steam import SteamClient, steam_app_id
 from gamewiki_automation.schemas import HOMEPAGE_SCHEMA, LANGUAGE_MARKET_SCHEMA, MODULES_SCHEMA, RESEARCH_SCHEMA, TEMPLATE_SITE_CONTENT_SCHEMA, TEMPLATE_SITE_IDENTITY_SCHEMA
 from gamewiki_automation.template_contract import build_site_content, export_existing_output, validate_localized_site_content, validate_template_contract
@@ -131,6 +131,37 @@ class CoreTests(unittest.TestCase):
         selected, candidates = RobloxClient(OfficialUrlHttp()).select_identity("Anime Expeditions", url)
         self.assertEqual(selected["placeId"], "84515722934860")
         self.assertEqual(candidates[0]["source"], "explicit-official-url")
+
+    def test_roblox_official_url_allows_disambiguated_search_label(self):
+        class AnomalyHttp(FakeHttp):
+            def get_json(self, url, **_kwargs):
+                if "universes/v1/places/78515283254292" in url:
+                    return {"universeId": 7613921865}
+                if "universeIds=" in url:
+                    return {"data": [{
+                        "id": 7613921865,
+                        "name": "Animal Hospital (Anomaly) 🧪",
+                        "description": "official game",
+                        "visits": 100,
+                        "creator": {"name": "Animal Anomaly"},
+                    }]}
+                raise AssertionError(url)
+
+        url = "https://www.roblox.com/games/78515283254292/Animal-Hospital"
+        selected, candidates = RobloxClient(AnomalyHttp()).select_identity(
+            "Animal Hospital Anomaly", url
+        )
+
+        self.assertEqual(selected["placeId"], "78515283254292")
+        self.assertEqual(selected["identitySelection"], "explicit-place-id")
+        self.assertLess(selected["matchScore"], 0.72)
+        self.assertEqual(len(candidates), 1)
+
+    def test_clean_roblox_name_keeps_disambiguator_but_drops_emoji(self):
+        self.assertEqual(
+            clean_roblox_display_name("Animal Hospital (Anomaly) 🧪"),
+            "Animal Hospital (Anomaly)",
+        )
 
     def test_identity_rejects_character_similar_but_different_noun(self):
         class SimilarWrongHttp(FakeHttp):
