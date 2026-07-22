@@ -20,8 +20,8 @@ TOAPIS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) get-search/1.0"
 DEFAULT_CONTEXT_MODEL = "gpt-5.3-codex-official"
 DEFAULT_CLUSTER_MODEL = "gpt-5.6-terra"
 LOW_CONFIDENCE_THRESHOLD = 0.55
-CLUSTER_POLICY_VERSION = 4
-CONTEXT_POLICY_VERSION = 3
+CLUSTER_POLICY_VERSION = 5
+CONTEXT_POLICY_VERSION = 4
 OPPORTUNITY_CONFIDENCE_THRESHOLD = 0.72
 TOAPIS_RETRY_ATTEMPTS = 3
 TOAPIS_RETRYABLE_HTTP = {408, 425, 429, 500, 502, 503, 504, 520, 522, 524}
@@ -277,7 +277,7 @@ CONTEXT_SCHEMA: dict[str, Any] = {
         },
         "page_opportunities": {
             "type": "array",
-            "maxItems": 24,
+            "maxItems": 40,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -301,7 +301,7 @@ CONTEXT_SCHEMA: dict[str, Any] = {
                     "confidence": {"type": "number", "minimum": 0, "maximum": 1},
                     "evidence_urls": {
                         "type": "array",
-                        "maxItems": 8,
+                        "maxItems": 12,
                         "items": {"type": "string"},
                     },
                     "evidence_types": {
@@ -386,12 +386,18 @@ def research_game_context(
         "You research game terminology for SEO clustering. You must use web search. "
         "Prefer official platform pages, creator-owned sources, and reliable recent community/editorial sources. "
         "Do not use competitor wikis as evidence. Never invent names, dates, mechanics, or URLs. "
-        "Separate the game's real concepts from generic video-title language. Also propose focused, "
-        "search-facing page opportunities for codes, tier lists, named updates, and named game entities. "
+        "Separate the game's real concepts from generic video-title language. The output is for a rich "
+        "game information site, so investigate page opportunities even when Google Suggest has not yet "
+        "formed an exact keyword. Propose focused pages for codes, tier lists, named updates, entities, "
+        "beginner flow, progression, currencies, upgrades, modes, maps, bosses, quests, and other systems "
+        "only when the evidence shows page-specific information. Do not collapse distinct player needs "
+        "into one umbrella guide merely because their content may overlap. "
         "For roster or collection games, inspect the supplied YouTube discovery evidence for named units, "
         "characters, bosses, modes, and items. When the same named entity is supported by at least two "
         "different videos, or by one official/creator source, propose its own entity page instead of only "
-        "an umbrella roster page. Return up to ten such named entity opportunities when genuinely supported. "
+        "an umbrella roster page. Return up to twenty such named entity opportunities and up to forty total "
+        "opportunities when genuinely supported. Prefer more useful, separately navigable coverage over a "
+        "few oversized articles, but never fill a quota. "
         "A page opportunity needs either one official/creator source or two distinct supporting URLs. "
         "Do not propose calculators, Discord/Reddit/Trello navigation pages, generic empty status pages, "
         "or a tier list unless the game has a genuinely rankable set. Use short ASCII topic_suffix values "
@@ -414,7 +420,7 @@ def research_game_context(
         model,
         instructions,
         input_text,
-        max_tokens=12000,
+        max_tokens=16000,
     )
 
 
@@ -611,7 +617,7 @@ def _cluster_candidate_batch(
         messages,
         _schema("keyword_cluster_decisions", CLUSTER_SCHEMA),
         reasoning_effort="high",
-        max_tokens=7000,
+        max_tokens=10000,
     )
 
 

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gamewiki.local/schemas/background-site-job.schema.json",
+  "title": "Game Wiki site job",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["game"],
+  "properties": {
+    "schemaVersion": { "type": "integer" },
+    "taskType": { "const": "site" },
+    "operation": { "enum": ["auto", "new", "rebuild"] },
+    "game": { "type": "string", "minLength": 1 },
+    "platform": { "enum": ["auto", "roblox", "steam"] },
+    "officialUrl": { "type": "string", "format": "uri" },
+    "siteUrl": { "type": "string", "minLength": 1 },
+    "publish": { "type": "boolean" },
+    "fullBuild": { "type": "boolean" },
+    "refresh": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "basicInfo": { "type": "boolean" },
+        "keywords": { "type": "boolean" },
+        "articles": { "type": "boolean" }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "githubOwner": { "type": "string" },
+        "githubRepo": { "type": "string" },
+        "reuseExisting": { "type": "boolean" },
+        "replaceRepositoryContents": { "type": "boolean" },
+        "vercelProject": { "type": "string" },
+        "skipVercel": { "type": "boolean" }
+      }
+    }
+  }
+}

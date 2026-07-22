@@ -110,6 +110,18 @@ class PublisherValidationTests(unittest.TestCase):
         self.assertNotIn("--token", commands[1])
         self.assertEqual(url, "https://game.vercel.app")
 
+    @patch("publisher.shutil.which", return_value="vercel")
+    @patch("publisher._run", side_effect=["", 'Production: https://game.vercel.app\nhttps://api.vercel.com/v13/deployments/dpl_123"'])
+    def test_deploy_receipt_ignores_internal_vercel_api_url(self, run, _which) -> None:
+        url = _deploy_with_vercel_cli(Path("C:/game"), "game", {})
+        self.assertEqual(url, "https://game.vercel.app")
+
+    @patch("publisher.shutil.which", return_value="vercel")
+    @patch("publisher._run", side_effect=["", "Production: https://game-abc.vercel.app\nInspect: https://vercel.com/team/game/deployment"])
+    def test_deploy_receipt_prefers_deployment_over_dashboard_url(self, run, _which) -> None:
+        url = _deploy_with_vercel_cli(Path("C:/game"), "game", {})
+        self.assertEqual(url, "https://game-abc.vercel.app")
+
 
 if __name__ == "__main__":
     unittest.main()

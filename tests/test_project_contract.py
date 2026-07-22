@@ -16,6 +16,22 @@ from project_contract import (
 
 
 class ProjectContractTests(unittest.TestCase):
+    def test_named_reward_loop_keeps_economy_inside_basic_info_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary)
+            intake = output / "template-intake"
+            intake.mkdir()
+            (intake / "site-identity.json").write_text(json.dumps({
+                "GAME_NAME": "Incremental Game",
+                "OFFICIAL_GAME_URL": "https://www.roblox.com/games/1/game",
+                "LANGUAGES": ["en", "es", "de", "fr", "ja", "ko"],
+            }), encoding="utf-8")
+            (intake / "site-content.json").write_text(json.dumps({
+                "site": {"description": "Earn Stars, buy upgrades, and climb.", "gamePlatform": ["Roblox"]},
+            }), encoding="utf-8")
+            profile = build_game_profile(output)
+        self.assertIn("economy", [item["id"] for item in profile["categoryCandidates"]])
+
     def test_steam_project_readme_preserves_deterministic_resume_command(self) -> None:
         url = "https://store.steampowered.com/app/3712080/funnel_runners/"
         readme = render_project_readme("Funnel Runners", "Steam", url)

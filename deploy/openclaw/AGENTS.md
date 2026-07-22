@@ -21,6 +21,10 @@ Rules:
 - Never bypass build/QA to publish.
 - Do not restart a full build because one stage failed. Read status and log first; retry only the existing job.
 - `needs_attention` requires a concise report: job ID, first failed stage, root cause, log path, and recommended next action.
-- Old sites use `fullBuild: true` and reuse their publication targets; replacement publication creates a backup tag.
+- Old sites use `operation: rebuild`, reuse their publication targets, and create a backup tag before replacement.
+- Normal site input is `game` plus optional `platform`, `officialUrl`, and `siteUrl`; never ask the user for repo or Vercel names unless automatic resolution reports a real ambiguity.
+- For an old site, set `operation: rebuild`; do not maintain or invoke a legacy upgrade path.
+- A batch attachment uses `taskType: siteBatch` and is submitted with `jobs submit-batch --config`. Each game becomes an independent job.
+- An Adsterra attachment uses `taskType: ads`. Preserve the raw JSON exactly, store the private file outside Git, and submit it as a normal job. Never print its `code` fields. The Worker performs strict game/domain/title/dimension matching and redeploys without rerunning content.
 - Do not delete workspaces manually; use the scheduled cleanup policy.
 - A request to make a repository Public must be refused.

@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from adsterra import normalize_adsterra_config
 from factory_cli import PermitState, _config_command, _handler
 from http.server import ThreadingHTTPServer
 from orchestrate_wiki import build_subprocess_env, read_json, slugify, write_json
@@ -116,21 +117,33 @@ def _event(db: sqlite3.Connection, job_id: str, event: str, **detail: Any) -> No
 
 
 def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
+    task_type = str(config.get("taskType") or "site").strip().casefold()
+    if task_type == "ads":
+        return normalize_adsterra_config(config)
+    if task_type != "site":
+        raise ValueError("config.taskType must be site or ads")
     allowed = {
-        "schemaVersion", "game", "platform", "officialUrl", "siteUrl", "publish",
-        "refresh", "fullBuild", "publication",
+        "schemaVersion", "taskType", "operation", "game", "platform", "officialUrl",
+        "siteUrl", "publish", "refresh", "fullBuild", "publication",
     }
     unknown = sorted(set(config) - allowed)
     if unknown:
         raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
     normalized = dict(config)
-    normalized["schemaVersion"] = 2
+    normalized["schemaVersion"] = 3
+    normalized["taskType"] = "site"
     normalized["game"] = " ".join(str(config.get("game") or "").split())
     if not normalized["game"]:
         raise ValueError("config.game must be a non-empty string")
     normalized.setdefault("platform", "auto")
     normalized.setdefault("publish", False)
-    normalized.setdefault("fullBuild", False)
+    operation = str(normalized.get("operation") or "auto").strip().casefold()
+    if operation not in {"auto", "new", "rebuild"}:
+        raise ValueError("config.operation must be auto, new, or rebuild")
+    normalized["operation"] = operation
+    normalized.setdefault("fullBuild", operation == "rebuild")
+    if operation == "rebuild":
+        normalized["fullBuild"] = True
     publication = normalized.get("publication") or {}
     if not isinstance(publication, dict):
         raise ValueError("config.publication must be an object")
@@ -141,6 +154,9 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     unknown_publication = sorted(set(publication) - publication_allowed)
     if unknown_publication:
         raise ValueError(f"unknown publication field(s): {', '.join(unknown_publication)}")
+    if normalized.get("fullBuild") and normalized.get("publish"):
+        publication.setdefault("reuseExisting", True)
+        publication.setdefault("replaceRepositoryContents", True)
     normalized["publication"] = publication
     # Validate the fields shared with the foreground CLI.
     foreground = {k: normalized[k] for k in ("schemaVersion", "game", "platform", "officialUrl", "siteUrl", "publish", "refresh") if k in normalized}
@@ -149,18 +165,58 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def submit(config_path: Path, *, max_attempts: int = 4) -> str:
-    config = normalize_config(read_json(config_path.expanduser().resolve()))
-    job_id = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{slugify(config['game'])}-{uuid.uuid4().hex[:6]}"
+def _submit_normalized(config: dict[str, Any], source: str, *, max_attempts: int = 4) -> str:
+    display_name = str(config.get("game") or config.get("domain_name") or "task")
+    slug = slugify(display_name)
+    job_id = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{slug}-{uuid.uuid4().hex[:6]}"
     now = _now()
     with connect() as db:
         db.execute(
             """INSERT INTO jobs(id,game,slug,config_json,status,max_attempts,available_at,created_at,updated_at)
                VALUES(?,?,?,?,?,?,?,?,?)""",
-            (job_id, config["game"], slugify(config["game"]), json.dumps(config, ensure_ascii=False), "queued", max_attempts, now, now, now),
+            (job_id, display_name, slug, json.dumps(config, ensure_ascii=False), "queued", max_attempts, now, now, now),
         )
-        _event(db, job_id, "job.submitted", configPath=str(config_path))
+        _event(db, job_id, "job.submitted", configPath=source)
     return job_id
+
+
+def submit(config_path: Path, *, max_attempts: int = 4) -> str:
+    resolved = config_path.expanduser().resolve()
+    config = normalize_config(read_json(resolved))
+    return _submit_normalized(config, str(resolved), max_attempts=max_attempts)
+
+
+def submit_batch(config_path: Path, *, max_attempts: int = 4) -> list[str]:
+    resolved = config_path.expanduser().resolve()
+    value = read_json(resolved)
+    if not isinstance(value, dict):
+        raise ValueError("batch config must be an object")
+    allowed = {"schemaVersion", "taskType", "batchName", "defaults", "games"}
+    unknown = sorted(set(value) - allowed)
+    if unknown:
+        raise ValueError(f"unknown batch field(s): {', '.join(unknown)}")
+    if str(value.get("taskType") or "siteBatch") != "siteBatch":
+        raise ValueError("batch taskType must be siteBatch")
+    defaults = value.get("defaults") or {}
+    games = value.get("games")
+    if not isinstance(defaults, dict) or not isinstance(games, list) or not games:
+        raise ValueError("batch defaults must be an object and games must be a non-empty array")
+    normalized: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for index, item in enumerate(games):
+        if not isinstance(item, dict):
+            raise ValueError(f"games[{index}] must be an object")
+        merged = {**defaults, **item, "taskType": "site"}
+        config = normalize_config(merged)
+        identity = slugify(config["game"])
+        if identity in seen:
+            raise ValueError(f"duplicate game in batch: {config['game']}")
+        seen.add(identity)
+        normalized.append(config)
+    return [
+        _submit_normalized(config, f"{resolved}#games[{index}]", max_attempts=max_attempts)
+        for index, config in enumerate(normalized)
+    ]
 
 
 def _requeue_stale(db: sqlite3.Connection) -> int:
@@ -204,13 +260,13 @@ def claim(worker: str, lease_seconds: int = 90) -> sqlite3.Row | None:
         db.close()
 
 
-def _heartbeat(job_id: str, slug: str, worker: str, stop: threading.Event, lease_seconds: int) -> None:
+def _heartbeat(job_id: str, slug: str, worker: str, stop: threading.Event, lease_seconds: int, task_type: str = "site") -> None:
     while not stop.wait(max(10, lease_seconds // 3)):
         expires = (datetime.now(timezone.utc) + timedelta(seconds=lease_seconds)).replace(microsecond=0).isoformat()
         projects_root = Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)).expanduser().resolve()
         manifest_path = projects_root / slug / ".gamewiki" / "manifest.json"
-        stage = None
-        if manifest_path.is_file():
+        stage = "ads" if task_type == "ads" else None
+        if task_type == "site" and manifest_path.is_file():
             try:
                 manifest = read_json(manifest_path)
                 stages = manifest.get("stages") or {}
@@ -248,11 +304,25 @@ def _execution_config(config: dict[str, Any], attempt_number: int) -> dict[str, 
     result = {k: config[k] for k in ("game", "platform", "officialUrl", "siteUrl") if k in config}
     result["schemaVersion"] = 1
     result["publish"] = False
-    if config.get("fullBuild") and attempt_number == 1:
+    if attempt_number != 1:
+        # A retry resumes the checkpoints written by the previous attempt.  It must
+        # never repeat paid refresh work merely because a later stage failed.
+        result["refresh"] = {"basicInfo": False, "keywords": False, "articles": False}
+    elif config.get("fullBuild"):
         result["refresh"] = {"basicInfo": True, "keywords": True, "articles": True}
     else:
-        result["refresh"] = {"basicInfo": False, "keywords": False, "articles": False}
+        requested = config.get("refresh") or {}
+        result["refresh"] = {
+            "basicInfo": bool(requested.get("basicInfo", False)),
+            "keywords": bool(requested.get("keywords", False)),
+            "articles": bool(requested.get("articles", False)),
+        }
     return result
+
+
+def _ad_execution_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Return the private worker input; raw code never reaches console output."""
+    return config
 
 
 def _prepare_full_build(config: dict[str, Any], slug: str, attempt_number: int) -> Path | None:
@@ -298,7 +368,7 @@ def _publish_command(config: dict[str, Any], slug: str) -> list[str]:
         command.extend(["--owner", str(publication["githubOwner"])])
     if publication.get("githubRepo"):
         command.extend(["--repo", str(publication["githubRepo"])])
-    if publication.get("replaceRepositoryContents"):
+    if publication.get("replaceRepositoryContents") or config.get("fullBuild"):
         command.append("--replace-existing")
     if publication.get("vercelProject"):
         command.extend(["--vercel-project", str(publication["vercelProject"])])
@@ -307,6 +377,28 @@ def _publish_command(config: dict[str, Any], slug: str) -> list[str]:
     if config.get("siteUrl"):
         command.extend(["--site-url", str(config["siteUrl"])])
     return command
+
+
+def _reuse_publication_from_backup(config: dict[str, Any], backup: Path | None) -> None:
+    """Recover nonstandard repo/project names before an old workspace is rebuilt."""
+    if backup is None:
+        return
+    receipt_path = backup / ".gamewiki" / "publish.json"
+    if not receipt_path.is_file():
+        return
+    receipt = read_json(receipt_path)
+    stages = receipt.get("stages") or {}
+    github = stages.get("github") or {}
+    vercel = stages.get("vercel") or {}
+    publication = config.setdefault("publication", {})
+    full_repo = str(github.get("repo") or "").strip()
+    if "/" in full_repo:
+        owner, repo = full_repo.split("/", 1)
+        publication.setdefault("githubOwner", owner)
+        publication.setdefault("githubRepo", repo)
+    project_name = str(vercel.get("projectName") or "").strip()
+    if project_name:
+        publication.setdefault("vercelProject", project_name)
 
 
 def _run_process(command: list[str], log, env: dict[str, str], job_id: str) -> int:
@@ -345,14 +437,20 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
     configs.mkdir(parents=True, exist_ok=True)
     log_path = logs / f"attempt-{attempt}.log"
     config_path = configs / f"attempt-{attempt}.json"
-    backup = _prepare_full_build(config, job["slug"], attempt)
-    write_json(config_path, _execution_config(config, attempt))
+    task_type = str(config.get("taskType") or "site")
+    backup = _prepare_full_build(config, job["slug"], attempt) if task_type == "site" else None
+    _reuse_publication_from_backup(config, backup)
+    write_json(
+        config_path,
+        _ad_execution_config(config) if task_type == "ads" else _execution_config(config, attempt),
+    )
     env = build_subprocess_env(ROOT)
     stop = threading.Event()
-    heartbeat = threading.Thread(target=_heartbeat, args=(job_id, job["slug"], worker, stop, lease_seconds), daemon=True)
+    heartbeat = threading.Thread(target=_heartbeat, args=(job_id, job["slug"], worker, stop, lease_seconds, task_type), daemon=True)
     heartbeat.start()
     with connect() as db:
-        db.execute("UPDATE jobs SET log_path=?,current_stage='pipeline',updated_at=? WHERE id=?", (str(log_path), _now(), job_id))
+        initial_stage = "ads" if task_type == "ads" else "pipeline"
+        db.execute("UPDATE jobs SET log_path=?,current_stage=?,updated_at=? WHERE id=?", (str(log_path), initial_stage, _now(), job_id))
         db.execute(
             "INSERT INTO attempts(job_id,number,worker,status,started_at,log_path) VALUES(?,?,?,?,?,?)",
             (job_id, attempt, worker, "running", _now(), str(log_path)),
@@ -364,12 +462,17 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
     try:
         with log_path.open("w", encoding="utf-8") as log:
             log.write(f"job={job_id}\nattempt={attempt}\nstarted={_now()}\n")
-            code = _run_process([sys.executable, str(ROOT / "gamewiki.py"), "--config", str(config_path)], log, env, job_id)
-            if code == 0 and config.get("publish"):
+            command = (
+                [sys.executable, str(ROOT / "gamewiki.py"), "ads", "import", "--config", str(config_path)]
+                if task_type == "ads"
+                else [sys.executable, str(ROOT / "gamewiki.py"), "--config", str(config_path)]
+            )
+            code = _run_process(command, log, env, job_id)
+            if code == 0 and task_type == "site" and config.get("publish"):
                 with connect() as db:
                     db.execute("UPDATE jobs SET current_stage='publish',updated_at=? WHERE id=?", (_now(), job_id))
                 code = _run_process(_publish_command(config, job["slug"]), log, env, job_id)
-            if code == 0:
+            if code == 0 and task_type == "site":
                 try:
                     pruned = _prune_success_build_artifacts(config, job["slug"])
                     if pruned:
@@ -485,7 +588,9 @@ def jobs_cli(argv: list[str]) -> int:
     submit_parser.add_argument("--config", type=Path, required=True)
     submit_parser.add_argument("--max-attempts", type=int, default=4)
     batch = sub.add_parser("submit-batch")
-    batch.add_argument("--config-dir", type=Path, required=True)
+    batch_source = batch.add_mutually_exclusive_group(required=True)
+    batch_source.add_argument("--config", type=Path)
+    batch_source.add_argument("--config-dir", type=Path)
     batch.add_argument("--max-attempts", type=int, default=4)
     list_parser = sub.add_parser("list")
     list_parser.add_argument("--json", action="store_true")
@@ -504,9 +609,13 @@ def jobs_cli(argv: list[str]) -> int:
         print(submit(args.config, max_attempts=args.max_attempts))
         return 0
     if args.command == "submit-batch":
-        paths = sorted(args.config_dir.expanduser().resolve().glob("*.json"))
-        for path in paths:
-            print(submit(path, max_attempts=args.max_attempts))
+        if args.config:
+            for job_id in submit_batch(args.config, max_attempts=args.max_attempts):
+                print(job_id)
+        else:
+            paths = sorted(args.config_dir.expanduser().resolve().glob("*.json"))
+            for path in paths:
+                print(submit(path, max_attempts=args.max_attempts))
         return 0
     if args.command == "cleanup":
         projects_root = Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)).expanduser().resolve()

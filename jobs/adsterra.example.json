@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "taskType": "ads",
+  "game": "GAME NAME (optional but recommended)",
+  "domain_id": "ADSTERRA DOMAIN ID",
+  "domain_name": "exact-production-domain.example",
+  "placements": [
+    {
+      "placement_id": "PLACEMENT ID",
+      "title": "Native Banner",
+      "alias": "NativeBanner_1",
+      "code": "PASTE THE UNMODIFIED ADSTERRA CODE"
+    },
+    {
+      "placement_id": "PLACEMENT ID",
+      "title": "Banner 468x60",
+      "alias": "468x60_1",
+      "code": "PASTE THE UNMODIFIED ADSTERRA CODE"
+    },
+    {
+      "placement_id": "PLACEMENT ID",
+      "title": "Banner 300x250",
+      "alias": "300x250_1",
+      "code": "PASTE THE UNMODIFIED ADSTERRA CODE"
+    },
+    {
+      "placement_id": "PLACEMENT ID",
+      "title": "Banner 160x300",
+      "alias": "160x300_1",
+      "code": "PASTE THE UNMODIFIED ADSTERRA CODE"
+    },
+    {
+      "placement_id": "PLACEMENT ID",
+      "title": "Banner 160x600",
+      "alias": "160x600_1",
+      "code": "PASTE THE UNMODIFIED ADSTERRA CODE"
+    },
+    {
+      "placement_id": "PLACEMENT ID",
+      "title": "Banner 320x50",
+      "alias": "320x50_1",
+      "code": "PASTE THE UNMODIFIED ADSTERRA CODE"
+    },
+    {
+      "placement_id": "PLACEMENT ID",
+      "title": "Banner 728x90",
+      "alias": "728x90_1",
+      "code": "PASTE THE UNMODIFIED ADSTERRA CODE"
+    }
+  ]
+}

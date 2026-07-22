@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -311,6 +312,91 @@ def write_report(
     (run_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def build_content_opportunity_report(
+    topic: str,
+    source_counts: dict[str, int],
+    discovered_candidates: list[Any],
+    expanded_candidates: list[Any],
+    selected: list[Any],
+    context: dict[str, Any],
+    opportunity_rejected: list[dict[str, Any]],
+    llm_rejected: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Explain whether a small site is evidence-limited or planner-limited."""
+    selected_names = {
+        str(item.entity_name or "").casefold().strip()
+        for item in selected
+        if getattr(item, "entity_name", None)
+    }
+    selected_keywords = "\n".join(str(item.keyword).casefold() for item in selected)
+    entity_coverage = []
+    for entity in context.get("entities") or []:
+        name = str(entity.get("name") or "").strip()
+        if not name:
+            continue
+        covered = name.casefold() in selected_names or name.casefold() in selected_keywords
+        entity_coverage.append({
+            "name": name,
+            "type": entity.get("type"),
+            "confidence": entity.get("confidence"),
+            "selectedAsStandalonePage": covered,
+            "note": (
+                "selected"
+                if covered
+                else "context mention only; no evidence-backed standalone opportunity survived"
+            ),
+        })
+    selected_by_category = Counter(str(item.category) for item in selected)
+    selected_by_page_type = Counter(str(item.page_type) for item in selected)
+    selected_by_source = Counter(
+        source
+        for item in selected
+        for source in getattr(item, "sources", set())
+    )
+    rejection_reasons = Counter(
+        str(item.get("reason") or "unknown")
+        for item in [*opportunity_rejected, *llm_rejected]
+    )
+    return {
+        "schemaVersion": 1,
+        "topic": topic,
+        "generatedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "sourceCounts": source_counts,
+        "funnel": {
+            "discoveredCandidates": len(discovered_candidates),
+            "researchedPageOpportunities": len(context.get("page_opportunities") or []),
+            "expandedCandidates": len(expanded_candidates),
+            "selectedPages": len(selected),
+            "rejectedResearchedOpportunities": len(opportunity_rejected),
+            "rejectedByEditorialGate": len(llm_rejected),
+        },
+        "selectedByCategory": dict(sorted(selected_by_category.items())),
+        "selectedByPageType": dict(sorted(selected_by_page_type.items())),
+        "selectedByDiscoverySource": dict(sorted(selected_by_source.items())),
+        "selectedPages": [
+            {
+                "keyword": item.keyword,
+                "category": item.category,
+                "pageType": item.page_type,
+                "entityName": item.entity_name,
+                "entityType": item.entity_type,
+                "intent": item.intent,
+                "confidence": item.confidence,
+                "sources": sorted(item.sources),
+                "evidenceUrls": item.evidence_urls,
+            }
+            for item in selected
+        ],
+        "contextEntityCoverage": entity_coverage,
+        "rejectionReasonCounts": dict(sorted(rejection_reasons.items())),
+        "interpretation": (
+            "A low selectedPages count with healthy source counts and many researched opportunities "
+            "usually means the evidence/editorial gates rejected or merged them; low source counts and "
+            "few researched opportunities indicate genuinely sparse public information."
+        ),
+    }
+
+
 def run_pipeline(
     root: Path,
     topic: str | None,
@@ -396,6 +482,7 @@ def run_pipeline(
     )
     manual_summary["directory"] = str(manual_input_dir.relative_to(root))
     candidates = merge_manual_candidates(topic, candidates, manual_candidates)
+    discovered_candidates = list(candidates)
     rejected.extend(manual_rejected)
     rules_selected = select_keywords(candidates, maximum=40)
     rules_keywords = build_keywords_json(topic, rules_selected)
@@ -403,6 +490,7 @@ def run_pipeline(
     opportunity_rejected: list[dict[str, Any]] = []
     llm_audit_errors: list[str] = []
     llm_manifest: dict[str, Any] = {}
+    effective_context: dict[str, Any] = {}
     if cluster_mode == "llm":
         if settings is None or not settings.toapis_api_key:
             raise ValueError(
@@ -414,7 +502,14 @@ def run_pipeline(
         video_fingerprint = hashlib.sha256(
             json.dumps(video_evidence, ensure_ascii=False, sort_keys=True).encode("utf-8")
         ).hexdigest()
-        context_checkpoint_inputs = [*candidate_keywords, f"youtube-evidence:{video_fingerprint}"]
+        trusted_fingerprint = hashlib.sha256(
+            json.dumps(trusted_context or {}, ensure_ascii=False, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        context_checkpoint_inputs = [
+            *candidate_keywords,
+            f"youtube-evidence:{video_fingerprint}",
+            f"trusted-context:{trusted_fingerprint}",
+        ]
         context_call = load_context_checkpoint(
             run_dir, topic, context_checkpoint_inputs, context_model
         )
@@ -521,6 +616,19 @@ def run_pipeline(
     )
     write_json(run_dir / "keywords-rules.json", rules_keywords)
     write_json(run_dir / "keywords.json", keywords)
+    write_json(
+        run_dir / "content-opportunity-report.json",
+        build_content_opportunity_report(
+            topic,
+            source_counts,
+            discovered_candidates,
+            candidates,
+            selected,
+            effective_context,
+            opportunity_rejected,
+            llm_rejected,
+        ),
+    )
     write_report(
         run_dir, topic, manifest, candidates, selected,
         rejected + opportunity_rejected + llm_rejected, errors

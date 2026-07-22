@@ -76,7 +76,13 @@ CATEGORY_DEFINITIONS: dict[str, dict[str, Any]] = {
     "economy": {
         "labels": {"en": "Economy", "es": "Economía", "de": "Wirtschaft", "fr": "Économie", "ja": "経済", "ko": "경제"},
         "description": "Currencies, loot, rewards, shops, and spending priorities.",
-        "terms": ["money", "currency", "coin", "cash", "loot", "reward", "shop"],
+        # This is an allowed planning boundary, not evidence for publishing an
+        # economy page.  Reward-loop verbs catch games with named currencies
+        # (for example Stars/Zenith) that never use the generic word "currency".
+        "terms": [
+            "money", "currency", "currencies", "coin", "coins", "cash", "loot",
+            "reward", "rewards", "shop", "shops", "earn", "spend", "buy", "purchase",
+        ],
     },
     "bosses": {
         "labels": {"en": "Bosses", "es": "Jefes", "de": "Bosse", "fr": "Boss", "ja": "ボス", "ko": "보스"},

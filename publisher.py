@@ -113,8 +113,16 @@ def _deploy_with_vercel_cli(project: Path, project_name: str, env: dict[str, str
         raise RuntimeError("Vercel CLI is required to create the production deployment")
     _run([vercel, "link", "--yes", "--project", project_name], project, env)
     output = _run([vercel, "--prod", "--yes"], project, env)
-    urls = re.findall(r"https://[^\s]+", output)
-    return urls[-1].rstrip(".,") if urls else ""
+    urls = [item.rstrip(".,)") for item in re.findall(r"https://[^\s\"']+", output)]
+    public_urls = [
+        item for item in urls
+        if (urllib.parse.urlparse(item).hostname or "").casefold() != "api.vercel.com"
+    ]
+    deployment_urls = [
+        item for item in public_urls
+        if (urllib.parse.urlparse(item).hostname or "").casefold().endswith(".vercel.app")
+    ]
+    return deployment_urls[-1] if deployment_urls else ""
 
 
 def _ensure_private_github_repo(full_repo: str, project: Path, env: dict[str, str]) -> None:

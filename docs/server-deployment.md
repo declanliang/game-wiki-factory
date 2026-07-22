@@ -49,19 +49,18 @@ sudo systemctl list-timers gamewiki-cleanup.timer
 
 ```json
 {
-  "fullBuild": true,
-  "publish": true,
-  "publication": {
-    "githubOwner": "declanliang",
-    "githubRepo": "existing-private-repo",
-    "reuseExisting": true,
-    "replaceRepositoryContents": true,
-    "vercelProject": "existing-vercel-project"
-  }
+  "schemaVersion": 3,
+  "taskType": "site",
+  "operation": "rebuild",
+  "game": "Existing Game",
+  "platform": "roblox",
+  "officialUrl": "https://www.roblox.com/games/123/example",
+  "siteUrl": "https://existing-game.wiki",
+  "publish": true
 }
 ```
 
-发布器会先创建 `pre-rebuild-<UTC>` 远端备份 tag，再用已通过 build/QA 的新站替换 `main`；Vercel 项目、正式域名和已有环境变量会被复用而不是删除。
+正常情况不需要填写 repo 或 Vercel project。系统会从旧 workspace receipt 或游戏 slug 恢复目标；只有非标准历史名称且 receipt 丢失、自动解析明确报歧义时才使用高级 `publication` 覆盖项。发布器会先创建 `pre-rebuild-<UTC>` 远端备份 tag，再用已通过 build/QA 的新站替换 `main`；Vercel 项目、正式域名和已有环境变量会被复用而不是删除。
 
 ## OpenClaw 专用 Agent
 
@@ -83,14 +82,9 @@ openclaw agent --local --agent game-wiki-operator --message \
 推荐提交 Prompt：
 
 ```text
-请为“GAME NAME”提交完整后台任务。
-平台：roblox 或 steam
-官方页面：https://...
-这是：新站 / 旧站完整重建
-GitHub Private repo：owner/repo
-Vercel project：project-name
-
-提交后返回 job ID。之后只查询后台任务，不要在对话里运行完整流水线；遇到 needs_attention 时返回首个失败阶段、日志路径、原因和建议动作。
+请验证并提交我附带的 Game Wiki JSON；它包含游戏名、平台、官网、域名和新建/重建意图。
+不要向我索要 repo 或 Vercel project，除非自动解析明确报歧义。提交后返回 job ID。
+之后只查询后台任务，不要在对话里运行完整流水线；遇到 needs_attention 时返回首个失败阶段、日志路径、原因和建议动作。
 ```
 
 ## 凭据维护
@@ -120,9 +114,9 @@ sudo systemctl restart gamewiki-worker gamewiki-control
 | 游戏 | 平台 | Job ID | 内容产出 | 生产 QA | 发布结果 |
 |---|---|---|---|---|---|
 | Funnel Runners | Steam，本地 | `20260722T022228Z-funnel-runners-723a23` | 12 篇英文 + 60 篇翻译 | 120 loc / 840 hreflang 全部 200 | `succeeded`，按测试要求未发布 |
-| Zenith Inc | Roblox，服务器 | `20260722T023847Z-zenith-inc-163359` | 10 篇英文 + 50 篇翻译 | 126 loc / 882 hreflang 全部 200 | Private GitHub + Vercel READY |
+| Zenith Inc | Roblox，本地完整重建 + 内容 V5 增量 | `20260722T041610Z-zenith-inc-1d45c6` | 22 篇英文 + 110 篇翻译 | 204 loc / 1428 hreflang 全部 200 | 原 Private GitHub/Vercel 原地替换；7 个广告位验证通过 |
 | Timebomb Duels | Roblox，服务器 | `20260722T023847Z-timebomb-duels-3a4676` | 6 篇英文 + 30 篇翻译 | 90 loc / 630 hreflang 全部 200 | Private GitHub + Vercel READY |
 
-线上验收：`https://zenith-inc-roblox.wiki/`、`https://timebomb-duels.wiki/`、各自 sitemap 和 robots 均返回 200；sitemap 不含 `example.com`。OpenClaw 使用独立新 session 实时读取到了两个 `succeeded` Job ID。
+线上验收：`https://zenith-inc-roblox.wiki/`、`https://timebomb-duels.wiki/`、各自 sitemap 和 robots 均返回 200；sitemap 不含 `example.com`。Zenith 的 7 个隔离广告路由返回 200 且精确代码哈希一致。OpenClaw 使用独立新 session 实时读取到了服务器任务 Job ID。
 
 本次真实任务发现并修复了 Windows UTF-8 日志、随机验证端口、Next.js standalone 启动、默认语言根路径循环、旧 `.next/types`、Vercel token 进程参数、Git 提交作者关联、Vercel OIDC 临时文件和成功构建缓存占盘等问题。失败均停在 QA/发布边界，内容阶段通过 checkpoint 复用，没有重复调研与翻译。

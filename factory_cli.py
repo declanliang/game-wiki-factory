@@ -27,10 +27,16 @@ RUNTIME_ROOT = ROOT / ".gamewiki" / "runs"
 
 
 def _config_command(config: dict[str, object]) -> tuple[str, list[str]]:
-    allowed = {"schemaVersion", "game", "platform", "officialUrl", "siteUrl", "publish", "refresh"}
+    allowed = {"schemaVersion", "taskType", "operation", "game", "platform", "officialUrl", "siteUrl", "publish", "refresh"}
     unknown = sorted(set(config) - allowed)
     if unknown:
         raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
+    task_type = str(config.get("taskType") or "site").casefold()
+    if task_type != "site":
+        raise ValueError("foreground --config only accepts taskType=site; submit ads through jobs")
+    operation = str(config.get("operation") or "auto").casefold()
+    if operation not in {"auto", "new"}:
+        raise ValueError("operation=rebuild must use `gamewiki.py jobs submit` for safe archival and replacement")
     game_value = config.get("game")
     if not isinstance(game_value, str) or not game_value.strip():
         raise ValueError("config.game must be a non-empty string")

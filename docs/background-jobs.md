@@ -46,29 +46,34 @@ Worker 启动时会回收过期 lease。网络、429、5xx、连接重置等瞬�
 
 ## 配置契约
 
-任务配置仍兼容 `jobs/example.json`，并增加可选发布目标：
+站点任务只要求 `game`。平台、官网和域名已知时应填写；GitHub repo 与 Vercel project 由系统创建或解析，不属于日常输入：
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
+  "taskType": "site",
+  "operation": "rebuild",
   "game": "Example Game",
   "platform": "roblox",
   "officialUrl": "https://www.roblox.com/games/123/example",
   "publish": true,
-  "fullBuild": true,
-  "publication": {
-    "githubOwner": "declanliang",
-    "githubRepo": "example-game",
-    "reuseExisting": true,
-    "replaceRepositoryContents": true,
-    "vercelProject": "example-game"
-  }
+  "siteUrl": "https://example-game.wiki"
 }
 ```
 
-`fullBuild: true` 强制刷新 Basic Info、关键词聚类和文章/翻译，是旧半成品升级和要求最新质量的新生产批次使用的模式。普通失败恢复不再次刷新；Worker 重试同一个 attempt 时依赖已落盘 checkpoint。
+`operation: rebuild` 是 `fullBuild: true` 的清晰入口，强制刷新 Basic Info、关键词规划和文章/翻译。旧 workspace 会先改名备份；发布目标从旧 `.gamewiki/publish.json` 恢复，缺少 receipt 时使用游戏 slug 查找默认 repo/project。普通失败恢复不再次刷新，Worker 重试依赖已落盘 checkpoint。
 
 `replaceRepositoryContents: true` 表示旧 repo 的 tracked tree 由新站完整替换，不解决历史代码冲突。发布器先创建远端备份 tag，再以经过 QA 的新 `main` 覆盖远端；当前线上部署在新 Push 成功前不受影响。Repo 必须为 Private。
+
+一次提交 10 个游戏使用 `jobs/batch.example.json`：
+
+```powershell
+python gamewiki.py jobs submit-batch --config jobs\daily.json
+```
+
+整个 batch 先完整验证，任意一项字段错误时一个任务也不会入队；通过后每个游戏成为独立 job，互不阻塞。
+
+广告是独立的 `taskType: ads` job。它接收 Adsterra 原始 JSON，在不重跑内容的情况下完成目标身份/域名/标题/尺寸四层校验、Vercel Production 环境变量写入、重新部署和同源广告路由验收。原始代码只存在于私有任务数据库和配置快照，不进入 Git 或控制台日志。
 
 ## 常用命令
 
@@ -78,6 +83,9 @@ python gamewiki.py jobs submit --config jobs\game.json
 
 # 批量提交目录内 JSON
 python gamewiki.py jobs submit-batch --config-dir jobs\batch
+
+# 单个批量文件
+python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 # Worker（前台调试）
 python gamewiki.py worker --concurrency 2
@@ -128,3 +136,4 @@ JINA_API_KEY_2=
 4. 临时错误有界重试，永久错误进入 `needs_attention`。
 5. 新站创建 Private repo/Vercel；旧站复用目标并替换 repo 内容。
 6. 未提供广告变量时零广告渲染；已有 Vercel 环境变量不被发布器删除。
+7. 广告 JSON 的域名不属于目标 Vercel project，或标题与代码尺寸不一致时，任务必须在写入任何变量前失败。

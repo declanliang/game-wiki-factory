@@ -3,8 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from get_search.classifier import Candidate
 from get_search.llm_cluster import LLMCall
 from get_search.pipeline import (
+    build_content_opportunity_report,
     load_context_checkpoint,
     load_run_metadata,
     slugify,
@@ -76,6 +78,31 @@ class PipelineTests(unittest.TestCase):
             path = Path(temporary) / "nested" / "value.json"
             write_json(path, {"name": "测试"})
             self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["name"], "测试")
+
+    def test_content_opportunity_report_explains_selection_funnel(self):
+        discovered = [Candidate(keyword="game guide", category="guide")]
+        selected = Candidate(
+            keyword="game aizen",
+            category="characters",
+            page_type="entity",
+            entity_name="Aizen",
+            sources={"context-opportunity", "video"},
+            confidence=0.9,
+            evidence_urls=["https://example.com/a", "https://example.com/b"],
+        )
+        report = build_content_opportunity_report(
+            "Game",
+            {"youtube_videos": 12},
+            discovered,
+            [*discovered, selected],
+            [selected],
+            {"page_opportunities": [{"topic_suffix": "aizen"}], "entities": [{"name": "Aizen", "type": "unit", "confidence": 0.9}]},
+            [],
+            [{"reason": "LLM merge: duplicate intent"}],
+        )
+        self.assertEqual(report["funnel"]["selectedPages"], 1)
+        self.assertEqual(report["selectedByPageType"], {"entity": 1})
+        self.assertTrue(report["contextEntityCoverage"][0]["selectedAsStandalonePage"])
 
 
 if __name__ == "__main__":

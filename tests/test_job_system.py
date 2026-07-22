@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _execution_config, _prepare_full_build, _prune_success_build_artifacts, classify_failure, claim, connect, normalize_config, submit
+from job_system import _execution_config, _prepare_full_build, _prune_success_build_artifacts, classify_failure, claim, connect, normalize_config, submit, submit_batch
 
 
 class JobSystemTests(unittest.TestCase):
@@ -17,6 +17,45 @@ class JobSystemTests(unittest.TestCase):
         config = normalize_config({"game": "Test Game", "platform": "roblox", "fullBuild": True})
         self.assertEqual(_execution_config(config, 1)["refresh"], {"basicInfo": True, "keywords": True, "articles": True})
         self.assertEqual(_execution_config(config, 2)["refresh"], {"basicInfo": False, "keywords": False, "articles": False})
+
+    def test_incremental_refresh_is_honored_once_then_resumes(self) -> None:
+        config = normalize_config({
+            "game": "Growing Game",
+            "refresh": {"basicInfo": False, "keywords": True, "articles": False},
+        })
+        self.assertEqual(_execution_config(config, 1)["refresh"], {
+            "basicInfo": False,
+            "keywords": True,
+            "articles": False,
+        })
+        self.assertEqual(_execution_config(config, 2)["refresh"], {
+            "basicInfo": False,
+            "keywords": False,
+            "articles": False,
+        })
+
+    def test_rebuild_operation_automatically_replaces_existing_publication(self) -> None:
+        config = normalize_config({"game": "Old Site", "operation": "rebuild", "publish": True})
+        self.assertTrue(config["fullBuild"])
+        self.assertTrue(config["publication"]["reuseExisting"])
+        self.assertTrue(config["publication"]["replaceRepositoryContents"])
+
+    def test_batch_is_validated_then_submitted_as_independent_jobs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):
+            config_path = Path(temporary) / "batch.json"
+            config_path.write_text(json.dumps({
+                "taskType": "siteBatch",
+                "defaults": {"platform": "roblox", "publish": True},
+                "games": [{"game": "One"}, {"game": "Two"}],
+            }), encoding="utf-8")
+            job_ids = submit_batch(config_path)
+            self.assertEqual(len(job_ids), 2)
+            with connect() as db:
+                rows = db.execute("SELECT game,status FROM jobs ORDER BY game").fetchall()
+            self.assertEqual([dict(row) for row in rows], [
+                {"game": "One", "status": "queued"},
+                {"game": "Two", "status": "queued"},
+            ])
 
     def test_failure_classification_is_bounded(self) -> None:
         self.assertEqual(classify_failure("HTTP 503 Service Unavailable"), "retryable")

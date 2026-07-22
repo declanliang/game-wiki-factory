@@ -12,10 +12,12 @@
 - Basic Info 的 `game-profile.json` 定义分类候选边界；候选可宽于最终导航（最多 16），Guide Search 不能越界创建站点分类，site-plan 最终最多发布 8 类。
 - `site-plan.json` 是 SEO Scout、intake 和模板的唯一语言/分类声明源。
 - 只发布有证据的分类，最多 8 个；不为数量合成 fallback 主题。资料丰富的游戏应拆成多个不同意图或实体页面，不得继续用旧的 3–5 篇经验值过度合并。联网知识机会必须满足一个官方/创作者 URL 或两个不同支持 URL，并受 Basic Info profile 约束。
+- 精确 Suggest 词不是联网知识机会的前提；有证据的系统、实体和不同玩家意图可以成为独立页面。每次 Guide Search 必须输出 `content-opportunity-report.json`，让小站能区分“信息稀少”和“门控淘汰”。
 - Codes、Tier List、Updates 和实体资料页是当前支持的 MDX 形态；Calculator、Planner、Team Builder 等工具页不在本阶段范围。
 - 正常续跑先验证 checkpoint，再跳过已完成工作。只有显式 refresh/overwrite 才重复付费调用。
 - 每次外部命令都必须写独立日志，失败必须写 `manifest.json` 和 traceback。
 - 生成的 GitHub 仓库必须且只能是 Private；不得提供 Public 发布参数。
+- 旧站统一使用 `operation: rebuild` 原地重做，不维护升级分支。广告 JSON 必须先严格匹配游戏身份、Vercel 域名、七个固定标题和代码尺寸，再写入任何环境变量。
 - 未提供 `--site-url` 时，Vercel 自动化只创建/连接项目；模板使用 Vercel 自动域名，绝不让 `example.com` 上线。提供 `--site-url` 时，发布器把它写入 `NEXT_PUBLIC_SITE_URL`。
 
 ## 修改后最低验收

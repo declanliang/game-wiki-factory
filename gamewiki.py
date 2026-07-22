@@ -21,6 +21,9 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "publish":
         from publisher import publish
         raise SystemExit(publish(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "ads":
+        from adsterra import ads_cli
+        raise SystemExit(ads_cli(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] in {"run-config", "run-many", "status", "logs", "resume"}:
         from factory_cli import dispatch
         raise SystemExit(dispatch(sys.argv[1], sys.argv[2:]))

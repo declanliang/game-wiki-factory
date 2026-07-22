@@ -34,7 +34,8 @@ Games/
       平台解析器 → Roblox adapter 或 Steam adapter
       官方身份、规范事实、首页、hero/favicon、固定六语言、category candidates
   → pipeline/guide-search
-      Google Suggest 主词+a–z、DataForSEO、去重视频标题证据、联网知识/实体机会、语义聚类与淘汰审计
+      Google Suggest 主词+a–z、DataForSEO、去重视频标题证据、联网系统/实体机会、语义聚类与淘汰审计
+      → content-opportunity-report（来源量、候选漏斗、实体覆盖、拒绝原因）
   → planner / project_contract.py
       game-profile + keywords → site-plan
   → pipeline/seo-scout
@@ -86,6 +87,8 @@ Roblox 与 Steam 共用 Basic Info 之后的全部契约：`facts.json` / `evide
 2. Guide Search 把搜索关键词和联网研究发现的 `page_opportunities` 合并后审计。知识机会只有在置信度至少 0.72，且拥有一个官方/创作者 URL 或两个不同支持 URL时才能进入聚类；Discord、Reddit、Trello、游戏链接、无实体依据的 Tier List 和工具页会被拒绝。
 3. `site-plan.json` 把 Guide Search 主题限制在 profile 内，记录分类顺序、六语言标签与描述、关键词、页面类型、实体/意图元数据、交付数量及状态。`strategy/tips/tactics` 合并到 `guide` 分类但保留独立关键词；planner 不生成无证据的 fallback 主题。
 
+Guide Search 不再把“必须已经出现精确 Suggest 词”作为独立页面的前提。联网研究可以从多个同游戏来源发现有具体玩家意图的系统页和实体页；仍必须通过确定性证据门、Basic Info 语义边界和最终编辑门。这样可以把资料丰富的游戏拆为更多可导航页面，同时继续拒绝完全错误、异义和无支撑主题。
+
 SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。生成阶段按 Codes、Tier List、Update、Entity、Guide 五种页面 brief 控制结构和事实边界；所有形态仍走同一搜索、采集、QA、翻译和 MDX 路由。模板只接收 intake 中 reconcile 后的 site plan。`content/` 是投影，不是反向事实源。
 
 首页也遵循同一所有权：Basic Info 生成 `home.guideSections` 的事实与文案，site plan 决定发布分类；编排器只为已经 published 的分类补 `/<category>` 链接。模板可从 published MDX 确定性生成分类专题卡片，但文章目录不能反向创造首页事实或分类。Hero 使用已处理的真实游戏图片，专题和相关推荐只链接实际存在的页面。
@@ -94,6 +97,7 @@ SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。生成阶
 
 - Basic Info：六语言首页、hero、favicon 和验证报告完整才可复用；cache 位于 `.gamewiki/basic-info/.cache/`。
 - Guide Search：保留 raw、LLM decision、rejected、manifest 和 keywords。
+- Guide Search 的 context checkpoint 同时绑定候选词、YouTube 证据和 Basic Info trusted context 指纹；上游事实或分类边界改变时不能错误复用旧研究判断。
 - SEO Scout：搜索、收集、生成、QA、翻译按文件幂等；翻译与英文做结构完整性对照。
 - LLM 截断或退化输出不会落盘：英文生成使用独立 token 上限和紧凑降级重试；仅翻译元数据超限时本地压缩后复验正文。
 - Template：编排器先按当前 site-plan 把 SEO Scout checkpoint 投影到 intake，再从 intake 重建 content；历史文章可留在 `.gamewiki` 复用，但被淘汰的旧分类不能进入部署项目。

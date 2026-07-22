@@ -13,6 +13,15 @@ from factory_cli import PermitState, _config_command, _parse_game_spec, dispatch
 
 
 class PermitStateTests(unittest.TestCase):
+    def test_foreground_accepts_current_site_config_metadata(self) -> None:
+        game, args = _config_command({"schemaVersion": 3, "taskType": "site", "operation": "auto", "game": "Game"})
+        self.assertEqual(game, "Game")
+        self.assertIn("auto", args)
+
+    def test_rebuild_requires_background_job_safety(self) -> None:
+        with self.assertRaisesRegex(ValueError, "jobs submit"):
+            _config_command({"game": "Game", "operation": "rebuild"})
+
     def test_config_normalizes_game_whitespace_and_maps_options(self) -> None:
         game, args = _config_command({
             "game": "Build A Blue Lock Squad\n",

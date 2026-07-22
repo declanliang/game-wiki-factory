@@ -1,18 +1,12 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
+  "taskType": "site",
+  "operation": "auto",
   "game": "GAME NAME",
   "platform": "roblox",
   "officialUrl": "https://www.roblox.com/games/PLACE_ID/GAME-SLUG",
   "siteUrl": "https://game-domain.example",
   "publish": true,
-  "fullBuild": false,
-  "publication": {
-    "githubOwner": "declanliang",
-    "githubRepo": "game-slug",
-    "reuseExisting": false,
-    "replaceRepositoryContents": false,
-    "vercelProject": "game-slug"
-  },
   "refresh": {
     "basicInfo": false,
     "keywords": false,

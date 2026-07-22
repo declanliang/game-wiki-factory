@@ -53,13 +53,22 @@ python gamewiki.py jobs logs <job-id> --tail 200
 python gamewiki.py jobs retry <job-id>
 ```
 
-旧半成品也使用相同的 `fullBuild: true` 完整生产逻辑；`publication.replaceRepositoryContents: true` 会在创建远端备份 tag 后替换原 Private repo 的内容，并复用指定 Vercel project。完整状态机、服务器和 OpenClaw 说明见 [docs/background-jobs.md](docs/background-jobs.md)，实施计划见 [docs/design/background-production-v1.md](docs/design/background-production-v1.md)，换 AI 时使用 [docs/ai-takeover-background-worker.md](docs/ai-takeover-background-worker.md)。
+一次提交多个游戏：
+
+```powershell
+Copy-Item jobs\batch.example.json jobs\daily.json
+python gamewiki.py jobs submit-batch --config jobs\daily.json
+```
+
+旧站不维护升级分支。把 `operation` 设为 `rebuild` 后，Worker 会从空目录按当前完整流程重做，自动从旧 receipt 复用非标准 GitHub/Vercel 名称；没有特殊名称时按游戏 slug 复用原项目。发布前创建远端备份 tag，再用已通过 QA 的新 `main` 替换旧 Private repo。完整状态机、服务器和 OpenClaw 说明见 [docs/background-jobs.md](docs/background-jobs.md)。
 
 Roblox 配置：
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
+  "taskType": "site",
+  "operation": "auto",
   "game": "Blox Monsters",
   "platform": "roblox",
   "officialUrl": "https://www.roblox.com/games/106763540857326/Blox-Monsters",
@@ -77,7 +86,9 @@ Steam 配置：
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
+  "taskType": "site",
+  "operation": "auto",
   "game": "Funnel Runners",
   "platform": "steam",
   "officialUrl": "https://store.steampowered.com/app/3712080/Funnel_Runners/",
@@ -99,14 +110,16 @@ python gamewiki.py --config jobs\my-game.json
 
 规则：
 
-- `game`、`platform` 和 `officialUrl` 决定游戏身份。已知官方页面时必须填写，避免同名游戏误选。
+- 只有 `game` 必填；已知 `platform`、`officialUrl` 和正式域名时应同时填写，减少歧义和人工介入。
 - `platform` 只能是 `roblox`、`steam` 或 `auto`。
 - `siteUrl` 可以是裸域名或完整 HTTPS URL；已知正式域名时填写。
 - `publish: true` 会创建或更新 Private GitHub 仓库、Vercel 项目并执行 production deployment。
+- 日常配置不需要 GitHub repo 或 Vercel project。新站自动创建；旧站按本地 publish receipt 和默认 slug 复用。只有历史项目使用非标准名称且本地 receipt 已丢失时，才使用高级 `publication` 覆盖项。
+- `operation: rebuild` 用于旧半成品：完整重新采集、规划、生成和翻译，并原地替换旧 repo。
 - `refresh` 默认全部为 `false`。普通续跑不要开启，防止重复 API 成本。
 - 配置中的多余换行和连续空格会在执行前规范化，未知字段和拼写错误会直接报错。
 
-`jobs/*.json` 默认不提交 Git，只提交 `jobs/example.json`。每次执行还会把当次配置快照和完整终端输出保存到游戏的 `.gamewiki/`，这些文件同样不会提交 Git。
+`jobs/*.json` 默认不提交 Git，只提交文件名以 `.example.json` 结尾的示例。每次执行还会把当次配置快照和完整终端输出保存到游戏的 `.gamewiki/`，这些文件同样不会提交 Git。
 
 ```text
 Games/<slug>/.gamewiki/configs/<timestamp>.json
@@ -114,6 +127,8 @@ Games/<slug>/.gamewiki/logs/<timestamp>-config.log
 Games/<slug>/.gamewiki/logs/orchestrator-<timestamp>.log
 Games/<slug>/.gamewiki/manifest.json
 ```
+
+Guide Search 还会生成 `.gamewiki/planning/guide-search/content-opportunity-report.json`，记录数据源返回量、研究机会数、入选页面、实体覆盖和拒绝原因。看到文章少时，先用它判断是公开资料确实少，还是机会在证据/编辑门被合并或拒绝。
 
 ## 命令行兼容方式
 
@@ -211,9 +226,18 @@ npm run verify:deploy
 
 ## 可选 Adsterra 广告
 
-每个网站使用自己申请的 Adsterra ad units。生成站点后，可把七段带标题的广告代码保存为站点根目录 `ad.txt` 并运行 `npm run ads:import`；脚本会自动校验和编码，不需要手工 Base64。也可以把原始代码直接粘贴到 Vercel 的 server-only `AD_*` 环境变量。所有广告变量均可留空，未配置时不会展示广告或保留空白。完整变量表和位置说明见生成站点的 `README.md`。
+每个网站使用自己申请的 Adsterra ad units。把平台返回的原始 JSON 保存为私有配置即可，不改代码，也不手工 Base64：
 
-旧半成品升级时应通过后台配置设置 `fullBuild: true`，让它按当前标准重新调研、规划、生成和翻译；失败后的同一任务重试会自动改用 checkpoint，不会再次支付已经完成阶段的 API 成本。不要为旧站维护第二套升级流水线。
+```powershell
+Copy-Item jobs\adsterra.example.json jobs\my-game-ads.json
+python gamewiki.py jobs submit --config jobs\my-game-ads.json
+```
+
+系统写入 Vercel 前会严格验证：可选 `game` 与本地游戏身份一致；`domain_name` 已绑定到目标 Vercel project；七个 `title` 逐字匹配且不缺失/重复；标题尺寸、代码 width/height、脚本路径和 key 相互一致。随后自动编码到严格对应的 server-only `AD_*_B64` 变量、production deployment，并逐个验证 `/api/ads/<format>` 已加载本次代码。日志和 receipt 只保存 placement ID、目标变量和代码哈希，不打印原始代码。
+
+广告任务可以晚于网站生产单独提交，不会重跑内容。变量全部留空时，不会渲染广告 iframe、占位或空白。Adsterra 素材实际填充可能仍受平台同步延迟影响。
+
+旧半成品使用 `operation: rebuild` 按当前标准重新调研、规划、生成和翻译；失败后的同一任务重试自动复用 checkpoint，不会重复已经完成的付费阶段。
 
 ## 出错时交给 AI
 
@@ -238,6 +262,7 @@ game-wiki-factory/
 ├─ orchestrate_wiki.py     主流水线
 ├─ project_contract.py     跨阶段内容契约
 ├─ publisher.py            GitHub/Vercel 发布
+├─ adsterra.py             广告 JSON 校验、Vercel 配置与验证
 ├─ jobs/example.json       游戏配置示例
 ├─ pipeline/
 │  ├─ basic-info/

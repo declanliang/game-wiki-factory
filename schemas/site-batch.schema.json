@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://gamewiki.local/schemas/site-batch.schema.json",
+  "title": "Game Wiki site batch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["games"],
+  "properties": {
+    "schemaVersion": { "type": "integer" },
+    "taskType": { "const": "siteBatch" },
+    "batchName": { "type": "string" },
+    "defaults": {
+      "type": "object",
+      "description": "Optional site-job fields merged into every game before validation."
+    },
+    "games": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "background-site-job.schema.json" }
+    }
+  }
+}

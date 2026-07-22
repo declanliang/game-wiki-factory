@@ -93,6 +93,8 @@ npm run ads:import
 
 脚本会校验尺寸并自动写入 `.env.local`，不需要手工转换 Base64。`ad.txt` 和 `.env.local` 均不会上传 GitHub。也可以直接把原始代码粘贴到 Vercel 的 `AD_NATIVE_BANNER`、`AD_BANNER_728X90` 等 server-only 环境变量；Base64 变量只是多行代码在本地 env 中的可靠传输格式，不参与广告网络请求。
 
+通过 Game Wiki Factory 生产时，优先把 Adsterra 导出的完整原始 JSON 作为独立 `taskType: ads` 任务提交。Factory 会先做游戏/域名和 7 个标题/尺寸的全量一致性校验，再自动写入 Vercel 并验证线上路由；操作员不需要运行本目录脚本或手工编码。
+
 广告代码在同源隔离 iframe 内执行，位置包括顶部 Sticky、Hero 后 Native、首页/分类卡片流、文章正文、宽屏侧栏和全站 Footer。修改 Vercel 环境变量后必须重新部署，Adsterra 新建或刚批准的 ad unit 还可能存在平台同步延迟。
 
 ## 设计边界

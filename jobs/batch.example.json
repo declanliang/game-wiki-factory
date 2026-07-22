@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "taskType": "siteBatch",
+  "batchName": "daily-games",
+  "defaults": {
+    "operation": "auto",
+    "platform": "auto",
+    "publish": true
+  },
+  "games": [
+    {
+      "game": "GAME ONE",
+      "platform": "roblox",
+      "officialUrl": "https://www.roblox.com/games/PLACE_ID/GAME-SLUG",
+      "siteUrl": "https://game-one.example"
+    },
+    {
+      "game": "GAME TWO",
+      "platform": "steam",
+      "officialUrl": "https://store.steampowered.com/app/APP_ID/GAME_SLUG/"
+    }
+  ]
+}
