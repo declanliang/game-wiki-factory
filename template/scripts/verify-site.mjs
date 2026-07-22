@@ -14,6 +14,7 @@
 
 import { execSync, spawn } from "node:child_process";
 import fs from "node:fs";
+import net from "node:net";
 import path from "node:path";
 import { resolveSiteUrl } from "../src/config/site-url.mjs";
 
@@ -26,7 +27,30 @@ const step = (msg) => console.log(`\n\x1b[1m${msg}\x1b[0m`);
 const args = process.argv.slice(2);
 const skipBuild = args.includes("--skip-build");
 const portArgIdx = args.indexOf("--port");
-const port = portArgIdx !== -1 ? Number(args[portArgIdx + 1]) : Number(process.env.GAMEWIKI_VERIFY_PORT || 3100);
+const configuredPort = portArgIdx !== -1 ? Number(args[portArgIdx + 1]) : Number(process.env.GAMEWIKI_VERIFY_PORT || 3100);
+
+async function findAvailablePort() {
+  const probe = net.createServer();
+  probe.unref();
+  return await new Promise((resolve, reject) => {
+    probe.once("error", reject);
+    probe.listen({ host: "127.0.0.1", port: 0 }, () => {
+      const address = probe.address();
+      const availablePort = typeof address === "object" && address ? address.port : null;
+      probe.close((err) => {
+        if (err) reject(err);
+        else if (!availablePort) reject(new Error("无法分配本地验证端口"));
+        else resolve(availablePort);
+      });
+    });
+  });
+}
+
+if (!Number.isInteger(configuredPort) || configuredPort < 0 || configuredPort > 65535) {
+  throw new Error(`无效的验证端口：${configuredPort}`);
+}
+const port = configuredPort === 0 ? await findAvailablePort() : configuredPort;
+const localOrigin = `http://127.0.0.1:${port}`;
 
 function run(cmd, label) {
   try {
@@ -198,16 +222,33 @@ function waitForServer(url, timeoutMs) {
   });
 }
 
-// Spawning "npx"/"npx.cmd" needs shell:true on Windows (they're .cmd shell scripts, not
-// PE executables — Node's spawn throws EINVAL trying to exec one directly, confirmed by
-// testing, not just theoretical) and shell:true is what triggers Node's DEP0190 warning
-// (a shell re-tokenizing an args array reopens the injection/quoting risk the array form
-// exists to avoid). Sidestepping npx entirely fixes both: `next`'s actual entry point is a
-// plain Node script (has a `#!/usr/bin/env node` shebang, not a native binary), so running
-// it as `node <that file> start -p <port>` needs no shell on any OS.
 const nextBin = path.join(root, "node_modules", "next", "dist", "bin", "next");
-const server = spawn(process.execPath, [nextBin, "start", "-p", String(port)], { cwd: root, stdio: "pipe" });
+const standaloneRoot = path.join(root, ".next", "standalone");
+const standaloneServer = path.join(standaloneRoot, "server.js");
+let serverArgs = [nextBin, "start", "-p", String(port)];
+let serverCwd = root;
+let serverEnv = process.env;
+
+if (fs.existsSync(standaloneServer)) {
+  // Next's standalone trace intentionally omits public and .next/static. Production
+  // containers copy both next to server.js, so reproduce that exact runtime for QA.
+  const publicSource = path.join(root, "public");
+  if (fs.existsSync(publicSource)) {
+    fs.cpSync(publicSource, path.join(standaloneRoot, "public"), { recursive: true, force: true });
+  }
+  const staticSource = path.join(root, ".next", "static");
+  if (fs.existsSync(staticSource)) {
+    fs.cpSync(staticSource, path.join(standaloneRoot, ".next", "static"), { recursive: true, force: true });
+  }
+  serverArgs = [standaloneServer];
+  serverCwd = standaloneRoot;
+  serverEnv = { ...process.env, HOSTNAME: "127.0.0.1", PORT: String(port) };
+}
+
+const server = spawn(process.execPath, serverArgs, { cwd: serverCwd, env: serverEnv, stdio: "pipe" });
+let serverStdout = "";
 let serverStderr = "";
+server.stdout.on("data", (d) => { serverStdout += d.toString(); });
 server.stderr.on("data", (d) => { serverStderr += d.toString(); });
 
 // Next's production server doesn't stay a direct child of the spawned process either
@@ -231,9 +272,9 @@ function killServer() {
 }
 
 try {
-  await waitForServer(`http://localhost:${port}/`, 30000);
+  await waitForServer(`${localOrigin}/`, 30000);
 
-  const sitemapRes = await fetch(`http://localhost:${port}/sitemap.xml`);
+  const sitemapRes = await fetch(`${localOrigin}/sitemap.xml`);
   let sitemapXml = "";
   if (!sitemapRes.ok) {
     fail(`sitemap.xml 请求失败：HTTP ${sitemapRes.status}`);
@@ -250,7 +291,7 @@ try {
         badCount++;
         continue;
       }
-      const res = await fetch(`http://localhost:${port}${url.pathname}${url.search}`, { redirect: "manual" });
+      const res = await fetch(`${localOrigin}${url.pathname}${url.search}`, { redirect: "manual" });
       if (res.status !== 200) {
         fail(`${url.pathname} 返回 ${res.status}（期望直接 200，不允许跳转）`);
         badCount++;
@@ -267,14 +308,14 @@ try {
     if (badCount === 0) ok(`sitemap.xml 的 ${locs.length} 个 loc 和 ${hreflangTargets.length} 个 hreflang 目标均为 self-canonical 且直接返回 200`);
   }
 
-  const homeRes = await fetch(`http://localhost:${port}/`);
+  const homeRes = await fetch(`${localOrigin}/`);
   const homeHtml = await homeRes.text();
   const homeUrl = sitemapXml.match(/<loc>([^<]+)<\/loc>/)?.[1] || null;
   const metadata = inspectHtmlMetadata(homeHtml, "本地生产首页：", null, homeUrl);
   if (metadata.ogUrl) {
     const expectedOrigin = new URL(metadata.ogUrl).origin;
     if (sitemapXml) inspectOriginDocument(sitemapXml, "本地 sitemap.xml", expectedOrigin);
-    const robotsRes = await fetch(`http://localhost:${port}/robots.txt`);
+    const robotsRes = await fetch(`${localOrigin}/robots.txt`);
     if (!robotsRes.ok) fail(`robots.txt 请求失败：HTTP ${robotsRes.status}`);
     else inspectOriginDocument(await robotsRes.text(), "本地 robots.txt", expectedOrigin);
   }
@@ -286,7 +327,8 @@ try {
   if (hreflangs.length > 0) ok(`hreflang 标签：${hreflangs.join(", ")}`);
   else console.log("  （没有 hreflang 标签 —— 单语言站点是正常的，多语言站点应该有）");
 } catch (err) {
-  fail(`服务检查失败：${err.message}${serverStderr ? `\n${serverStderr}` : ""}`);
+  const diagnostics = `${serverStdout}${serverStderr}`;
+  fail(`服务检查失败：${err.message}${diagnostics ? `\n${diagnostics}` : ""}`);
 } finally {
   killServer();
 }

@@ -16,6 +16,7 @@
 6. docs/background-jobs.md
 7. docs/design/background-production-v1.md
 8. docs/design/production-automation-v2.md
+9. docs/server-deployment.md
 
 业务决策：
 - 新站和旧站只维护一条 full_build 内容流水线。
@@ -42,4 +43,3 @@
 
 最终报告必须包含：完成的 commit、测试证据、服务器服务状态、OpenClaw Agent 名称及使用 Prompt、尚未完成事项和第一阻塞点。
 ```
-

@@ -433,6 +433,14 @@ def _job_dict(row: sqlite3.Row) -> dict[str, Any]:
 
 
 def jobs_cli(argv: list[str]) -> int:
+    # Job logs intentionally preserve Unicode status markers.  Windows can
+    # otherwise inherit a legacy GBK console encoding and fail while merely
+    # displaying an otherwise healthy UTF-8 log.
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure:
+            reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(prog="gamewiki.py jobs")
     sub = parser.add_subparsers(dest="command", required=True)
     submit_parser = sub.add_parser("submit")

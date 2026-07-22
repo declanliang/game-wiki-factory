@@ -213,7 +213,7 @@ npm run verify:deploy
 
 每个网站使用自己申请的 Adsterra ad units。生成站点后，可把七段带标题的广告代码保存为站点根目录 `ad.txt` 并运行 `npm run ads:import`；脚本会自动校验和编码，不需要手工 Base64。也可以把原始代码直接粘贴到 Vercel 的 server-only `AD_*` 环境变量。所有广告变量均可留空，未配置时不会展示广告或保留空白。完整变量表和位置说明见生成站点的 `README.md`。
 
-旧站点升级到最新模板时，重新执行相同游戏配置即可复用 Basic Info、关键词、文章和翻译 checkpoint；不要添加 refresh/overwrite 参数。
+旧半成品升级时应通过后台配置设置 `fullBuild: true`，让它按当前标准重新调研、规划、生成和翻译；失败后的同一任务重试会自动改用 checkpoint，不会再次支付已经完成阶段的 API 成本。不要为旧站维护第二套升级流水线。
 
 ## 出错时交给 AI
 

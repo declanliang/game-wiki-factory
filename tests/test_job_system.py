@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -59,6 +61,28 @@ class JobSystemTests(unittest.TestCase):
             self.assertFalse(project.exists())
             self.assertTrue((backup / "old.txt").is_file())
             self.assertIsNone(_prepare_full_build({"fullBuild": True}, "old-site", 2))
+
+    def test_job_logs_are_utf8_safe_on_legacy_windows_console(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):
+            config_path = Path(temporary) / "game.json"
+            config_path.write_text(json.dumps({"game": "Unicode Game", "platform": "roblox"}), encoding="utf-8")
+            job_id = submit(config_path)
+            log_path = Path(temporary) / "unicode.log"
+            log_path.write_text("✅ translated\n", encoding="utf-8")
+            with connect() as db:
+                db.execute("UPDATE jobs SET log_path=? WHERE id=?", (str(log_path), job_id))
+            env = os.environ.copy()
+            env["GAMEWIKI_DATA_DIR"] = temporary
+            env["PYTHONIOENCODING"] = "gbk"
+            result = subprocess.run(
+                [sys.executable, "gamewiki.py", "jobs", "logs", job_id, "--tail", "5"],
+                cwd=Path(__file__).resolve().parents[1],
+                env=env,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", errors="replace"))
+            self.assertIn("✅ translated", result.stdout.decode("utf-8"))
 
 
 if __name__ == "__main__":
