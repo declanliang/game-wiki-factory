@@ -194,6 +194,27 @@ def acknowledge_notifications(notification_ids: list[int]) -> int:
         ).rowcount
 
 
+def defer_notification(notification_id: int, error: str) -> None:
+    """Keep a failed delivery pending with bounded exponential backoff."""
+    with connect() as db:
+        row = db.execute(
+            "SELECT attempts FROM notifications WHERE id=? AND status='pending'",
+            (notification_id,),
+        ).fetchone()
+        if row is None:
+            return
+        attempts = int(row["attempts"]) + 1
+        delay = min(1800, 30 * (2 ** min(attempts - 1, 6)))
+        available = (
+            datetime.now(timezone.utc) + timedelta(seconds=delay)
+        ).replace(microsecond=0).isoformat()
+        db.execute(
+            """UPDATE notifications SET attempts=?,available_at=?,last_error=?,updated_at=?
+               WHERE id=? AND status='pending'""",
+            (attempts, available, error[-500:], _now(), notification_id),
+        )
+
+
 def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     task_type = str(config.get("taskType") or "site").strip().casefold()
     if task_type == "ads":

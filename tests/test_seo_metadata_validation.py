@@ -41,6 +41,15 @@ class SeoMetadataValidationTests(unittest.TestCase):
         content, error = process_english(raw, "guide", "2026-07-19")
         self.assertIsNotNone(content, error)
 
+    def test_rejects_a_second_output_contract_embedded_in_article_body(self) -> None:
+        repeated = (
+            f"TITLE: Timebomb Duels Tips\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{BODY}"
+            f"\nTITLE: Timebomb Duels Tips\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{BODY}"
+        )
+        content, error = process_english(repeated, "guide", "2026-07-19")
+        self.assertIsNone(content)
+        self.assertIn("Duplicated TITLE/DESCRIPTION/BODY", error)
+
     def test_normalizes_basic_raw_html_blocks_before_saving_mdx(self) -> None:
         body = "<h2>Maps</h2>\n<ul><li><h3>Facility</h3>Use cover carefully.</li></ul>\n" + BODY
         raw = f"TITLE: Dino Hunters Maps\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{body}"

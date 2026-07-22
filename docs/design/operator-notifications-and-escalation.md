@@ -14,7 +14,7 @@ Status: implemented locally; production deployment waits for a maintenance windo
 Worker transaction
   -> events
   -> notifications (pending)
-  -> OpenClaw cron / future dispatcher
+  -> deterministic dispatcher (`gamewiki notifier --once`)
   -> bound chat channel
   -> jobs notifications --ack <id>
 ```
@@ -30,10 +30,11 @@ The notification payload joins only the non-secret job summary, terminal event d
 /usr/local/bin/gamewiki jobs notifications --ack 12 13
 ```
 
-- Poll every 2–5 minutes until a channel-specific dispatcher is configured.
+- Run the dispatcher every 2 minutes through OpenClaw cron or a systemd timer.
 - Send each item once per notification ID.
 - Acknowledge only after successful delivery.
 - Leave failed deliveries pending; do not acknowledge optimistically.
+- The dispatcher invokes the JSON argv in `GAMEWIKI_NOTIFICATION_COMMAND_JSON`; one argv item contains `{message}`. It does not call an LLM.
 - A daily summary is separate from per-job terminal events.
 
 ## Authority boundary

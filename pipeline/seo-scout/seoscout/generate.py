@@ -247,6 +247,10 @@ def _build_mdx(title: str, description: str, category: str, current_date: str,
 MAX_ARTICLE_CHARS = 50_000
 REPEATED_WHITESPACE_RE = re.compile(r'\s{200,}')
 STARTS_WITH_METADATA_RE = re.compile(r'\Aexport const metadata\s*=\s*\{')
+DUPLICATED_OUTPUT_CONTRACT_RE = re.compile(
+    r'^TITLE:\s*.+\nDESCRIPTION:\s*.+\n(?:(?:QUICKGUIDE|BODY):)',
+    re.MULTILINE,
+)
 
 
 def _has_repeated_chunk(content: str, min_repeats: int = 10,
@@ -317,6 +321,8 @@ def validate_markdown(content: str) -> tuple:
         return False, "Content does not start with 'export const metadata = {'"
     if '```' in content:
         return False, "Stray code-fence marker (```) found in body — article content must not contain code fences"
+    if DUPLICATED_OUTPUT_CONTRACT_RE.search(content):
+        return False, "Duplicated TITLE/DESCRIPTION/BODY output contract found inside article body"
     return True, ""
 
 
@@ -452,8 +458,19 @@ async def run_generate(
             continue
 
         if os.path.exists(output_path) and not overwrite:
-            skipped_exists += 1
-            continue
+            existing = Path(output_path).read_text(encoding='utf-8', errors='replace')
+            existing_valid, existing_error = validate_markdown(existing)
+            if existing_valid:
+                skipped_exists += 1
+                continue
+            # Never let an invalid paid-stage checkpoint flow into QA or
+            # translation. Remove only the invalid article; all collected
+            # evidence and every other valid article remain reusable.
+            Path(output_path).unlink()
+            print(
+                f"  🔄 {slug}.mdx has an invalid generation checkpoint: "
+                f"{existing_error}"
+            )
 
         # Load collected content
         merged = load_json(collected_path)

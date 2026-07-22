@@ -112,7 +112,7 @@ Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status
 /usr/local/bin/gamewiki jobs notifications --ack 12 13
 ```
 
-OpenClaw 的通知 cron 建议每 2–5 分钟运行一次。它必须先读取待通知项，将 `succeeded`、`failed`、`cancelled` 或 `needs_attention` 消息送达绑定渠道，然后只确认已经成功送达的 notification ID。对话断线、Agent 重启和重复轮询都不会丢消息；未确认消息会保留。每日汇总可以另设 cron，但不能代替终态通知。
+OpenClaw cron 建议每2分钟执行一次 `/usr/local/bin/gamewiki notifier --once`。这是确定性 dispatcher，不调用 LLM；它将 `succeeded`、`failed`、`cancelled` 或 `needs_attention` 送到配置渠道，只有发送命令成功后才确认 notification ID。对话断线、Agent 重启和重复轮询都不会丢消息；未确认消息会退避重试。每日汇总可以另设 Agent cron，但不能代替终态通知。
 
 在尚未绑定具体聊天渠道前，只部署 outbox，不得假装已经具备主动送达能力。渠道绑定完成后，应做一次“生成测试事件 → 收到消息 → acknowledge → 再次查询为空”的端到端验收。
 

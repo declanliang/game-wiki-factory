@@ -54,6 +54,14 @@ python gamewiki.py jobs notifications --ack 12 13
 
 通知 outbox 是渠道无关的基础设施。OpenClaw、微信、飞书等具体渠道通过短周期 cron 或独立 dispatcher 消费它；未配置渠道时不会发送，也不会伪造成功通知。
 
+推荐生产方式是让 cron 每 2 分钟执行一次确定性 dispatcher，而不是唤醒 LLM Agent：
+
+```bash
+/usr/local/bin/gamewiki notifier --once
+```
+
+`GAMEWIKI_NOTIFICATION_COMMAND_JSON` 是 argv JSON，其中必须有一个 `{message}` 占位符。发送命令返回0才 acknowledge；失败保留 pending 并按30秒到30分钟指数退避。具体账号和收件人只放服务器私有环境，不进入 Git。
+
 ## 配置契约
 
 站点任务只要求 `game`。平台、官网和域名已知时应填写；GitHub repo 与 Vercel project 由系统创建或解析，不属于日常输入：
