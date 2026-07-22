@@ -30,7 +30,7 @@ The notification payload joins only the non-secret job summary, terminal event d
 /usr/local/bin/gamewiki jobs notifications --ack 12 13
 ```
 
-- Run the dispatcher every 2 minutes through OpenClaw cron or a systemd timer.
+- Run the dispatcher every 2 minutes through the bundled systemd timer. This avoids depending on an Agent turn or Gateway cron scope.
 - Send each item once per notification ID.
 - Acknowledge only after successful delivery.
 - Leave failed deliveries pending; do not acknowledge optimistically.

@@ -1,0 +1,15 @@
+[Unit]
+Description=Deliver pending Game Wiki Factory notifications
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/srv/game-wiki-factory/app
+EnvironmentFile=/srv/game-wiki-factory/secrets/factory.env
+Environment=HOME=/home/ubuntu
+Environment=PATH=/srv/game-wiki-factory/venv/bin:/home/ubuntu/.local/share/pnpm:/home/ubuntu/.nvm/versions/node/v22.22.3/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/srv/game-wiki-factory/venv/bin/python gamewiki.py notifier --once
+NoNewPrivileges=true
+PrivateTmp=true

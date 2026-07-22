@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll durable Game Wiki notifications every two minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=2min
+AccuracySec=15s
+Persistent=true
+Unit=gamewiki-notifier.service
+
+[Install]
+WantedBy=timers.target
