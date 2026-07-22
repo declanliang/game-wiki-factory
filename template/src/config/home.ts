@@ -16,10 +16,12 @@ export const HOME_SECTIONS = [
   "hero",
   "ads",
   "video",
+  // Featured pages are the homepage's task router: players choose the job
+  // they need before reading the longer editorial sections below.
+  "featured",
   "about",
   "guideSections",
   "categories",
-  "featured",
   "liveTools",
   "extraSections",
   "updates",

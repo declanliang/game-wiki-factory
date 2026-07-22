@@ -3,7 +3,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, BookOpen, ChevronRight, type LucideIcon } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronRight, ExternalLink, Fingerprint, type LucideIcon } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ type Home = Omit<typeof en.home, "featured" | "liveTools" | "hero"> & {
 };
 
 type Category = { key: string; path: string; title: string; description: string; count: number };
+type IdentityFact = { label: string; value: string };
 
 const iconByKey: Record<string, LucideIcon> = Object.fromEntries(NAVIGATION_CONFIG.map((item) => [item.key, item.icon]));
 
@@ -85,16 +86,17 @@ function LightCard({ item, locale }: { item: LightItem; locale: string }) {
   );
 }
 
-function LightSectionBlock({ section, locale, insertAd = false }: { section: LightSection; locale: string; insertAd?: boolean }) {
+function LightSectionBlock({ section, locale, insertAd = false, taskRouter = false }: { section: LightSection; locale: string; insertAd?: boolean; taskRouter?: boolean }) {
   if (!section.items || section.items.length === 0) return null;
   return (
-    <section className="mx-auto max-w-5xl">
+    <section className={`mx-auto ${taskRouter ? "max-w-6xl rounded-[2rem] border border-border bg-card/40 px-5 py-8 sm:px-8 sm:py-10" : "max-w-5xl"}`}>
+      {taskRouter ? <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[hsl(var(--nav-theme)/0.12)] text-[hsl(var(--nav-theme))]"><ArrowRight className="h-5 w-5" /></div> : null}
       <h2 className="text-center text-3xl font-bold tracking-tight text-foreground sm:text-5xl">{section.title}</h2>
       {section.description && (
         <p className="mx-auto mt-4 max-w-3xl text-center text-lg text-muted-foreground">{section.description}</p>
       )}
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {section.items.map((item, index) => (
+        {(taskRouter ? section.items.slice(0, 6) : section.items).map((item, index) => (
           <Fragment key={item.href}>
             <LightCard item={item} locale={locale} />
             {insertAd && index === 2 && section.items.length > 3 ? <div className="py-4 sm:col-span-2 lg:col-span-3"><ResponsiveContentAd /></div> : null}
@@ -153,7 +155,7 @@ function GuideSectionsBlock({ sections, locale }: { sections: GuideSection[]; lo
   );
 }
 
-export default function HomePageClient({ home, quickFactsLabel, videoLabels, locale, recentArticles, categories }: { home: Home; quickFactsLabel: string; videoLabels: VideoLabels; locale: string; recentArticles: ContentItem[]; categories: Category[] }) {
+export default function HomePageClient({ home, quickFactsLabel, videoLabels, locale, recentArticles, categories, identityFacts, officialUrl }: { home: Home; quickFactsLabel: string; videoLabels: VideoLabels; locale: string; recentArticles: ContentItem[]; categories: Category[]; identityFacts: IdentityFact[]; officialUrl: string }) {
   const nativeEnabled = useAdEnabled("nativeBanner");
   const banner728Enabled = useAdEnabled("banner728x90");
   const banner300Enabled = useAdEnabled("banner300x250");
@@ -161,11 +163,12 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
     switch (section) {
       case "hero":
         return (
-          <section className="relative mx-auto min-h-[36rem] max-w-[90rem] overflow-hidden rounded-[2rem] border border-white/10 bg-card text-center shadow-2xl shadow-black/30">
+          <div>
+          <section className="relative mx-auto min-h-[32rem] max-w-[90rem] overflow-hidden rounded-[2rem] border border-white/10 bg-card text-center shadow-2xl shadow-black/30">
             <Image src="/images/hero.webp" alt="" fill priority sizes="(max-width: 1440px) 100vw, 1440px" className="object-cover" />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,6,10,.38)_0%,rgba(4,6,10,.62)_48%,rgba(4,6,10,.94)_100%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,transparent_0%,rgba(0,0,0,.2)_52%,rgba(0,0,0,.6)_100%)]" />
-            <div className="relative z-10 mx-auto flex min-h-[36rem] max-w-6xl flex-col px-5 pb-6 pt-6 sm:px-10 lg:px-14">
+            <div className="relative z-10 mx-auto flex min-h-[32rem] max-w-6xl flex-col px-5 pb-6 pt-6 sm:px-10 lg:px-14">
               <div className="flex flex-1 flex-col items-center justify-center py-4 sm:py-5">
                 <div className="mx-auto mb-4 flex justify-center">
                   <span className="inline-flex items-center rounded-full border border-white/25 bg-black/35 px-4 py-1.5 text-sm font-semibold text-white backdrop-blur-md">{home.hero.eyebrow}</span>
@@ -187,6 +190,22 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
               </div>
             </div>
           </section>
+          {identityFacts.length > 0 ? (
+            <Link href={officialUrl} className="group relative z-20 mx-auto -mt-3 flex max-w-5xl flex-wrap items-stretch justify-center overflow-hidden rounded-2xl border border-border bg-background/95 shadow-xl backdrop-blur-xl">
+              <span className="flex min-w-40 items-center gap-3 border-b border-border px-5 py-4 text-sm font-bold text-foreground sm:border-b-0 sm:border-r">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-[hsl(var(--nav-theme)/0.12)] text-[hsl(var(--nav-theme))]"><Fingerprint className="h-4 w-4" /></span>
+                {home.hero.eyebrow}
+              </span>
+              {identityFacts.map((fact) => (
+                <span key={fact.label} className="min-w-40 flex-1 border-l border-border/70 px-5 py-3.5 first:border-l-0">
+                  <span className="block text-[0.68rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">{fact.label}</span>
+                  <span className="mt-1 block truncate text-sm font-semibold text-foreground">{fact.value}</span>
+                </span>
+              ))}
+              <span className="grid w-12 place-items-center text-muted-foreground transition group-hover:text-[hsl(var(--nav-theme))]"><ExternalLink className="h-4 w-4" /></span>
+            </Link>
+          ) : null}
+          </div>
         );
 
       case "ads":
@@ -259,8 +278,9 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
         ) : null;
 
       case "featured":
-        // Lightweight editor-picked cards, pointing at specific articles (not a repeat of the category cards above)
-        return <LightSectionBlock section={home.featured} locale={locale} insertAd={banner728Enabled || banner300Enabled} />;
+        // The first content decision on the page: route players by the job they
+        // need, using real generated articles rather than synthetic tool pages.
+        return <LightSectionBlock section={home.featured} locale={locale} insertAd={banner728Enabled || banner300Enabled} taskRouter />;
 
       case "liveTools":
         // Only renders if the game actually has time-sensitive content configured

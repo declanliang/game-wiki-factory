@@ -64,6 +64,8 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 当前稳定生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。认证规则和已上线站点清单见 [docs/releases/v1_0722.md](docs/releases/v1_0722.md)。
 
+首页采用任务优先的信息架构，并支持有证据的 Codes/Update 等“当前无结果”状态页；网站本身即 Wiki，不生成 `/wiki/` 分类。设计与验收边界见 [docs/design/task-first-home-and-status-pages.md](docs/design/task-first-home-and-status-pages.md)。
+
 Roblox 配置：
 
 ```json

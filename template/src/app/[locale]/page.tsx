@@ -78,6 +78,16 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
       };
     });
 
+  const officialUrl = messages.site.playUrl;
+  const robloxPlace = officialUrl.match(/roblox\.com\/games\/(\d+)/i)?.[1];
+  const steamApp = officialUrl.match(/store\.steampowered\.com\/app\/(\d+)/i)?.[1];
+  const aboutStats = messages.home.aboutGame.stats;
+  const identityFacts = [
+    robloxPlace ? { label: "Roblox Place ID", value: robloxPlace } : steamApp ? { label: "Steam App ID", value: steamApp } : null,
+    messages.site.developer ? { label: aboutStats[0]?.label || "Developer", value: messages.site.developer } : null,
+    messages.site.gamePlatform?.[0] ? { label: aboutStats[1]?.label || "Platform", value: messages.site.gamePlatform[0] } : null,
+  ].filter((item): item is { label: string; value: string } => Boolean(item?.value));
+
   return (
     <main className="mx-auto max-w-[90rem] px-5 pb-10 pt-5 sm:px-8 sm:pt-6 lg:px-12">
       {messages.home.faq.items.length > 0 && <JsonLd data={faqPage} />}
@@ -88,6 +98,8 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
         locale={locale}
         recentArticles={recentArticles}
         categories={categories}
+        identityFacts={identityFacts}
+        officialUrl={officialUrl}
       />
     </main>
   );

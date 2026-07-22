@@ -13,10 +13,22 @@
       "githubCommit": "3b850a2410a7fac3159cba818a64f7e52234c467",
       "onlineVerifiedAt": "2026-07-22T06:12:06+00:00",
       "status": "certified"
+    },
+    {
+      "game": "Timebomb Duels",
+      "slug": "timebomb-duels",
+      "platform": "roblox",
+      "githubRepo": "declanliang/timebomb-duels",
+      "vercelProject": "timebomb-duels",
+      "productionUrl": "https://timebomb-duels.wiki",
+      "githubCommit": "48ca20f2aa86ef417215afbe79d36b733620e66a",
+      "onlineVerifiedAt": "2026-07-22T07:17:29+00:00",
+      "status": "certified",
+      "articles": {"english": 15, "allLanguages": 90},
+      "categories": ["guide", "mechanics", "floors", "items", "progression", "updates"]
     }
   ],
   "needsRebuild": [
-    {"game": "Timebomb Duels", "slug": "timebomb-duels", "githubRepo": "declanliang/timebomb-duels", "vercelProject": "timebomb-duels", "productionUrl": "https://timebomb-duels.wiki"},
     {"game": "Skibi Defense", "slug": "skibi-defense-roblox", "githubRepo": "declanliang/skibi-defense-roblox", "vercelProject": "skibi-defense-roblox", "productionUrl": "https://skibi-defense-roblox.wiki"},
     {"game": "Anime Squadron", "slug": "anime-squadron", "githubRepo": "declanliang/anime-squadron", "vercelProject": "anime-squadron", "productionUrl": "https://anime-squadron-roblox.wiki"},
     {"game": "Build A Blue Lock Squad", "slug": "build-a-blue-lock-squad", "githubRepo": "declanliang/build-a-blue-lock-squad", "vercelProject": "build-a-blue-lock-squad", "productionUrl": "https://build-a-blue-lock-squad.vercel.app"},
