@@ -207,6 +207,25 @@ def _validate_project(project: Path) -> dict:
     return manifest
 
 
+def _remove_vercel_oidc_env(project: Path) -> bool:
+    """Remove only the one-key temporary file created by recent Vercel CLI releases."""
+    path = project / ".env.local"
+    if not path.is_file():
+        return False
+    keys: set[str] = set()
+    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            return False
+        keys.add(line.split("=", 1)[0].strip())
+    if keys != {"VERCEL_OIDC_TOKEN"}:
+        return False
+    path.unlink()
+    return True
+
+
 def publish(argv: list[str]) -> int:
     runtime_env = build_subprocess_env(ROOT)
     parser = argparse.ArgumentParser(prog="gamewiki.py publish")
@@ -220,6 +239,7 @@ def publish(argv: list[str]) -> int:
     parser.add_argument("--vercel-project", help="Reuse a Vercel project name that differs from the GitHub repository name.")
     args = parser.parse_args(argv)
     project = (args.project_dir or (PROJECTS_ROOT / args.slug)).expanduser().resolve()
+    _remove_vercel_oidc_env(project)
     _validate_project(project)
     repo = args.repo or args.slug
     receipt_path = project / ".gamewiki" / "publish.json"
@@ -307,7 +327,10 @@ def publish(argv: list[str]) -> int:
                 "nextAction": "Trigger a production deployment, then run npm run verify:deploy.",
                 "updatedAt": _now(),
             })
-        deployment_url = _deploy_with_vercel_cli(project, project_name, env)
+        try:
+            deployment_url = _deploy_with_vercel_cli(project, project_name, env)
+        finally:
+            _remove_vercel_oidc_env(project)
         receipt["stages"]["vercel"].update({
             "status": "complete",
             "deploymentUrl": deployment_url,

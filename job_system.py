@@ -272,6 +272,25 @@ def _prepare_full_build(config: dict[str, Any], slug: str, attempt_number: int) 
     return backup
 
 
+def _prune_success_build_artifacts(config: dict[str, Any], slug: str) -> list[str]:
+    """Release reproducible build caches after a successful published job."""
+    enabled = os.environ.get("GAMEWIKI_PRUNE_SUCCESS_BUILD_ARTIFACTS", "1").strip().casefold()
+    if not config.get("publish") or enabled in {"0", "false", "no", "off"}:
+        return []
+    projects_root = Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)).expanduser().resolve()
+    project = (projects_root / slug).resolve()
+    if project.parent != projects_root or not project.is_dir():
+        return []
+    removed: list[str] = []
+    for name in ("node_modules", ".next"):
+        target = (project / name).resolve()
+        if target.parent != project or not target.is_dir():
+            continue
+        shutil.rmtree(target)
+        removed.append(name)
+    return removed
+
+
 def _publish_command(config: dict[str, Any], slug: str) -> list[str]:
     publication = config.get("publication") or {}
     command = [sys.executable, str(ROOT / "gamewiki.py"), "publish", slug]
@@ -350,6 +369,15 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                 with connect() as db:
                     db.execute("UPDATE jobs SET current_stage='publish',updated_at=? WHERE id=?", (_now(), job_id))
                 code = _run_process(_publish_command(config, job["slug"]), log, env, job_id)
+            if code == 0:
+                try:
+                    pruned = _prune_success_build_artifacts(config, job["slug"])
+                    if pruned:
+                        log.write(f"\nprunedBuildArtifacts={','.join(pruned)}\n")
+                except OSError as exc:
+                    # Publishing already succeeded; failure to delete a
+                    # disposable cache must not fail the completed website.
+                    log.write(f"\n[warning] could not prune build artifacts: {exc}\n")
             log.write(f"\nfinished={_now()}\nexitCode={code}\n")
     finally:
         stop.set()

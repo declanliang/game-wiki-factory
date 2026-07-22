@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _execution_config, _prepare_full_build, classify_failure, claim, connect, normalize_config, submit
+from job_system import _execution_config, _prepare_full_build, _prune_success_build_artifacts, classify_failure, claim, connect, normalize_config, submit
 
 
 class JobSystemTests(unittest.TestCase):
@@ -61,6 +61,23 @@ class JobSystemTests(unittest.TestCase):
             self.assertFalse(project.exists())
             self.assertTrue((backup / "old.txt").is_file())
             self.assertIsNone(_prepare_full_build({"fullBuild": True}, "old-site", 2))
+
+    def test_successful_published_job_prunes_only_reproducible_build_caches(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ,
+            {"GAMEWIKI_PROJECTS_ROOT": temporary, "GAMEWIKI_PRUNE_SUCCESS_BUILD_ARTIFACTS": "1"},
+        ):
+            project = Path(temporary) / "published-site"
+            (project / "node_modules").mkdir(parents=True)
+            (project / ".next").mkdir()
+            (project / "intake").mkdir()
+            marker = project / "intake" / "site-identity.json"
+            marker.write_text("{}", encoding="utf-8")
+
+            removed = _prune_success_build_artifacts({"publish": True}, "published-site")
+
+            self.assertEqual(removed, ["node_modules", ".next"])
+            self.assertTrue(marker.is_file())
 
     def test_job_logs_are_utf8_safe_on_legacy_windows_console(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):
