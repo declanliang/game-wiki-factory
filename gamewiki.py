@@ -18,6 +18,9 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "notifier":
         from job_notifier import notifier_cli
         raise SystemExit(notifier_cli(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "supervisor":
+        from job_supervisor import supervisor_cli
+        raise SystemExit(supervisor_cli(sys.argv[2:]))
     if len(sys.argv) > 2 and sys.argv[1] == "--config":
         from factory_cli import dispatch
         raise SystemExit(dispatch("run-config", sys.argv[2:]))

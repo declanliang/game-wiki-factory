@@ -27,17 +27,21 @@ sudo systemctl list-timers gamewiki-cleanup.timer
 - `gamewiki-control`：仅监听 loopback，供本机控制面使用。
 - `gamewiki-cleanup.timer`：按保留策略清理已经发布的临时工作区。
 - `gamewiki-notifier.timer`：每2分钟消费持久化通知 outbox；不调用 LLM Agent。
+- `gamewiki-supervisor.timer`：每分钟检查 checkpoint-safe 内容失败并冷却续跑；不调用 LLM Agent。
 - 服务崩溃或服务器重启后，过期 lease 会被回收；流水线从磁盘 checkpoint 继续。
 
 通知渠道配置完成后安装 timer：
 
 ```bash
 sudo cp deploy/systemd/gamewiki-notifier.service deploy/systemd/gamewiki-notifier.timer /etc/systemd/system/
+sudo cp deploy/systemd/gamewiki-supervisor.service deploy/systemd/gamewiki-supervisor.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now gamewiki-notifier.timer
+sudo systemctl enable --now gamewiki-notifier.timer gamewiki-supervisor.timer
 ```
 
 发送失败时消息保持 pending 并退避，下一次 timer 继续尝试。
+
+Supervisor 只执行 `docs/background-jobs.md` 中的确定性白名单策略。它不读取或修改密钥，不运行 Git 维护，不热改代码。自动恢复预算耗尽后，Notifier 才把异常交给用户/Codex。
 
 成功发布后会立即删除可重建的 `node_modules/` 和 `.next/`，但保留源码、intake、调研 checkpoint 和日志到成功任务保留期结束。可用 `GAMEWIKI_PRUNE_SUCCESS_BUILD_ARTIFACTS=0` 临时关闭这一行为。
 

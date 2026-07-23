@@ -50,6 +50,7 @@ python gamewiki.py worker --concurrency 2
 python gamewiki.py jobs list
 python gamewiki.py jobs notifications --json
 python gamewiki.py notifier --once
+python gamewiki.py supervisor --once
 python gamewiki.py jobs status <job-id>
 python gamewiki.py jobs logs <job-id> --tail 200
 python gamewiki.py jobs retry <job-id>
@@ -67,6 +68,8 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 成功、最终失败、取消和 `needs_attention` 会进入持久化通知 outbox；渠道成功送达后再用 `jobs notifications --ack ...` 确认。Agent 只负责队列控制和 runbook 内的常规恢复，任何核心代码或生产逻辑问题必须升级给 Codex/基础设施维护者，禁止直接热修服务器工作树。
 
 服务器可通过 `GAMEWIKI_NOTIFICATION_COMMAND_JSON` 配置渠道发送命令，并定时执行 `gamewiki.py notifier --once`。Dispatcher 只在发送命令返回成功后确认消息；发送失败会保留并指数退避，不需要让聊天 Agent 常驻或反复消耗 LLM。
+
+服务器的 Supervisor 每分钟检查一次失败事件。只有文章生成/翻译明确保存了有效 checkpoint、且失败属于可继续的内容阶段时，才自动冷却并恢复同一个 Job；默认最多 6 轮。身份、密钥/余额、schema、代码、构建、GitHub/Vercel 安全问题不会自动处理，最终才通知用户和 Codex。这样批量任务不依赖 OpenClaw 对话持续在线。
 
 当前稳定生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。认证规则和已上线站点清单见 [docs/releases/v1_0722.md](docs/releases/v1_0722.md)。
 
@@ -204,7 +207,7 @@ Games/<game-slug>/
 └─ .gamewiki/              本地调研、缓存、配置快照、日志和 manifest
 ```
 
-GitHub 仅提交网站运行所需文件；`.gamewiki/`、`.env`、构建缓存和日志不会上传。游戏仓库只能创建为 Private。
+GitHub 提交网站运行所需文件以及成本最高的最终产物 `intake/`、六语言 `content/`；`.gamewiki/`、`.env`、原始搜索/LLM 调试缓存、构建缓存和日志不会上传。完整 `.gamewiki/` 不适合 Git 历史；未来若需要跨服务器保存原始调研 checkpoint，应使用带生命周期的私有对象存储。游戏仓库只能创建为 Private。
 
 ## 本地预览与上线检查
 

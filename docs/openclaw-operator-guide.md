@@ -114,6 +114,40 @@ Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status
 
 OpenClaw cron 建议每2分钟执行一次 `/usr/local/bin/gamewiki notifier --once`。这是确定性 dispatcher，不调用 LLM；它将 `succeeded`、`failed`、`cancelled` 或 `needs_attention` 送到配置渠道，只有发送命令成功后才确认 notification ID。对话断线、Agent 重启和重复轮询都不会丢消息；未确认消息会退避重试。每日汇总可以另设 Agent cron，但不能代替终态通知。
 
+服务器还运行每分钟一次的确定性 Supervisor。文章生成或翻译已保存部分 checkpoint、但 ToAPIs/网络在有界 Worker 重试后仍失败时，Supervisor 会自动恢复同一 Job；OpenClaw 不需要询问用户，也不得创建替代 Job。身份、凭据、余额、schema、代码、构建和发布安全问题不会被 Supervisor 接管，仍按 `needs_attention` 汇报。
+
+批量生产时，用户只需发送一个 `siteBatch` JSON 并要求提交后台队列：
+
+```json
+{
+  "schemaVersion": 3,
+  "taskType": "siteBatch",
+  "batchName": "daily-roblox",
+  "defaults": {
+    "operation": "new",
+    "platform": "roblox",
+    "publish": true
+  },
+  "games": [
+    {
+      "game": "Game One",
+      "officialUrl": "https://www.roblox.com/games/123/Game-One",
+      "siteUrl": "https://game-one.wiki"
+    },
+    {
+      "game": "Game Two",
+      "officialUrl": "https://www.roblox.com/games/456/Game-Two"
+    }
+  ]
+}
+```
+
+标准 Prompt：
+
+```text
+请验证并使用 jobs submit-batch 提交附件中的 Game Wiki 批量 JSON。返回每个 Job ID 后结束本轮，不要在对话进程运行流水线。后台 Worker、Supervisor 和 Notifier 会负责执行、checkpoint-safe 恢复和终态通知。只有收到最终 needs_attention 时才汇报根因并升级，不要创建重复 Job。
+```
+
 在尚未绑定具体聊天渠道前，只部署 outbox，不得假装已经具备主动送达能力。渠道绑定完成后，应做一次“生成测试事件 → 收到消息 → acknowledge → 再次查询为空”的端到端验收。
 
 ## 故障处理权限

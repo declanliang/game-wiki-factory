@@ -39,6 +39,36 @@ gamewiki.py jobs submit/status/logs/retry/cancel
 - `running`：已获得 lease，后台进程运行中。
 - `retry_wait`：可重试错误，等待 `available_at`。
 - `needs_attention`：身份歧义、配置、余额、权限、schema/代码等不能安全自动处理的问题。
+
+## 事件驱动自动恢复
+
+`gamewiki-supervisor.timer` 每分钟运行一次确定性策略，不调用 LLM。它只恢复异常文本明确承诺“已保存有效 checkpoint”的内容阶段失败：
+
+- 英文文章部分生成成功，剩余文章因上游 API 暂时失败；
+- 多语言翻译部分成功，剩余翻译因上游 API 暂时失败。
+
+同一个 Job 冷却后进入 `retry_wait`，下一次继续跳过已有文章、QA verdict 和翻译文件。默认最多自动恢复 6 次。自动恢复发生后，对应的临时终态通知会被抑制；最终成功正常通知，超过恢复预算仍失败才发送 `needs_attention/failed`。
+
+以下问题永不自动恢复：身份或官网歧义、API Key/余额/权限、schema、代码和构建错误、GitHub/Vercel 安全问题、Secret 扫描失败。它们必须保持终态并升级给基础设施维护者。
+
+```bash
+/usr/local/bin/gamewiki supervisor --once
+/srv/game-wiki-factory/venv/bin/python gamewiki.py supervisor --dry-run
+```
+
+相关环境变量：
+
+- `GAMEWIKI_SUPERVISOR_MAX_RECOVERIES=6`
+- `GAMEWIKI_SUPERVISOR_COOLDOWN_SECONDS=300`
+- `GAMEWIKI_DISK_PAUSE_PERCENT=90`
+
+Supervisor 在磁盘达到暂停阈值时不会恢复任务。
+
+## Checkpoint 保留边界
+
+每个 Private 网站仓库已跟踪最终、可部署且成本最高的产物：`intake/` 与六语言 `content/`。不要把整个 `.gamewiki/` 提交到 Git：原始搜索页、视频转录、LLM 调试响应和二进制归档会快速膨胀 Git 历史，也可能包含不适合长期复制的第三方上下文。
+
+运行中的断点续跑依赖服务器 workspace；发布成功后 GitHub 是网站源码的长期存档。若未来确实需要跨服务器恢复原始调研 checkpoint，应使用带生命周期和访问控制的对象存储，并在 Factory 中记录对象哈希；不要使用 Git/LFS 充当任务缓存。
 - `succeeded`：完整流程和要求的发布完成。
 - `failed`：已超过自动重试上限。
 - `cancelled`：操作员取消；Worker 在安全边界终止。
