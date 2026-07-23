@@ -39,7 +39,12 @@ def notification_message(item: dict[str, Any]) -> str:
         if origin:
             lines.append(f"线上：{origin}")
     elif status in {"needs_attention", "failed"}:
-        lines.append("处理：已停止自动推进，请把此 Job ID 交给 Codex/基础设施维护者。")
+        error_class = str((item.get("detail") or {}).get("errorClass") or "")
+        if error_class == "quota_exhausted":
+            lines.append("原因：API 额度或账户余额不足。任务已立即停止，且不会自动重试付费阶段。")
+            lines.append("处理：请立即充值或更换对应 API Key；完成后重试同一 Job ID 以复用 checkpoint。")
+        else:
+            lines.append("处理：已停止自动推进，请把此 Job ID 交给 Codex/基础设施维护者。")
         if item.get("log_path"):
             lines.append(f"日志：{item['log_path']}")
     return "\n".join(lines)
@@ -101,4 +106,3 @@ def notifier_cli(argv: list[str]) -> int:
     while True:
         dispatch_once(limit=args.limit)
         time.sleep(max(5.0, args.interval))
-

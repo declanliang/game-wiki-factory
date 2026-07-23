@@ -2,6 +2,8 @@
 
 本文记录当前单机生产环境的非敏感事实。它和 `docs/background-jobs.md` 一起使用；密钥、服务器地址、密码和 Token 不得写入本文。
 
+空白服务器安装、全损恢复、备份与回滚的完整步骤见 `docs/bootstrap-from-github.md`；本文只记录当前生产约定和日常运维。
+
 ## 当前部署
 
 - 系统：Ubuntu 24.04，systemd 托管。

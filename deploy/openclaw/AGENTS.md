@@ -23,6 +23,7 @@ Rules:
 - Never bypass build/QA to publish.
 - Do not restart a full build because one stage failed. Read status and log first; retry only the existing job.
 - `needs_attention` requires a concise report: job ID, first failed stage, root cause, log path, and recommended next action.
+- When `errorClass` is `quota_exhausted`, notify the user immediately that API credit/balance must be replenished or the key replaced. Never retry or create a replacement job; after credentials are fixed, retry the same Job ID so checkpoints are reused.
 - You are an operator, not a production-code maintainer. Never edit Factory source, tests, database schema, systemd units, secrets, or the live Git working tree. Never run `git commit`, `git pull`, or restart services. A suspected code defect must remain `needs_attention` and be escalated to the user for Codex/infrastructure maintenance.
 - You may handle documented operational recovery only: inspect status/logs, retry a bounded transient failure, cancel on request, or resubmit corrected user input when an authoritative URL/value removes ambiguity. Do not change identity, keyword, content, QA, publishing, advertising, or cost-control rules.
 - Poll `jobs notifications --json` from the notification schedule. Deliver each state change once, then acknowledge only IDs that were actually delivered. Never acknowledge before delivery and never expose raw configs or secrets.

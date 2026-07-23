@@ -13,7 +13,9 @@ from job_system import _event, connect, pending_notifications, submit
 
 
 class JobNotifierTests(unittest.TestCase):
-    def _notification(self, temporary: str, status: str = "needs_attention") -> dict:
+    def _notification(
+        self, temporary: str, status: str = "needs_attention", error_class: str | None = None
+    ) -> dict:
         config = Path(temporary) / "game.json"
         config.write_text(json.dumps({"game": "Notify Game"}), encoding="utf-8")
         job_id = submit(config)
@@ -29,7 +31,7 @@ class JobNotifierTests(unittest.TestCase):
                 notify=True,
                 attempt=2,
                 status=status,
-                errorClass=status,
+                errorClass=error_class or status,
             )
         return pending_notifications()[0]
 
@@ -40,6 +42,17 @@ class JobNotifierTests(unittest.TestCase):
             message = notification_message(self._notification(temporary))
         self.assertIn("交给 Codex", message)
         self.assertIn("Notify Game", message)
+
+    def test_quota_message_demands_immediate_operator_action(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ, {"GAMEWIKI_DATA_DIR": temporary}
+        ):
+            message = notification_message(
+                self._notification(temporary, error_class="quota_exhausted")
+            )
+        self.assertIn("API 额度或账户余额不足", message)
+        self.assertIn("不会自动重试付费阶段", message)
+        self.assertIn("重试同一 Job ID", message)
 
     def test_successful_delivery_acknowledges_outbox_row(self) -> None:
         env = {

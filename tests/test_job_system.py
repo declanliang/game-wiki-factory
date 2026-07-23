@@ -59,6 +59,8 @@ class JobSystemTests(unittest.TestCase):
 
     def test_failure_classification_is_bounded(self) -> None:
         self.assertEqual(classify_failure("HTTP 503 Service Unavailable"), "retryable")
+        self.assertEqual(classify_failure("insufficient_user_quota"), "quota_exhausted")
+        self.assertEqual(classify_failure("account balance exhausted"), "quota_exhausted")
         self.assertEqual(classify_failure("Two Roblox candidates are too close to select safely"), "needs_attention")
         self.assertEqual(classify_failure("unknown build problem"), "needs_attention")
 

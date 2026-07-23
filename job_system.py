@@ -385,13 +385,21 @@ TRANSIENT_PATTERNS = (
     "bad gateway", "service unavailable", "rate limit", "dns",
 )
 ATTENTION_PATTERNS = (
-    "too close to select safely", "api key", "unauthorized", "forbidden", "insufficient",
-    "quota", "balance", "schema", "permission", "identity", "candidate",
+    "too close to select safely", "api key", "unauthorized", "forbidden",
+    "schema", "permission", "identity", "candidate",
+)
+QUOTA_PATTERNS = (
+    "insufficient_user_quota", "insufficient quota", "quota exceeded",
+    "quota exhausted", "insufficient balance", "balance insufficient",
+    "balance exhausted", "insufficient credits", "credits exhausted",
+    "credit balance", "余额不足", "额度不足",
 )
 
 
 def classify_failure(text: str) -> str:
     lowered = text.casefold()
+    if any(pattern in lowered for pattern in QUOTA_PATTERNS):
+        return "quota_exhausted"
     if any(pattern in lowered for pattern in ATTENTION_PATTERNS):
         return "needs_attention"
     if any(pattern in lowered for pattern in TRANSIENT_PATTERNS):

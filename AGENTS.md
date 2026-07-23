@@ -1,6 +1,6 @@
 # AI / 开发者接手说明
 
-先完整阅读 `README.md`、`docs/architecture.md`、`docs/runbook.md`、`docs/ai-handoff.md`，再查看目标子模块自己的 `AGENTS.md`。
+先完整阅读 `README.md`、`docs/architecture.md`、`docs/runbook.md`、`docs/ai-handoff.md`。全新环境还必须阅读 `docs/bootstrap-from-github.md`，再查看目标子模块自己的 `AGENTS.md`。
 
 ## 不可破坏的约束
 

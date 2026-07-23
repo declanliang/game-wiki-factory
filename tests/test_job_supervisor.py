@@ -77,6 +77,25 @@ class JobSupervisorTests(unittest.TestCase):
             self.assertEqual(statuses[identity], "needs_attention")
             self.assertEqual(statuses[unknown], "needs_attention")
 
+    def test_does_not_requeue_quota_failure_even_with_checkpoint_text(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ,
+            {
+                "GAMEWIKI_DATA_DIR": temporary,
+                "GAMEWIKI_DISK_PAUSE_PERCENT": "100",
+                "GAMEWIKI_SUPERVISOR_COOLDOWN_SECONDS": "0",
+            },
+        ):
+            job_id = self._failed_job(
+                temporary,
+                "Translation failed for 7 item(s); existing valid locale checkpoints were preserved; insufficient_user_quota.",
+            )
+            self.assertEqual(recover_once(), [])
+            with connect() as db:
+                status = db.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
+            self.assertEqual(status, "needs_attention")
+            self.assertEqual(len(pending_notifications()), 1)
+
     def test_stops_after_recovery_budget(self):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
             os.environ,

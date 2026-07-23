@@ -2,6 +2,8 @@
 
 输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建、GitHub 私有仓库发布和 Vercel production deployment。
 
+全新电脑或服务器仅凭 GitHub 接手时，先读 [从零恢复手册](docs/bootstrap-from-github.md)。当前生产风险与剩余运营事项见 [生产就绪审计](docs/production-readiness-audit-2026-07-23.md)。
+
 固定语言为英语、西班牙语、德语、法语、日语和韩语。生成的网站位于 factory 同级目录，例如 `Games/hellhole/`。
 
 ## 首次安装

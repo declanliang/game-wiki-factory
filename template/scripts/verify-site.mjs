@@ -23,6 +23,16 @@ let errors = 0;
 const fail = (msg) => { console.error(`\x1b[31m✗\x1b[0m ${msg}`); errors++; };
 const ok = (msg) => console.log(`\x1b[32m✓\x1b[0m ${msg}`);
 const step = (msg) => console.log(`\n\x1b[1m${msg}\x1b[0m`);
+const REQUIRED_HREFLANGS = ["en", "es", "de", "fr", "ja", "ko", "x-default"];
+
+function verifyRequiredHreflangs(values, label) {
+  const actual = new Set(values.map((value) => value.toLowerCase()));
+  const missing = REQUIRED_HREFLANGS.filter((value) => !actual.has(value));
+  const unexpected = [...actual].filter((value) => !REQUIRED_HREFLANGS.includes(value));
+  if (missing.length) fail(`${label} 缺少固定语言 hreflang：${missing.join(", ")}`);
+  if (unexpected.length) fail(`${label} 包含契约外 hreflang：${unexpected.join(", ")}`);
+  if (!missing.length && !unexpected.length) ok(`${label} 固定六语言与 x-default 完整`);
+}
 
 const args = process.argv.slice(2);
 const skipBuild = args.includes("--skip-build");
@@ -292,6 +302,8 @@ try {
     sitemapXml = await sitemapRes.text();
     const locs = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
     const hreflangTargets = [...sitemapXml.matchAll(/<xhtml:link[^>]+href=["']([^"']+)["']/g)].map((m) => m[1]);
+    const sitemapHreflangs = [...sitemapXml.matchAll(/<xhtml:link[^>]+hreflang=["']([^"']+)["']/gi)].map((m) => m[1]);
+    verifyRequiredHreflangs(sitemapHreflangs, "本地 sitemap.xml");
     const allTargets = [...new Set([...locs, ...hreflangTargets])];
     let badCount = 0;
     for (const target of allTargets) {
@@ -334,8 +346,7 @@ try {
   // HTML output, not the lowercase `hreflang` its own name would suggest — case-insensitive
   // match so this doesn't silently under-report real, correctly-rendered tags as missing.
   const hreflangs = [...homeHtml.matchAll(/rel="alternate"\s+hreflang="([^"]+)"/gi)].map((m) => m[1]);
-  if (hreflangs.length > 0) ok(`hreflang 标签：${hreflangs.join(", ")}`);
-  else console.log("  （没有 hreflang 标签 —— 单语言站点是正常的，多语言站点应该有）");
+  verifyRequiredHreflangs(hreflangs, "本地首页");
 } catch (err) {
   const diagnostics = `${serverStdout}${serverStderr}`;
   fail(`服务检查失败：${err.message}${diagnostics ? `\n${diagnostics}` : ""}`);
@@ -393,14 +404,15 @@ if (args.includes("--deploy")) {
     if (live["/"]) {
       const metadata = inspectHtmlMetadata(live["/"], "线上首页：", siteUrl, siteUrl);
       const hreflangs = [...live["/"].matchAll(/rel="alternate"\s+hreflang="([^"]+)"/gi)].map((match) => match[1]);
-      if (hreflangs.length > 0) ok(`线上 hreflang 标签：${hreflangs.join(", ")}`);
-      else fail("线上首页没有 hreflang 标签；多语言 metadata 可能渲染失败");
+      verifyRequiredHreflangs(hreflangs, "线上首页");
       if (!metadata.title || !metadata.ogUrl) {
         fail("线上首页虽然返回 200，但 metadata 不完整；请检查 NEXT_PUBLIC_SITE_URL 和 Vercel Function 日志");
       }
     }
     if (live["/sitemap.xml"]) {
       inspectOriginDocument(live["/sitemap.xml"], "线上 sitemap.xml", siteUrl);
+      const sitemapHreflangs = [...live["/sitemap.xml"].matchAll(/<xhtml:link[^>]+hreflang=["']([^"']+)["']/gi)].map((match) => match[1]);
+      verifyRequiredHreflangs(sitemapHreflangs, "线上 sitemap.xml");
       const targets = [...new Set([
         ...[...live["/sitemap.xml"].matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]),
         ...[...live["/sitemap.xml"].matchAll(/<xhtml:link[^>]+href=["']([^"']+)["']/g)].map((match) => match[1]),

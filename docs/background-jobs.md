@@ -40,6 +40,8 @@ gamewiki.py jobs submit/status/logs/retry/cancel
 - `retry_wait`：可重试错误，等待 `available_at`。
 - `needs_attention`：身份歧义、配置、余额、权限、schema/代码等不能安全自动处理的问题。
 
+API quota/credit/balance 耗尽会记录为 `quota_exhausted` 原因并立即进入 `needs_attention`：不消费普通重试次数、不由 Supervisor 恢复，Notifier 首条消息会明确要求充值或更换 key。恢复后只重试同一 Job ID，以复用已经落盘的 checkpoint。
+
 ## 事件驱动自动恢复
 
 `gamewiki-supervisor.timer` 每分钟运行一次确定性策略，不调用 LLM。它只恢复异常文本明确承诺“已保存有效 checkpoint”的内容阶段失败：

@@ -1,5 +1,7 @@
 # 运行与故障接手手册
 
+全新机器没有现成 Factory 时，先执行 `docs/bootstrap-from-github.md`，完成测试和冒烟验收后再使用本手册。
+
 ## 正常运行
 
 ```powershell
