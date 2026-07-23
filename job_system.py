@@ -341,7 +341,11 @@ def claim(worker: str, lease_seconds: int = 90) -> sqlite3.Row | None:
         row = db.execute(
             """SELECT * FROM jobs
                WHERE status IN ('queued','retry_wait') AND available_at <= ? AND cancel_requested=0
-               ORDER BY created_at LIMIT 1""",
+               -- A previously-started job that only needs a transient retry must
+               -- not be starved by a large batch submitted in the same second.
+               ORDER BY CASE WHEN status='retry_wait' THEN 0 ELSE 1 END,
+                        available_at, created_at, id
+               LIMIT 1""",
             (_now(),),
         ).fetchone()
         if row is None:

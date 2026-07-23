@@ -50,6 +50,19 @@ def notification_message(item: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def cancelled_batch_message(items: list[dict[str, Any]]) -> str:
+    """Summarize a batch pause/cancel instead of sending one message per job."""
+    games = [str(item["game"]) for item in items]
+    shown = games[:8]
+    suffix = f"，另 {len(games) - len(shown)} 个" if len(games) > len(shown) else ""
+    return "\n".join([
+        "⛔ Game Wiki 批量任务已取消",
+        f"数量：{len(games)}",
+        f"游戏：{'、'.join(shown)}{suffix}",
+        "处理：任务 checkpoint 已保留；恢复时请重新入队，而不是重新生成。",
+    ])
+
+
 def command_from_environment(message: str) -> list[str]:
     raw = os.environ.get("GAMEWIKI_NOTIFICATION_COMMAND_JSON", "").strip()
     if not raw:
@@ -64,8 +77,16 @@ def command_from_environment(message: str) -> list[str]:
 
 def dispatch_once(*, dry_run: bool = False, limit: int = 20) -> int:
     failures = 0
-    for item in pending_notifications(limit):
-        message = notification_message(item)
+    # Fetch enough rows to collapse a whole operator-initiated cancellation
+    # batch even when it is larger than the normal per-tick notification limit.
+    items = pending_notifications(max(limit, 1000))
+    groups: list[list[dict[str, Any]]] = []
+    cancelled = [item for item in items if item["event_status"] == "cancelled"]
+    if cancelled:
+        groups.append(cancelled)
+    groups.extend([[item] for item in items if item["event_status"] != "cancelled"])
+    for group in groups:
+        message = cancelled_batch_message(group) if len(group) > 1 else notification_message(group[0])
         if dry_run:
             print(message)
             continue
@@ -83,12 +104,13 @@ def dispatch_once(*, dry_run: bool = False, limit: int = 20) -> int:
             if result.returncode != 0:
                 error = (result.stderr or result.stdout or f"exit {result.returncode}").strip()
                 raise RuntimeError(error)
-            acknowledge_notifications([int(item["notification_id"])])
+            acknowledge_notifications([int(item["notification_id"]) for item in group])
         except (OSError, ValueError, RuntimeError, subprocess.TimeoutExpired) as exc:
             failures += 1
-            defer_notification(int(item["notification_id"]), str(exc))
+            for item in group:
+                defer_notification(int(item["notification_id"]), str(exc))
             print(
-                f"notification {item['notification_id']} delivery failed: {exc}",
+                f"notification group {[item['notification_id'] for item in group]} delivery failed: {exc}",
                 file=__import__("sys").stderr,
             )
     return 1 if failures else 0

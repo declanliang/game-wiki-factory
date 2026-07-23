@@ -96,6 +96,35 @@ class JobNotifierTests(unittest.TestCase):
                 self.assertEqual(row["attempts"], 1)
                 self.assertIsNone(row["delivered_at"])
 
+    def test_cancelled_jobs_are_delivered_as_one_batch_message(self) -> None:
+        env = {
+            "GAMEWIKI_DATA_DIR": "",
+            "GAMEWIKI_NOTIFICATION_COMMAND_JSON": json.dumps(
+                ["sender", "--message", "{message}"]
+            ),
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            env["GAMEWIKI_DATA_DIR"] = temporary
+            with patch.dict(os.environ, env), patch(
+                "job_notifier.subprocess.run",
+                return_value=subprocess.CompletedProcess([], 0, "ok", ""),
+            ) as run:
+                config = Path(temporary) / "game.json"
+                config.write_text(json.dumps({"game": "First Cancelled"}), encoding="utf-8")
+                first = submit(config)
+                config.write_text(json.dumps({"game": "Second Cancelled"}), encoding="utf-8")
+                second = submit(config)
+                with connect() as db:
+                    for job_id in (first, second):
+                        db.execute("UPDATE jobs SET status='cancelled' WHERE id=?", (job_id,))
+                        _event(db, job_id, "job.cancel_requested", notify=True, status="cancelled")
+                self.assertEqual(dispatch_once(), 0)
+                self.assertEqual(run.call_count, 1)
+                message = run.call_args.args[0][-1]
+                self.assertIn("批量任务已取消", message)
+                self.assertIn("数量：2", message)
+                self.assertEqual(pending_notifications(), [])
+
 
 if __name__ == "__main__":
     unittest.main()

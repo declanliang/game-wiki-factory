@@ -78,6 +78,23 @@ class JobSystemTests(unittest.TestCase):
                 row = db.execute("SELECT status,lease_owner FROM jobs WHERE id=?", (job_id,)).fetchone()
             self.assertEqual(dict(row), {"status": "running", "lease_owner": "worker-one"})
 
+    def test_due_retry_is_claimed_before_new_queued_work(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):
+            first = Path(temporary) / "first.json"
+            second = Path(temporary) / "second.json"
+            first.write_text(json.dumps({"game": "Queued Game"}), encoding="utf-8")
+            second.write_text(json.dumps({"game": "Retry Game"}), encoding="utf-8")
+            queued_id = submit(first)
+            retry_id = submit(second)
+            with connect() as db:
+                db.execute(
+                    "UPDATE jobs SET status='retry_wait',available_at=? WHERE id=?",
+                    ("2000-01-01T00:00:00+00:00", retry_id),
+                )
+            claimed = claim("retry-priority-worker")
+            self.assertEqual(claimed["id"], retry_id)
+            self.assertNotEqual(claimed["id"], queued_id)
+
     def test_publication_contract_accepts_replace_existing(self) -> None:
         config = normalize_config({
             "game": "Old Site",
