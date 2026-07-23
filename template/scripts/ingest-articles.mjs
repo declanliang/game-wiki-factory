@@ -50,7 +50,14 @@ function escapeStrayLtInBody(source) {
   const body = source.slice(splitAt);
   let count = 0;
   let voidTagCount = 0;
-  const mdxSafeBody = body.replace(/<br\s*>/gi, () => {
+  let autoLinkCount = 0;
+  // MDX interprets CommonMark's <https://...> autolink syntax as JSX. Convert
+  // it to an explicit Markdown link before any generic angle-bracket handling.
+  const markdownLinkBody = body.replace(/<((?:https?:\/\/)[^\s>]+)>/gi, (_match, url) => {
+    autoLinkCount++;
+    return `[${url}](${url})`;
+  });
+  const mdxSafeBody = markdownLinkBody.replace(/<br\s*>/gi, () => {
     voidTagCount++;
     return "<br />";
   });
@@ -58,7 +65,7 @@ function escapeStrayLtInBody(source) {
     count++;
     return "&lt;";
   });
-  return { fixed: head + fixedBody, count, voidTagCount };
+  return { fixed: head + fixedBody, count, voidTagCount, autoLinkCount };
 }
 
 const { env } = resolveIntakeConfig(root);
@@ -108,10 +115,11 @@ for (const locale of localeDirs) {
     const slug = fileNameToSlug(path.basename(file));
     const destDir = path.join(root, "content", locale, category);
     fs.mkdirSync(destDir, { recursive: true });
-    const { fixed, count, voidTagCount } = escapeStrayLtInBody(source);
+    const { fixed, count, voidTagCount, autoLinkCount } = escapeStrayLtInBody(source);
     fs.writeFileSync(path.join(destDir, `${slug}.mdx`), fixed);
     if (count > 0) ok(`${path.relative(root, file)} — 自动转义了 ${count} 处会导致 MDX 构建失败的裸 "<"（如 "<10%"），改成 "&lt;"`);
     if (voidTagCount > 0) ok(`${path.relative(root, file)} — 自动修复了 ${voidTagCount} 个裸 <br>，改成 MDX 合法的 <br />`);
+    if (autoLinkCount > 0) ok(`${path.relative(root, file)} — 自动转换了 ${autoLinkCount} 个 <https://...> 自动链接，避免 MDX 误判为 JSX`);
     ingested++;
   }
 }
