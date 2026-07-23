@@ -26,6 +26,19 @@
       "status": "certified",
       "articles": {"english": 15, "allLanguages": 90},
       "categories": ["guide", "mechanics", "floors", "items", "progression", "updates"]
+    },
+    {
+      "game": "Animal Hospital Anomaly",
+      "slug": "animal-hospital-anomaly",
+      "platform": "roblox",
+      "githubRepo": "declanliang/animal-hospital-anomaly",
+      "vercelProject": "animal-hospital-anomaly",
+      "productionUrl": "https://animal-hospital-anomalies.wiki",
+      "githubCommit": "dfd166abc186238663e98298f793c985d4f676ac",
+      "onlineVerifiedAt": "2026-07-23T01:08:39+00:00",
+      "status": "certified",
+      "articles": {"english": 22, "allLanguages": 132},
+      "categories": ["guide", "codes", "mechanics", "progression", "modes", "quests", "characters"]
     }
   ],
   "needsRebuild": [
@@ -45,7 +58,6 @@
     {"game": "Build An ASMR Tower", "slug": "build-an-asmr-tower-roblox", "githubRepo": "declanliang/BUILD-AN-ASMR-TOWER-ROBLOX", "vercelProject": "build-an-asmr-tower-roblox", "productionUrl": "https://build-an-asmr-tower-roblox.vercel.app"},
     {"game": "Hellhole", "slug": "hell-hole-roblox", "githubRepo": "declanliang/hell-hole-roblox", "vercelProject": "hell-hole-roblox", "productionUrl": "https://hell-hole-roblox.wiki"},
     {"game": "Anime Paradox X", "slug": "anime-paradox-x", "githubRepo": "declanliang/anime-paradox-x", "vercelProject": "anime-paradox-x", "productionUrl": "https://anime-paradox-x-bay.vercel.app"},
-    {"game": "Anime Expeditions", "slug": "anime-expeditions2", "githubRepo": "declanliang/anime-expeditions2", "vercelProject": "anime-expeditions2", "productionUrl": "https://anime-expeditions-game.wiki"},
-    {"game": "Animal Hospital", "slug": "animal-hospital-roblox", "githubRepo": "declanliang/animal_hospital_roblox", "vercelProject": "animal-hospital-roblox", "productionUrl": "https://animal-hospital-anomalies.wiki", "note": "Legacy repo is public; rebuild publication must enforce private visibility."}
+    {"game": "Anime Expeditions", "slug": "anime-expeditions2", "githubRepo": "declanliang/anime-expeditions2", "vercelProject": "anime-expeditions2", "productionUrl": "https://anime-expeditions-game.wiki"}
   ]
 }
