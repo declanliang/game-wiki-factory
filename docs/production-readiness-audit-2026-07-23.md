@@ -6,7 +6,7 @@ Factory 的主要安全边界已经代码化：游戏 repo 强制 Private、密�
 
 本次高优先级修复是 API 额度耗尽：错误被独立标记为 `quota_exhausted`，立即生成明确通知，停止自动推进，并禁止 Supervisor 因已有文章/翻译 checkpoint 而误恢复。
 
-线上抽查还发现 `anime-expeditions-game.wiki` 的 HTML 与 sitemap 只有 `en/es/x-default`，缺少 `de/fr/ja/ko`。根因属于旧生成站点/发布结果，而验证器此前只验证“已有目标可访问”，没有验证固定语言集合。本次已把六语言加 `x-default` 完整性加入本地和线上硬门；该具体站点需用当前 Factory 重新物化并发布，不能把它当作已通过 v1_0722 六语言验收的样本。
+线上抽查曾发现 `anime-expeditions-game.wiki` 的 HTML 与 sitemap 只有 `en/es/x-default`，缺少 `de/fr/ja/ko`。验证器此前只验证“已有目标可访问”，没有验证固定语言集合。本次已把六语言加 `x-default` 完整性加入本地和线上硬门，并用当前 Factory 重新物化、发布和复验该站：222 个唯一 loc/hreflang 目标全部直接返回 200。该站历史 Vercel project 名为 `anime-expeditions2`，不能按 GitHub repo 名推断。
 
 ## 已检查范围
 

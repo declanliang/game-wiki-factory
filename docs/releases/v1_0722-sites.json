@@ -39,6 +39,19 @@
       "status": "certified",
       "articles": {"english": 22, "allLanguages": 132},
       "categories": ["guide", "codes", "mechanics", "progression", "modes", "quests", "characters"]
+    },
+    {
+      "game": "Anime Expeditions",
+      "slug": "anime-expeditions",
+      "platform": "roblox",
+      "githubRepo": "declanliang/anime-expeditions",
+      "vercelProject": "anime-expeditions2",
+      "productionUrl": "https://anime-expeditions-game.wiki",
+      "githubCommit": "c734b0fefdd67e25d4cf84e254488968388bbe5b",
+      "onlineVerifiedAt": "2026-07-23T12:33:00+08:00",
+      "status": "certified",
+      "articles": {"english": 24, "allLanguages": 144},
+      "categories": ["guide", "codes", "modes", "economy", "characters", "upgrades", "updates", "tier-list"]
     }
   ],
   "needsRebuild": [
@@ -57,7 +70,6 @@
     {"game": "Guess the character color", "slug": "guess-the-character-color", "githubRepo": "declanliang/guess-the-character-color", "vercelProject": "guess-the-character-color", "productionUrl": "https://guess-the-character-color.vercel.app"},
     {"game": "Build An ASMR Tower", "slug": "build-an-asmr-tower-roblox", "githubRepo": "declanliang/BUILD-AN-ASMR-TOWER-ROBLOX", "vercelProject": "build-an-asmr-tower-roblox", "productionUrl": "https://build-an-asmr-tower-roblox.vercel.app"},
     {"game": "Hellhole", "slug": "hell-hole-roblox", "githubRepo": "declanliang/hell-hole-roblox", "vercelProject": "hell-hole-roblox", "productionUrl": "https://hell-hole-roblox.wiki"},
-    {"game": "Anime Paradox X", "slug": "anime-paradox-x", "githubRepo": "declanliang/anime-paradox-x", "vercelProject": "anime-paradox-x", "productionUrl": "https://anime-paradox-x-bay.vercel.app"},
-    {"game": "Anime Expeditions", "slug": "anime-expeditions2", "githubRepo": "declanliang/anime-expeditions2", "vercelProject": "anime-expeditions2", "productionUrl": "https://anime-expeditions-game.wiki"}
+    {"game": "Anime Paradox X", "slug": "anime-paradox-x", "githubRepo": "declanliang/anime-paradox-x", "vercelProject": "anime-paradox-x", "productionUrl": "https://anime-paradox-x-bay.vercel.app"}
   ]
 }
