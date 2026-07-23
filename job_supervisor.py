@@ -19,6 +19,14 @@ SAFE_RECOVERY_PATTERNS = (
     "existing valid locale checkpoints were preserved",
     "jsondecodeerror",
     "context research returned an invalid structured response",
+    "api 500",
+    "api 502",
+    "api 503",
+    "api 504",
+    "api 520",
+    "api 522",
+    "api 524",
+    "all_channels_circuit_broken",
 )
 
 BLOCKED_RECOVERY_PATTERNS = (

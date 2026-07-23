@@ -389,6 +389,8 @@ def _heartbeat(job_id: str, slug: str, worker: str, stop: threading.Event, lease
 TRANSIENT_PATTERNS = (
     "timed out", "timeout", "connection reset", "connection aborted", "temporary failure",
     "http 429", "status 429", "http 500", "http 502", "http 503", "http 504",
+    "api 500", "api 502", "api 503", "api 504", "api 520", "api 522", "api 524",
+    "all_channels_circuit_broken",
     "bad gateway", "service unavailable", "rate limit", "dns",
 )
 ATTENTION_PATTERNS = (

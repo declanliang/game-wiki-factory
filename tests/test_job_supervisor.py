@@ -77,6 +77,21 @@ class JobSupervisorTests(unittest.TestCase):
                 status = db.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
             self.assertEqual(status, "retry_wait")
 
+    def test_requeues_checkpoint_safe_provider_524_failure(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ,
+            {
+                "GAMEWIKI_DATA_DIR": temporary,
+                "GAMEWIKI_DISK_PAUSE_PERCENT": "100",
+                "GAMEWIKI_SUPERVISOR_COOLDOWN_SECONDS": "0",
+            },
+        ):
+            job_id = self._failed_job(
+                temporary,
+                "API 524 for article generation; valid checkpoints remain on disk",
+            )
+            self.assertEqual([item["jobId"] for item in recover_once()], [job_id])
+
     def test_does_not_requeue_identity_or_unknown_failures(self):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
             os.environ,
