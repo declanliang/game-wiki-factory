@@ -188,25 +188,49 @@ def _call_toapis_web_research(
     max_tokens: int = 7000,
     timeout_seconds: int = 240,
 ) -> LLMCall:
-    raw = _request_toapis(
-        api_key,
-        TOAPIS_RESPONSES_URL,
-        {
-            "model": model,
-            "instructions": instructions,
-            "input": input_text,
-            "tools": [{"type": "web_search_preview"}],
-            "tool_choice": "required",
-            "max_output_tokens": max_tokens,
-        },
-        timeout_seconds,
-    )
-    text, annotations, output_types = _responses_text_and_annotations(raw)
-    if "web_search_call" not in output_types:
-        raise RuntimeError("ToAPIs context research completed without a web_search_call")
-    if not text:
-        raise RuntimeError("ToAPIs Responses API returned no research text")
-    data = _parse_json(text)
+    payload = {
+        "model": model,
+        "instructions": instructions,
+        "input": input_text,
+        "tools": [{"type": "web_search_preview"}],
+        "tool_choice": "required",
+        "max_output_tokens": max_tokens,
+    }
+
+    # A Responses call can succeed at the HTTP level while returning a
+    # truncated or otherwise malformed JSON answer. Treat that as a bounded
+    # transient provider failure, rather than failing the entire game job.
+    raw: dict[str, Any] | None = None
+    annotations: list[Any] = []
+    output_types: list[str] = []
+    last_error: Exception | None = None
+    for attempt in range(1, TOAPIS_RETRY_ATTEMPTS + 1):
+        raw = _request_toapis(api_key, TOAPIS_RESPONSES_URL, payload, timeout_seconds)
+        text, annotations, output_types = _responses_text_and_annotations(raw)
+        try:
+            if "web_search_call" not in output_types:
+                raise RuntimeError("ToAPIs context research completed without a web_search_call")
+            if not text:
+                raise RuntimeError("ToAPIs Responses API returned no research text")
+            data = _parse_json(text)
+            break
+        except (ValueError, json.JSONDecodeError, RuntimeError) as exc:
+            last_error = exc
+            if attempt == TOAPIS_RETRY_ATTEMPTS:
+                raise RuntimeError(
+                    "ToAPIs context research returned an invalid structured response "
+                    f"after {TOAPIS_RETRY_ATTEMPTS} attempts: {exc}"
+                ) from exc
+            delay = 2 ** (attempt - 1)
+            print(
+                f"[warning] ToAPIs context response was malformed "
+                f"({attempt}/{TOAPIS_RETRY_ATTEMPTS}): {exc}; retrying in {delay}s"
+            )
+            time.sleep(delay)
+    else:  # pragma: no cover - loop always breaks or raises
+        raise RuntimeError(f"ToAPIs context research failed: {last_error}")
+
+    assert raw is not None
     usage = raw.get("usage") or {}
     meta = {
         "id": raw.get("id"),

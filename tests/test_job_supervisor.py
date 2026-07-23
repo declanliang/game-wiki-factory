@@ -57,6 +57,26 @@ class JobSupervisorTests(unittest.TestCase):
             self.assertEqual(events, 1)
             self.assertEqual(pending_notifications(), [])
 
+    def test_requeues_malformed_context_response_before_content_generation(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ,
+            {
+                "GAMEWIKI_DATA_DIR": temporary,
+                "GAMEWIKI_DISK_PAUSE_PERCENT": "100",
+                "GAMEWIKI_SUPERVISOR_COOLDOWN_SECONDS": "0",
+            },
+        ):
+            job_id = self._failed_job(
+                temporary,
+                "json.decoder.JSONDecodeError: Expecting ',' delimiter: line 1 column 120",
+                stage="gameProfile",
+            )
+            recovered = recover_once()
+            self.assertEqual([item["jobId"] for item in recovered], [job_id])
+            with connect() as db:
+                status = db.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
+            self.assertEqual(status, "retry_wait")
+
     def test_does_not_requeue_identity_or_unknown_failures(self):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
             os.environ,

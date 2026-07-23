@@ -17,6 +17,8 @@ SAFE_RECOVERY_PATTERNS = (
     "translation failed for",
     "no incomplete response was accepted",
     "existing valid locale checkpoints were preserved",
+    "jsondecodeerror",
+    "context research returned an invalid structured response",
 )
 
 BLOCKED_RECOVERY_PATTERNS = (
@@ -53,7 +55,7 @@ def _recovery_count(db, job_id: str) -> int:
 def _is_checkpoint_safe(job: dict[str, Any]) -> bool:
     if str(job.get("task_type") or "site") != "site":
         return False
-    if str(job.get("current_stage") or "") not in {"articles", "pipeline"}:
+    if str(job.get("current_stage") or "") not in {"gameProfile", "articles", "pipeline"}:
         return False
     error = str(job.get("last_error") or "").casefold()
     if any(pattern in error for pattern in BLOCKED_RECOVERY_PATTERNS):
