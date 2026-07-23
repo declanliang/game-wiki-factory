@@ -39,7 +39,7 @@ That work remains a separate future migration and must not be mixed into the con
 - Factory source is clean and contains no real-game output.
 - Real games are siblings of the factory and never nested in it.
 - Secrets are read from process environment or ignored `.env` files; they are never copied, printed, committed, or written to publish receipts.
-- Fixed locale order is `en/es/de/fr/ja/ko`.
+- Fixed locale order is `en/es/de/fr/ja`.
 - Basic Info facts remain the only source of homepage facts.
 - `game-profile.json` remains the category boundary; `site-plan.json` remains the sole published category/language declaration.
 - SEO Scout output may provide existing article links for homepage navigation, but may not create homepage facts or categories.
@@ -121,7 +121,7 @@ Homepage acceptance:
 
 - Existing sites without `guideSections` render unchanged.
 - New evidence-rich games render at least two guide sections.
-- Intake/locales remain structurally identical across six languages.
+- Intake/locales remain structurally identical across five languages.
 - No dead category link is emitted.
 - Homepage JSON-LD, canonical, sitemap, and performance behavior remain valid.
 

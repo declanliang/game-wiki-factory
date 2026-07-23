@@ -25,7 +25,7 @@ const ok = (msg) => console.log(`\x1b[32m✓\x1b[0m ${msg}`);
 const info = (msg) => console.log(`\x1b[36mi\x1b[0m ${msg}`);
 
 const { env, identity, resolvedByConvention, videoId } = resolveIntakeConfig(root, { warn });
-const FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja", "ko"];
+const FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja"];
 const sitePlanPath = path.join(root, "intake", "site-plan.json");
 let sitePlan = null;
 if (!fs.existsSync(sitePlanPath)) {
@@ -40,10 +40,10 @@ if (!fs.existsSync(sitePlanPath)) {
     const published = (sitePlan.categories || []).filter((category) => category.status === "published");
     for (const category of published) {
       if (!category.labels || FIXED_LANGUAGES.some((locale) => !category.labels[locale])) {
-        fail(`site-plan 分类 ${category.id || "(missing id)"} 缺少六语言 labels`);
+        fail(`site-plan 分类 ${category.id || "(missing id)"} 缺少五语言 labels`);
       }
       if (!category.descriptions || FIXED_LANGUAGES.some((locale) => !category.descriptions[locale])) {
-        fail(`site-plan 分类 ${category.id || "(missing id)"} 缺少六语言 descriptions`);
+        fail(`site-plan 分类 ${category.id || "(missing id)"} 缺少五语言 descriptions`);
       }
     }
     if (published.length < Number(sitePlan.categoryPolicy?.minimum ?? 1)) {

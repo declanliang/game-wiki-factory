@@ -250,7 +250,7 @@ class OrchestratorTests(unittest.TestCase):
             intake = output / "template-intake"
             favicon = intake / "favicon"
             favicon.mkdir(parents=True)
-            languages = ["en", "es", "de", "fr", "ja", "ko"]
+            languages = ["en", "es", "de", "fr", "ja"]
             identity = {"GAME_NAME": "Test Game", "LANGUAGES": languages}
             (intake / "site-identity.json").write_text(json.dumps(identity), encoding="utf-8")
             (intake / "site-content.json").write_text("{}", encoding="utf-8")
@@ -271,7 +271,7 @@ class OrchestratorTests(unittest.TestCase):
 
         self.assertEqual(actual_intake, intake)
         self.assertEqual(actual_identity, identity)
-        self.assertEqual(languages, ["en", "es", "de", "fr", "ja", "ko"])
+        self.assertEqual(languages, ["en", "es", "de", "fr", "ja"])
 
     def test_homepage_guide_links_only_use_published_site_plan_categories(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

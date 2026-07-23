@@ -18,7 +18,6 @@ const LOCALE_LABELS: Record<Locale, string> = {
   de: "Deutsch",
   fr: "Français",
   ja: "日本語",
-  ko: "한국어",
 };
 
 /**

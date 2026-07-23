@@ -108,14 +108,14 @@ npm run launch:site
 成功必须同时满足：
 
 - intake 0 error
-- 六语言文章树一致
+- 五语言文章树一致
 - 全部 MDX 结构通过
 - TypeScript 通过
 - 配置同步通过
 - production build 通过
 - sitemap 的 loc/hreflang 目标全部直接 200（不接受 3xx）
 - OG/Twitter image 正常
-- hreflang 包含六语言和 x-default；每个 locale 页面 canonical 等于自身最终 URL
+- hreflang 包含五语言和 x-default；每个 locale 页面 canonical 等于自身最终 URL
 - 非英语分类描述、法律页和文章正文没有英语静默回退
 - 首页 Hero 使用真实游戏图；有至少两篇文章的高价值分类会生成本地化专题入口，且所有专题链接存在
 
@@ -128,6 +128,8 @@ npm run verify:deploy
 `NEXT_PUBLIC_SITE_URL` 推荐填写完整 `https://...`；裸域名会自动补 HTTPS。它是公开站点 origin，不需要 Sensitive。`verify:deploy` 会读取线上 HTML 并检查 title、canonical、`og:url`、图片绝对 URL、sitemap/robots 和全部 loc/hreflang 直接 200，避免把跳转或 metadata 崩溃的 HTTP 200 当成成功。
 
 ## 已有网站的两类操作
+
+固定语言策略减少时，先运行 `python migrate_language_policy.py <游戏项目目录>`，再同步当前模板并执行完整 build/线上验收。该命令只删除退出产品策略的 locale，不调用 API，也不修改仍受支持的文章。
 
 仅修复通用模板或编排器时，从 Factory 再次执行同一游戏名。同步模板不会覆盖游戏的 `intake/`、`content/`、`.gamewiki/`、`node_modules/` 或本地环境文件；不使用 refresh，即可复用内容 checkpoint、重新物化并验证站点。
 

@@ -23,7 +23,7 @@ ISO_639_1_CODES = [
 ]
 # Product policy, not a per-game research result.  Every generated wiki ships the
 # same six high-value locales so downstream stages can be deterministic.
-DEFAULT_LANGUAGE_CODES = ["en", "es", "de", "fr", "ja", "ko"]
+DEFAULT_LANGUAGE_CODES = ["en", "es", "de", "fr", "ja"]
 MONETIZATION_LANGUAGE_CODES = list(DEFAULT_LANGUAGE_CODES)
 
 

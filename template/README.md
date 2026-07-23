@@ -34,7 +34,6 @@ intake/
 ├─ site-content.de.json
 ├─ site-content.fr.json
 ├─ site-content.ja.json
-├─ site-content.ko.json
 ├─ site-plan.json
 ├─ hero.<ext>
 ├─ favicon/
@@ -44,10 +43,9 @@ intake/
    ├─ de/<category>/*.mdx
    ├─ fr/<category>/*.mdx
    ├─ ja/<category>/*.mdx
-   └─ ko/<category>/*.mdx
 ```
 
-`site-plan.json` 是语言、分类、顺序和发布状态的唯一事实源。模板不会从 `content/en` 反推分类，也不会用正则修改 TypeScript 配置。六语言固定为 `en/es/de/fr/ja/ko`。
+`site-plan.json` 是语言、分类、顺序和发布状态的唯一事实源。模板不会从 `content/en` 反推分类，也不会用正则修改 TypeScript 配置。五语言固定为 `en/es/de/fr/ja`。
 
 ## 生成站点
 
@@ -58,7 +56,7 @@ npm run launch:site
 
 流水线依次执行：
 
-1. 校验 intake、六语言和 published 分类。
+1. 校验 intake、五语言和 published 分类。
 2. 应用身份、首页文案和素材。
 3. 清空生成的 `content/`，从 intake 幂等导入文章。
 4. 将 intake site-plan 复制为 `src/config/site-plan.json`。
@@ -106,7 +104,7 @@ npm run ads:import
 - site-plan 至少包含 1 个有真实关键词证据、最多 8 个 published 分类；不为数量生成 fallback 分类，每种语言必须交付相同文章树。
 - `NEXT_PUBLIC_SITE_URL` 集中规范化：裸域名自动补 HTTPS，非法协议在构建前失败；`verify:deploy` 会检查线上 metadata、self-canonical 和 sitemap 直接 200，而不只检查首页 HTTP 200。
 - 首页按“媒体入口 + 信息枢纽”组织：桌面 Hero 控制在约 576px，缩短页头后的留白，核心标题位于视觉中心、紧凑数据卡固定在内容下沿，保证常见首屏能立即看到主要信息；有可信视频时在首屏后展示点击加载的 YouTube；正文、分类和更新区使用受控宽度；专题卡片按三列从左到右排列，换行后从左侧继续；深度 section 使用醒目的无分割线编号卡片。Footer 的内容导航总标题统一为 `Wiki`，避免和其中的 Guides 分类重名。
-- 分类标签和描述来自 site-plan 的六语言 `labels` / `descriptions`，模板只负责机械使用。
+- 分类标签和描述来自 site-plan 的五语言 `labels` / `descriptions`，模板只负责机械使用。
 - 根 URL 固定为英语/x-default；非英语页面、JSON-LD 和 sitemap 使用 locale 前缀。缺少译文时构建失败，不做英语回退。
 - 具体游戏仓库必须提交 `intake/`；原始调研、cache 和日志位于被 Git 忽略的 `.gamewiki/`。
 - 广告变量全部可选；环境变量未配置时页面保持原布局，不展示广告，也不预留空白。

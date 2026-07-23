@@ -37,7 +37,7 @@ python gamewiki.py --config jobs/<game>.json
 - 不生成 Calculator、Planner、Team Builder 等工具页。
 - 不手工补标签掩盖被截断的翻译。
 
-完成标准：只保留有证据的 published 分类；简单游戏允许少量页面，资料丰富的游戏要保留不同意图和实体入口；en/es/de/fr/ja/ko；六语言文章树一致；
+完成标准：只保留有证据的 published 分类；简单游戏允许少量页面，资料丰富的游戏要保留不同意图和实体入口；en/es/de/fr/ja；五语言文章树一致；
 intake、MDX、TypeScript、production build、线上首页、metadata、sitemap、robots、所有 loc/hreflang 直接 200、self-canonical、OG 全部通过。Vercel READY 不等于完成，必须确认 `publish.json` 的 `stages.onlineVerification.status=complete`。
 
 最终报告：网站根目录、分类、语言、文章数、首页视频来源、manifest、最新日志、API 是否复用、Private repo 状态、Vercel 待配置域名与环境变量。

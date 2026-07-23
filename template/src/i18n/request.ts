@@ -9,7 +9,6 @@ import es from "@/locales/es.json";
 import de from "@/locales/de.json";
 import fr from "@/locales/fr.json";
 import ja from "@/locales/ja.json";
-import ko from "@/locales/ko.json";
 
 type Messages = typeof en;
 const messagesMap: Record<string, unknown> = {
@@ -18,7 +17,6 @@ const messagesMap: Record<string, unknown> = {
   de,
   fr,
   ja,
-  ko,
 };
 
 export default getRequestConfig(async ({ requestLocale }) => {

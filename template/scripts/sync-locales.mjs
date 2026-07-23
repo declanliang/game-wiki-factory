@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const expected = ["en", "es", "de", "fr", "ja", "ko"];
+const expected = ["en", "es", "de", "fr", "ja"];
 const planPath = path.join(root, "intake", "site-plan.json");
 if (!fs.existsSync(planPath)) {
   console.error("缺少 intake/site-plan.json");

@@ -23,7 +23,7 @@ let errors = 0;
 const fail = (msg) => { console.error(`\x1b[31m✗\x1b[0m ${msg}`); errors++; };
 const ok = (msg) => console.log(`\x1b[32m✓\x1b[0m ${msg}`);
 const step = (msg) => console.log(`\n\x1b[1m${msg}\x1b[0m`);
-const REQUIRED_HREFLANGS = ["en", "es", "de", "fr", "ja", "ko", "x-default"];
+const REQUIRED_HREFLANGS = ["en", "es", "de", "fr", "ja", "x-default"];
 
 function verifyRequiredHreflangs(values, label) {
   const actual = new Set(values.map((value) => value.toLowerCase()));
@@ -31,7 +31,7 @@ function verifyRequiredHreflangs(values, label) {
   const unexpected = [...actual].filter((value) => !REQUIRED_HREFLANGS.includes(value));
   if (missing.length) fail(`${label} 缺少固定语言 hreflang：${missing.join(", ")}`);
   if (unexpected.length) fail(`${label} 包含契约外 hreflang：${unexpected.join(", ")}`);
-  if (!missing.length && !unexpected.length) ok(`${label} 固定六语言与 x-default 完整`);
+  if (!missing.length && !unexpected.length) ok(`${label} 固定五语言与 x-default 完整`);
 }
 
 const args = process.argv.slice(2);
@@ -144,7 +144,7 @@ function inspectStructuredPageUrls(html, pageUrl) {
   let issues = 0;
   const parsedPage = new URL(pageUrl);
   const firstSegment = parsedPage.pathname.split("/").filter(Boolean)[0];
-  const locale = ["es", "de", "fr", "ja", "ko"].includes(firstSegment) ? firstSegment : "en";
+  const locale = ["es", "de", "fr", "ja"].includes(firstSegment) ? firstSegment : "en";
   const localeBase = `${parsedPage.origin}${locale === "en" ? "" : `/${locale}`}`;
   const isLocaleUrl = (value) => {
     try {

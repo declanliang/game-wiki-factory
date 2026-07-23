@@ -7,7 +7,7 @@
   "properties": {
     "schemaVersion": {"const": 2},
     "game": {"type": "object", "required": ["name", "slug", "platform"]},
-    "languages": {"const": ["en", "es", "de", "fr", "ja", "ko"]},
+    "languages": {"const": ["en", "es", "de", "fr", "ja"]},
     "categoryPolicy": {"type": "object", "required": ["minimum", "maximum"]},
     "categories": {
       "type": "array",

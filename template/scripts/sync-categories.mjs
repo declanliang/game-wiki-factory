@@ -8,7 +8,7 @@ import path from "node:path";
 const root = process.cwd();
 const source = path.join(root, "intake", "site-plan.json");
 const target = path.join(root, "src", "config", "site-plan.json");
-const FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja", "ko"];
+const FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja"];
 
 function fail(message) {
   console.error(`\x1b[31m✗\x1b[0m ${message}`);
@@ -32,10 +32,10 @@ if (new Set(ids).size !== ids.length) fail("site-plan categories 包含重复 id
 for (const category of plan.categories) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(category.id || "")) fail(`非法分类 id：${category.id}`);
   if (!category.labels || FIXED_LANGUAGES.some((locale) => !category.labels[locale])) {
-    fail(`分类 ${category.id} 缺少六语言 labels`);
+    fail(`分类 ${category.id} 缺少五语言 labels`);
   }
   if (!category.descriptions || FIXED_LANGUAGES.some((locale) => !category.descriptions[locale])) {
-    fail(`分类 ${category.id} 缺少六语言 descriptions`);
+    fail(`分类 ${category.id} 缺少五语言 descriptions`);
   }
 }
 const published = plan.categories.filter((category) => category.status === "published");

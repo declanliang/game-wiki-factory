@@ -107,7 +107,7 @@ Tier List is allowed only when Basic Info contains rankable entity evidence. Cha
 - Entity: identity, acquisition/location, role or use, related systems, cautions, next related pages.
 - Guide: focused how-to answer without absorbing unrelated entity topics.
 
-All page types retain the existing metadata, topic QA, translation completeness, and six-language tree requirements. The generator must not manufacture tables, values, codes, dates, or rankings when the collected source packet does not support them.
+All page types retain the existing metadata, topic QA, translation completeness, and five-language tree requirements. The generator must not manufacture tables, values, codes, dates, or rankings when the collected source packet does not support them.
 
 ## 7. Homepage and internal linking
 

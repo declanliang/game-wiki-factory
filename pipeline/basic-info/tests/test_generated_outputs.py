@@ -52,7 +52,7 @@ class GeneratedOutputTests(unittest.TestCase):
         self.assertNotIn("footer", site_content)
         self.assertEqual(set(site_content), {"site", "home"})
         self.assertEqual(set(site_identity), {"GAME_NAME", "OFFICIAL_GAME_URL", "DISCORD_URL", "YOUTUBE_CHANNEL_URL", "FANDOM_URL", "YOUTUBE_VIDEO_ID", "LANGUAGES"})
-        self.assertEqual(site_identity["LANGUAGES"], ["en", "es", "de", "fr", "ja", "ko"])
+        self.assertEqual(site_identity["LANGUAGES"], ["en", "es", "de", "fr", "ja"])
         intake = directory / "template-intake"
         self.assertEqual(site_identity, json.loads((intake / "site-identity.json").read_text(encoding="utf-8")))
         self.assertEqual(site_content, json.loads((intake / "site-content.json").read_text(encoding="utf-8")))

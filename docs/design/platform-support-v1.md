@@ -18,7 +18,7 @@ game + platform + optional official URL
 
 - 输出目录、manifest、日志和 checkpoint。
 - `site-identity.json`、`site-content*.json`、`game-profile.json` 与 `site-plan.json`。
-- 固定语言 `en/es/de/fr/ja/ko`。
+- 固定语言 `en/es/de/fr/ja`。
 - 搜索证据、关键词筛选、文章生成、相关性 QA 和翻译。
 - 首页、内链、MDX、TypeScript、production build、sitemap、canonical 与 hreflang 验收。
 

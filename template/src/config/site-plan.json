@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "game": {"name": "", "slug": "", "platform": "Roblox"},
-  "languages": ["en", "es", "de", "fr", "ja", "ko"],
+  "languages": ["en", "es", "de", "fr", "ja"],
   "categoryPolicy": {"minimum": 1, "maximum": 8},
   "categories": []
 }

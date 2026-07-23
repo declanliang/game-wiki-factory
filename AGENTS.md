@@ -7,7 +7,7 @@
 - 本仓库是唯一工厂源码；真实游戏产物只能写入工厂同级的 `../<slug>/`，游戏目录本身就是 Next.js 根。
 - 最终部署输入必须在游戏根 `intake/`；调研、cache、manifest 和日志必须在游戏根 `.gamewiki/`。
 - 所有模块只维护 factory 根目录 `.env`；不读取、打印、复制或提交其中的值。
-- 默认语言严格为 `en/es/de/fr/ja/ko`，顺序也属于契约。
+- 默认语言严格为 `en/es/de/fr/ja`，顺序也属于契约；不生成韩语，避免无效翻译成本。
 - 当前平台范围严格为 Roblox 和 Steam。平台专属身份只在 Basic Info adapter 中处理，后续阶段消费统一事实契约；不得把 Steam App ID 当 Place ID，也不得把手柄支持写成 Steam Deck 官方认证。
 - Basic Info 的 `game-profile.json` 定义分类候选边界；候选可宽于最终导航（最多 16），Guide Search 不能越界创建站点分类，site-plan 最终最多发布 8 类。
 - `site-plan.json` 是 SEO Scout、intake 和模板的唯一语言/分类声明源。

@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const expectedLocales = ["en", "es", "de", "fr", "ja", "ko"];
+const expectedLocales = ["en", "es", "de", "fr", "ja"];
 let errors = 0;
 let warnings = 0;
 const fail = (message) => { console.error(`\x1b[31m✗\x1b[0m ${message}`); errors++; };

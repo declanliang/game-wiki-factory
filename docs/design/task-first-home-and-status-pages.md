@@ -31,5 +31,5 @@ Tier List 仍要求游戏确实存在可排名实体；没有可排名集合时�
 
 - 首页任务入口只能指向已生成文章；不得产生 404。
 - 身份条必须由官方 URL 和 Basic Info 字段机械生成。
-- 六语言文章树、导航、sitemap 与 site-plan 保持一致。
+- 五语言文章树、导航、sitemap 与 site-plan 保持一致。
 - production 发布必须通过现有线上 canonical、robots、sitemap 和全部 loc/hreflang URL 验收。

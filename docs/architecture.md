@@ -32,7 +32,7 @@ Games/
 游戏名 + 可选 platform / official URL
   → pipeline/basic-info
       平台解析器 → Roblox adapter 或 Steam adapter
-      官方身份、规范事实、首页、hero/favicon、固定六语言、category candidates
+      官方身份、规范事实、首页、hero/favicon、固定五语言、category candidates
   → pipeline/guide-search
       Google Suggest 主词+a–z、DataForSEO、去重视频标题证据、联网系统/实体机会、语义聚类与淘汰审计
       → content-opportunity-report（来源量、候选漏斗、实体覆盖、拒绝原因）
@@ -85,7 +85,7 @@ Roblox 与 Steam 共用 Basic Info 之后的全部契约：`facts.json` / `evide
 
 1. `game-profile.json` 由 Basic Info 根据可信游戏事实和平台能力生成，定义允许的分类候选和语义边界。候选词汇可宽于最终导航（最多 16 个），避免在关键词研究前过早淘汰真实类别；最终 site plan 仍最多发布 8 类。Roblox 可把 Codes 作为候选能力，但没有后续证据就不会发布。
 2. Guide Search 把搜索关键词和联网研究发现的 `page_opportunities` 合并后审计。知识机会只有在置信度至少 0.72，且拥有一个官方/创作者 URL 或两个不同支持 URL时才能进入聚类；Discord、Reddit、Trello、游戏链接、无实体依据的 Tier List 和工具页会被拒绝。
-3. `site-plan.json` 把 Guide Search 主题限制在 profile 内，记录分类顺序、六语言标签与描述、关键词、页面类型、实体/意图元数据、交付数量及状态。`strategy/tips/tactics` 合并到 `guide` 分类但保留独立关键词；planner 不生成无证据的 fallback 主题。
+3. `site-plan.json` 把 Guide Search 主题限制在 profile 内，记录分类顺序、五语言标签与描述、关键词、页面类型、实体/意图元数据、交付数量及状态。`strategy/tips/tactics` 合并到 `guide` 分类但保留独立关键词；planner 不生成无证据的 fallback 主题。
 
 Guide Search 不再把“必须已经出现精确 Suggest 词”作为独立页面的前提。联网研究可以从多个同游戏来源发现有具体玩家意图的系统页和实体页；仍必须通过确定性证据门、Basic Info 语义边界和最终编辑门。这样可以把资料丰富的游戏拆为更多可导航页面，同时继续拒绝完全错误、异义和无支撑主题。
 
@@ -95,7 +95,7 @@ SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。生成阶
 
 ## Checkpoint
 
-- Basic Info：六语言首页、hero、favicon 和验证报告完整才可复用；cache 位于 `.gamewiki/basic-info/.cache/`。
+- Basic Info：五语言首页、hero、favicon 和验证报告完整才可复用；cache 位于 `.gamewiki/basic-info/.cache/`。
 - Guide Search：保留 raw、LLM decision、rejected、manifest 和 keywords。
 - Guide Search 的 context checkpoint 同时绑定候选词、YouTube 证据和 Basic Info trusted context 指纹；上游事实或分类边界改变时不能错误复用旧研究判断。
 - SEO Scout：搜索、收集、生成、QA、翻译按文件幂等；翻译与英文做结构完整性对照。

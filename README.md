@@ -4,7 +4,7 @@
 
 全新电脑或服务器仅凭 GitHub 接手时，先读 [从零恢复手册](docs/bootstrap-from-github.md)。当前生产风险与剩余运营事项见 [生产就绪审计](docs/production-readiness-audit-2026-07-23.md)。
 
-固定语言为英语、西班牙语、德语、法语、日语和韩语。生成的网站位于 factory 同级目录，例如 `Games/hellhole/`。
+固定语言为英语、西班牙语、德语、法语和日语。生成的网站位于 factory 同级目录，例如 `Games/hellhole/`。
 
 ## 首次安装
 
@@ -201,7 +201,7 @@ game-wiki-factory/.gamewiki/runs/<run-id>/
 
 ```text
 Games/<game-slug>/
-├─ intake/                 网站身份、首页内容、图片和六语言文章输入
+├─ intake/                 网站身份、首页内容、图片和五语言文章输入
 ├─ content/                网站实际读取的文章
 ├─ src/
 ├─ public/
@@ -209,7 +209,7 @@ Games/<game-slug>/
 └─ .gamewiki/              本地调研、缓存、配置快照、日志和 manifest
 ```
 
-GitHub 提交网站运行所需文件以及成本最高的最终产物 `intake/`、六语言 `content/`；`.gamewiki/`、`.env`、原始搜索/LLM 调试缓存、构建缓存和日志不会上传。完整 `.gamewiki/` 不适合 Git 历史；未来若需要跨服务器保存原始调研 checkpoint，应使用带生命周期的私有对象存储。游戏仓库只能创建为 Private。
+GitHub 提交网站运行所需文件以及成本最高的最终产物 `intake/`、五语言 `content/`；`.gamewiki/`、`.env`、原始搜索/LLM 调试缓存、构建缓存和日志不会上传。完整 `.gamewiki/` 不适合 Git 历史；未来若需要跨服务器保存原始调研 checkpoint，应使用带生命周期的私有对象存储。游戏仓库只能创建为 Private。
 
 ## 本地预览与上线检查
 

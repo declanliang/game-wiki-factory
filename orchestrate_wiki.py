@@ -573,7 +573,7 @@ def sync_template_source(template_dir: Path, site_dir: Path) -> None:
     # These paths existed in earlier template releases but conflict with the
     # current next-intl `as-needed` middleware route.  Copying only files that
     # still exist cannot remove obsolete template code from a resumed project.
-    for relative in (Path("src/app/page.tsx"),):
+    for relative in (Path("src/app/page.tsx"), Path("src/locales/ko.json")):
         obsolete = site_dir / relative
         if obsolete.is_file():
             obsolete.unlink()

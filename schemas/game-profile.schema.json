@@ -8,7 +8,7 @@
     "schemaVersion": {"const": 2},
     "source": {"const": "auto-basic-info"},
     "game": {"type": "object", "required": ["name", "slug", "platform"]},
-    "languages": {"const": ["en", "es", "de", "fr", "ja", "ko"]},
+    "languages": {"const": ["en", "es", "de", "fr", "ja"]},
     "categoryPolicy": {"type": "object", "required": ["minimum", "maximum"]},
     "categoryCandidates": {"type": "array", "minItems": 4, "maxItems": 16}
   }

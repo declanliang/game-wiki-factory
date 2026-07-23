@@ -16,7 +16,7 @@ from typing import Any
 
 
 SCHEMA_VERSION = 2
-FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja", "ko"]
+FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja"]
 MINIMUM_CATEGORIES = 1
 MAXIMUM_CATEGORIES = 8
 MAXIMUM_PROFILE_CANDIDATES = 16
@@ -27,7 +27,6 @@ LANGUAGE_NAMES = {
     "de": "Deutsch",
     "fr": "Français",
     "ja": "日本語",
-    "ko": "한국어",
 }
 
 # Four evergreen information architectures are always useful for a guide site.
@@ -202,12 +201,12 @@ def _text_values(value: Any) -> list[str]:
 
 def _candidate(category_id: str, evidence: list[str], source: str) -> dict[str, Any]:
     definition = CATEGORY_DEFINITIONS[category_id]
-    descriptions = {"en": definition["description"], **CATEGORY_DESCRIPTION_TRANSLATIONS[category_id]}
+    all_descriptions = {"en": definition["description"], **CATEGORY_DESCRIPTION_TRANSLATIONS[category_id]}
     return {
         "id": category_id,
-        "labels": definition["labels"],
+        "labels": {locale: definition["labels"][locale] for locale in FIXED_LANGUAGES},
         "description": definition["description"],
-        "descriptions": descriptions,
+        "descriptions": {locale: all_descriptions[locale] for locale in FIXED_LANGUAGES},
         "source": source,
         "evidence": evidence[:8],
     }
@@ -483,7 +482,7 @@ def render_project_readme(
 
 ## 目录
 
-- `intake/`：网站最终输入的唯一事实源，包含身份、六语言首页配置、site-plan、素材和文章；应提交 Git。
+- `intake/`：网站最终输入的唯一事实源，包含身份、五语言首页配置、site-plan、素材和文章；应提交 Git。
 - `content/`、`src/config/site-plan.json`、`src/locales/`、`public/`：从 intake 机械生成的网站投影。
 - `.gamewiki/manifest.json`：可续跑 stage 状态和路径。
 - `.gamewiki/planning/`：game profile、Guide Search、site plan 和关键词决策。
