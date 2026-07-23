@@ -47,10 +47,10 @@
       "githubRepo": "declanliang/anime-expeditions",
       "vercelProject": "anime-expeditions2",
       "productionUrl": "https://anime-expeditions-game.wiki",
-      "githubCommit": "c734b0fefdd67e25d4cf84e254488968388bbe5b",
-      "onlineVerifiedAt": "2026-07-23T12:33:00+08:00",
+      "githubCommit": "d9e2a2a849b5c9a3ef6338fa2200f49a9c92feb3",
+      "onlineVerifiedAt": "2026-07-23T13:17:00+08:00",
       "status": "certified",
-      "articles": {"english": 24, "allLanguages": 144},
+      "articles": {"english": 24, "allLanguages": 120},
       "categories": ["guide", "codes", "modes", "economy", "characters", "upgrades", "updates", "tier-list"]
     }
   ],
