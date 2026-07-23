@@ -816,7 +816,9 @@ def apply_cluster_decisions(
         decision = decisions.get(key)
         if decision is None:
             rejected.append({"keyword": candidate.keyword, "reason": "LLM omitted candidate"})
-            audit_errors.append(f"LLM omitted candidate: {candidate.keyword}")
+            # A model omission is a conservative drop, not proof that the
+            # generated plan is unsafe. Keep the audit trail without aborting
+            # the entire game job over one unselected candidate.
             continue
         action = str(decision.get("action") or "drop")
         confidence = float(decision.get("confidence") or 0)

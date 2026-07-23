@@ -256,6 +256,9 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     if normalized.get("fullBuild") and normalized.get("publish"):
         publication.setdefault("reuseExisting", True)
         publication.setdefault("replaceRepositoryContents", True)
+    # Background jobs publish the private GitHub repository only. Vercel
+    # import, domain selection, and runtime variables remain operator-owned.
+    publication.setdefault("skipVercel", True)
     normalized["publication"] = publication
     # Validate the fields shared with the foreground CLI.
     foreground = {k: normalized[k] for k in ("schemaVersion", "game", "platform", "officialUrl", "siteUrl", "publish", "refresh") if k in normalized}
@@ -520,7 +523,7 @@ def _publish_command(config: dict[str, Any], slug: str) -> list[str]:
         command.append("--replace-existing")
     if publication.get("vercelProject"):
         command.extend(["--vercel-project", str(publication["vercelProject"])])
-    if publication.get("skipVercel"):
+    if publication.get("skipVercel", True):
         command.append("--skip-vercel")
     if config.get("siteUrl"):
         command.extend(["--site-url", str(config["siteUrl"])])

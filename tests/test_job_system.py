@@ -39,6 +39,7 @@ class JobSystemTests(unittest.TestCase):
         self.assertTrue(config["fullBuild"])
         self.assertTrue(config["publication"]["reuseExisting"])
         self.assertTrue(config["publication"]["replaceRepositoryContents"])
+        self.assertTrue(config["publication"]["skipVercel"])
 
     def test_batch_is_validated_then_submitted_as_independent_jobs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):

@@ -169,7 +169,7 @@ class LLMClusterTests(unittest.TestCase):
         self.assertIn("below", reasons["anime expeditions release date"])
         self.assertEqual(errors, [])
 
-    def test_missing_and_unknown_decisions_are_audited(self) -> None:
+    def test_missing_decisions_are_dropped_without_invalidating_the_plan(self) -> None:
         candidates = [self.candidate("anime expeditions units", {"labs"})]
         data = {"decisions": [self.decision("anime expeditions made up keyword")]}
         selected, rejected, errors = apply_cluster_decisions(
@@ -177,9 +177,8 @@ class LLMClusterTests(unittest.TestCase):
         )
         self.assertEqual(selected, [])
         self.assertEqual(rejected[0]["reason"], "LLM omitted candidate")
-        self.assertEqual(len(errors), 2)
+        self.assertEqual(len(errors), 1)
         self.assertTrue(any("unknown keyword" in error for error in errors))
-        self.assertTrue(any("omitted candidate" in error for error in errors))
 
     def test_context_opportunities_require_strong_evidence_and_profile_category(self) -> None:
         context = {

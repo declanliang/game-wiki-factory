@@ -351,7 +351,16 @@ def publish(argv: list[str]) -> int:
     }
     write_json(receipt_path, receipt)
 
-    if not args.skip_vercel:
+    if args.skip_vercel:
+        receipt["stages"]["vercel"] = {
+            "status": "manual_action_required",
+            "nextAction": "Import this private GitHub repository in Vercel, configure the final domain and NEXT_PUBLIC_SITE_URL, then deploy and run npm run verify:deploy.",
+            "dashboardUrl": "https://vercel.com/dashboard",
+            "updatedAt": _now(),
+        }
+        receipt["stages"].pop("onlineVerification", None)
+        write_json(receipt_path, receipt)
+    else:
         vercel_token = runtime_env.get("VERCEL_TOKEN")
         project_name = args.vercel_project or re.sub(r"[^a-z0-9-]+", "-", repo.casefold()).strip("-")[:100]
         if vercel_token:

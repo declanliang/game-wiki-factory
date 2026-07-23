@@ -89,17 +89,14 @@ Prompt：
 不要根据之前聊天记忆回答。
 ```
 
-Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status JOB_ID --json`。成功任务的 `result` 是清理 workspace 后仍保留的非敏感验收摘要，包含文章数、分类、Private GitHub、Vercel 和线上验证；不要绕过 CLI 直接读取 secrets。只有下列条件全部满足才能报告成功：
+Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status JOB_ID --json`。成功任务的 `result` 是清理 workspace 后仍保留的非敏感摘要，包含文章数、分类、Private GitHub 和 Vercel 手动操作提示；不要绕过 CLI 直接读取 secrets。只有下列条件全部满足才能报告生成完成：
 
 1. job 为 `succeeded`，manifest 必需阶段完成；
 2. GitHub repo 为 Private；
-3. Vercel production deployment 完成；
-4. `publish.json` 中 `stages.onlineVerification.status=complete`；
-5. 线上首页 metadata/canonical、sitemap、robots 和所有 loc/hreflang 目标直接返回 200；
-6. sitemap/robots/canonical 不含 `example.com`；
-7. 若是广告任务，七个广告路由均为本次代码哈希。
+3. `publish.json` 中 `stages.vercel.status=manual_action_required`，或运营者已另行完成线上部署和验收；
+4. 若是广告任务，七个广告路由均为本次代码哈希。
 
-完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、production URL、线上验证状态/日志、广告状态。Vercel 显示 READY 但线上门未通过时，只能报告“部署完成、验收失败/进行中”。
+完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Vercel 手动导入提示和广告状态。未手动部署前不得声称网站已线上验证。
 
 `needs_attention` 固定汇报：第一个失败阶段、根因、日志路径、是否需要用户动作、是否会重复 API 成本。网络/429/5xx 由 Worker 有界重试；不要创建第二个同游戏任务。用户修复密钥、余额、DNS 或权限后，重试原 job，复用 checkpoint。
 

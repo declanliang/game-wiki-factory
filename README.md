@@ -1,6 +1,6 @@
 # Game Wiki Factory
 
-输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建、GitHub 私有仓库发布和 Vercel production deployment。
+输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库。Vercel 的导入、域名和环境变量配置默认由站点运营者手动完成。
 
 全新电脑或服务器仅凭 GitHub 接手时，先读 [从零恢复手册](docs/bootstrap-from-github.md)。当前生产风险与剩余运营事项见 [生产就绪审计](docs/production-readiness-audit-2026-07-23.md)。
 
@@ -114,7 +114,7 @@ python gamewiki.py --config jobs\my-game.json
 - 只有 `game` 必填；已知 `platform`、`officialUrl` 和正式域名时应同时填写，减少歧义和人工介入。
 - `platform` 只能是 `roblox`、`steam` 或 `auto`。
 - `siteUrl` 可以是裸域名或完整 HTTPS URL；已知正式域名时填写。
-- `publish: true` 会创建或更新 Private GitHub 仓库、Vercel production deployment，并强制执行线上验收。首页 metadata/canonical、sitemap、robots 和全部 loc/hreflang 目标未全部通过时，任务不会标记成功。
+- `publish: true` 会创建或更新 Private GitHub 仓库，随后任务即可标记成功。回执会标记 `vercel.manual_action_required`，提示运营者在 Vercel 导入仓库、配置域名和 `NEXT_PUBLIC_SITE_URL` 后手动部署；后台任务默认不调用 Vercel API 或 CLI。
 - 日常配置不需要 GitHub repo 或 Vercel project。新站自动创建；旧站按本地 publish receipt 和默认 slug 复用。只有历史项目使用非标准名称且本地 receipt 已丢失时，才使用高级 `publication` 覆盖项。
 - `operation: rebuild` 用于旧半成品：完整重新采集、规划、生成和翻译，并原地替换旧 repo。
 - `refresh` 默认全部为 `false`。普通续跑不要开启，防止重复 API 成本。
