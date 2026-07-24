@@ -380,6 +380,7 @@ TRANSIENT_PATTERNS = (
     "timed out", "timeout", "connection reset", "connection aborted", "temporary failure",
     "http 429", "status 429", "http 500", "http 502", "http 503", "http 504",
     "api 500", "api 502", "api 503", "api 504", "api 520", "api 522", "api 524",
+    '"error_code":524', '"status":524', "origin_response_timeout",
     "all_channels_circuit_broken",
     "bad gateway", "service unavailable", "rate limit", "dns",
 )
@@ -399,10 +400,10 @@ def classify_failure(text: str) -> str:
     lowered = text.casefold()
     if any(pattern in lowered for pattern in QUOTA_PATTERNS):
         return "quota_exhausted"
-    if any(pattern in lowered for pattern in ATTENTION_PATTERNS):
-        return "needs_attention"
     if any(pattern in lowered for pattern in TRANSIENT_PATTERNS):
         return "retryable"
+    if any(pattern in lowered for pattern in ATTENTION_PATTERNS):
+        return "needs_attention"
     return "needs_attention"
 
 

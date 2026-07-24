@@ -26,6 +26,9 @@ SAFE_RECOVERY_PATTERNS = (
     "api 520",
     "api 522",
     "api 524",
+    '"error_code":524',
+    '"status":524',
+    "origin_response_timeout",
     "all_channels_circuit_broken",
 )
 
@@ -66,6 +69,13 @@ def _is_checkpoint_safe(job: dict[str, Any]) -> bool:
     if str(job.get("current_stage") or "") not in {"gameProfile", "articles", "pipeline"}:
         return False
     error = str(job.get("last_error") or "").casefold()
+    # Structured provider timeout markers are authoritative. Tracebacks from
+    # Guide Search naturally contain names such as cluster_candidates, which
+    # must not turn an upstream 524 into an identity/candidate failure.
+    if any(pattern in error for pattern in (
+        '"error_code":524', '"status":524', "origin_response_timeout",
+    )):
+        return True
     if any(pattern in error for pattern in BLOCKED_RECOVERY_PATTERNS):
         return False
     return any(pattern in error for pattern in SAFE_RECOVERY_PATTERNS)

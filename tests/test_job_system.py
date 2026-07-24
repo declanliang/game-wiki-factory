@@ -96,6 +96,13 @@ class JobSystemTests(unittest.TestCase):
         self.assertEqual(classify_failure("account balance exhausted"), "quota_exhausted")
         self.assertEqual(classify_failure("Two Roblox candidates are too close to select safely"), "needs_attention")
         self.assertEqual(classify_failure("unknown build problem"), "needs_attention")
+        self.assertEqual(
+            classify_failure(
+                'cluster_candidates failed: {"status":524,"error_code":524,'
+                '"error_name":"origin_response_timeout"}'
+            ),
+            "retryable",
+        )
 
     def test_claim_is_atomic_and_records_lease(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):

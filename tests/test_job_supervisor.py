@@ -10,6 +10,29 @@ from job_system import _event, connect, pending_notifications, submit
 
 
 class JobSupervisorTests(unittest.TestCase):
+    def test_structured_524_is_safe_despite_candidate_traceback_name(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ,
+            {
+                "GAMEWIKI_DATA_DIR": temporary,
+                "GAMEWIKI_DISK_PAUSE_PERCENT": "100",
+                "GAMEWIKI_SUPERVISOR_COOLDOWN_SECONDS": "0",
+            },
+        ):
+            job_id = self._failed_job(
+                temporary,
+                'cluster_candidates: {"status":524,"error_code":524,'
+                '"error_name":"origin_response_timeout"}',
+                stage="gameProfile",
+            )
+            recovered = recover_once()
+            with connect() as db:
+                status = db.execute(
+                    "SELECT status FROM jobs WHERE id=?", (job_id,)
+                ).fetchone()[0]
+        self.assertEqual([item["jobId"] for item in recovered], [job_id])
+        self.assertEqual(status, "retry_wait")
+
     def _failed_job(self, temporary: str, error: str, stage: str = "articles") -> str:
         config = Path(temporary) / "job.json"
         config.write_text(json.dumps({"game": "Retry Game", "platform": "roblox"}), encoding="utf-8")
