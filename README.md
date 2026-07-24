@@ -2,7 +2,7 @@
 
 输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库。Vercel 的导入、域名和环境变量配置默认由站点运营者手动完成。
 
-全新电脑或服务器仅凭 GitHub 接手时，先读 [从零恢复手册](docs/bootstrap-from-github.md)。当前生产风险与剩余运营事项见 [生产就绪审计](docs/production-readiness-audit-2026-07-23.md)。
+第一次接手先读 [立即接手指南](docs/takeover.md)。全新电脑或服务器仅凭 GitHub 恢复时，再按 [从零恢复手册](docs/bootstrap-from-github.md) 操作。当前生产风险见 [生产就绪审计](docs/production-readiness-audit-2026-07-23.md)。
 
 固定语言为英语、西班牙语、德语、法语和日语。生成的网站位于 factory 同级目录，例如 `Games/hellhole/`。
 
@@ -42,6 +42,8 @@ vercel login
 Copy-Item jobs\example.json jobs\my-game.json
 ```
 
+外部收集的关键词可直接放进配置的 `manualKeywords` 数组，无需创建 Guide Search 源码目录下的手工文件。示例见 `jobs/example.json`。
+
 ## 后台批量生产
 
 需要关闭终端后继续、每天排队多个站点或交给 OpenClaw 时，使用 SQLite Worker，不要让 Agent 会话承载长任务：
@@ -65,7 +67,7 @@ Copy-Item jobs\batch.example.json jobs\daily.json
 python gamewiki.py jobs submit-batch --config jobs\daily.json
 ```
 
-旧站不维护升级分支。把 `operation` 设为 `rebuild` 后，Worker 会从空目录按当前完整流程重做，自动从旧 receipt 复用非标准 GitHub/Vercel 名称；没有特殊名称时按游戏 slug 复用原项目。发布前创建远端备份 tag，再用已通过 QA 的新 `main` 替换旧 Private repo。完整状态机、服务器和 OpenClaw 说明见 [docs/background-jobs.md](docs/background-jobs.md)。
+今后所有游戏都按新项目从空 workspace 开始生产，不再接受旧站 `rebuild` 输入。失败恢复只重试原 Job 并复用它自己的 checkpoint。完整状态机、服务器和 OpenClaw 说明见 [docs/background-jobs.md](docs/background-jobs.md)。
 
 成功、最终失败、取消和 `needs_attention` 会进入持久化通知 outbox；渠道成功送达后再用 `jobs notifications --ack ...` 确认。Agent 只负责队列控制和 runbook 内的常规恢复，任何核心代码或生产逻辑问题必须升级给 Codex/基础设施维护者，禁止直接热修服务器工作树。
 
@@ -101,7 +103,7 @@ Steam 配置：
 }
 ```
 
-单站配置不必填写 `schemaVersion`、`taskType` 或默认 `operation`，系统会自动补齐。只有把旧站按当前完整流程重做时，才在顶层增加 `"operation": "rebuild"`。
+单站配置不必填写 `schemaVersion`、`taskType` 或 `operation`，系统会自动规范为新的站点任务。可以用 `manualKeywords` 随游戏基础信息提交外部收集的关键词。
 
 执行：
 
@@ -114,9 +116,9 @@ python gamewiki.py --config jobs\my-game.json
 - 只有 `game` 必填；已知 `platform`、`officialUrl` 和正式域名时应同时填写，减少歧义和人工介入。
 - `platform` 只能是 `roblox`、`steam` 或 `auto`。
 - `siteUrl` 可以是裸域名或完整 HTTPS URL；已知正式域名时填写。
-- `publish: true` 会创建或更新 Private GitHub 仓库，随后任务即可标记成功。回执会标记 `vercel.manual_action_required`，提示运营者在 Vercel 导入仓库、配置域名和 `NEXT_PUBLIC_SITE_URL` 后手动部署；后台任务默认不调用 Vercel API 或 CLI。
-- 日常配置不需要 GitHub repo 或 Vercel project。新站自动创建；旧站按本地 publish receipt 和默认 slug 复用。只有历史项目使用非标准名称且本地 receipt 已丢失时，才使用高级 `publication` 覆盖项。
-- `operation: rebuild` 用于旧半成品：完整重新采集、规划、生成和翻译，并原地替换旧 repo。
+- `manualKeywords` 是可选字符串数组，最多 200 项；系统会清理空白、按大小写去重，并作为 `user_provided` 来源进入 Guide Search。它们仍受风险过滤、证据门和 Basic Info 分类边界约束。
+- `publish: true` 会创建新的 Private GitHub 仓库，随后任务即可标记成功。回执会标记 `vercel.manual_action_required`，提示运营者在 Vercel 导入仓库、配置域名和 `NEXT_PUBLIC_SITE_URL` 后手动部署；后台任务默认不调用 Vercel API 或 CLI。
+- 日常配置不需要 GitHub repo 或 Vercel project。每个游戏都创建新的 Private GitHub repo。
 - `refresh` 默认全部为 `false`。普通续跑不要开启，防止重复 API 成本。
 - 配置中的多余换行和连续空格会在执行前规范化，未知字段和拼写错误会直接报错。
 
@@ -225,7 +227,7 @@ npm run build
 npm run verify:deploy
 ```
 
-未提供 `siteUrl` 时，线上 canonical、sitemap 和 robots 使用 Vercel production URL。提供 `siteUrl` 时，发布器先设置 Production 的 `NEXT_PUBLIC_SITE_URL`，再部署；仍需在 Vercel 添加正式域名并完成 DNS 配置。
+后台站点任务不会自动部署 Vercel。运营者在 Vercel 导入 Private repo 后，必须绑定域名并把 Production 的 `NEXT_PUBLIC_SITE_URL` 设为最终公开 origin；随后部署并执行 `npm run verify:deploy`。未完成这一步时，Job 的 `succeeded` 只代表生成、构建、QA 和 Private GitHub 完成，不代表网站已上线。
 
 ## 可选 Adsterra 广告
 
@@ -240,7 +242,7 @@ python gamewiki.py jobs submit --config jobs\my-game-ads.json
 
 广告任务可以晚于网站生产单独提交，不会重跑内容。变量全部留空时，不会渲染广告 iframe、占位或空白。Adsterra 素材实际填充可能仍受平台同步延迟影响。
 
-旧半成品使用 `operation: rebuild` 按当前标准重新调研、规划、生成和翻译；失败后的同一任务重试自动复用 checkpoint，不会重复已经完成的付费阶段。
+失败后的同一任务重试自动复用 checkpoint，不会重复已经完成的付费阶段。不要为同一个失败任务创建替代 Job。
 
 ## 出错时交给 AI
 
@@ -252,7 +254,7 @@ python gamewiki.py jobs submit --config jobs\my-game-ads.json
 读取该项目 .gamewiki/manifest.json、configs 和最新 logs。
 已完成的 Basic Info、关键词、文章和翻译不要重新生成。
 修复实际问题后从 checkpoint 继续，使用最新版 factory 模板。
-GitHub 仓库必须为 Private，并完成 Vercel production deployment。
+GitHub 仓库必须为 Private。后台任务完成后，明确汇报 Vercel 仍需手工导入、域名、`NEXT_PUBLIC_SITE_URL`、部署和线上验收。
 最后检查 canonical、sitemap、robots 和 hreflang。
 ```
 

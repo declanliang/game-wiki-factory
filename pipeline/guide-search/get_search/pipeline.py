@@ -409,6 +409,7 @@ def run_pipeline(
     cluster_model: str = DEFAULT_CLUSTER_MODEL,
     trusted_context: dict[str, Any] | None = None,
     output_run_dir: Path | None = None,
+    manual_keywords: list[str] | None = None,
 ) -> Path:
     generated_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     if from_run:
@@ -478,7 +479,7 @@ def run_pipeline(
 
     candidates, rejected = extract_candidates(topic, raw)
     manual_candidates, manual_rejected, manual_summary = load_manual_inputs(
-        topic, manual_input_dir
+        topic, manual_input_dir, manual_keywords
     )
     manual_summary["directory"] = str(manual_input_dir.relative_to(root))
     candidates = merge_manual_candidates(topic, candidates, manual_candidates)
@@ -628,6 +629,11 @@ def run_pipeline(
             opportunity_rejected,
             llm_rejected,
         ),
+    )
+    source_counts["manual_user_provided_keywords"] = sum(
+        int(item["accepted_keywords"])
+        for item in manual_summary["files"]
+        if item["source"] == "user_provided"
     )
     write_report(
         run_dir, topic, manifest, candidates, selected,

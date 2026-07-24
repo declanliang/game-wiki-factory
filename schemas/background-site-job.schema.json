@@ -8,13 +8,17 @@
   "properties": {
     "schemaVersion": { "type": "integer" },
     "taskType": { "const": "site" },
-    "operation": { "enum": ["auto", "new", "rebuild"] },
+    "operation": { "enum": ["auto", "new"] },
     "game": { "type": "string", "minLength": 1 },
     "platform": { "enum": ["auto", "roblox", "steam"] },
     "officialUrl": { "type": "string", "format": "uri" },
     "siteUrl": { "type": "string", "minLength": 1 },
     "publish": { "type": "boolean" },
-    "fullBuild": { "type": "boolean" },
+    "manualKeywords": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
     "refresh": {
       "type": "object",
       "additionalProperties": false,
@@ -22,18 +26,6 @@
         "basicInfo": { "type": "boolean" },
         "keywords": { "type": "boolean" },
         "articles": { "type": "boolean" }
-      }
-    },
-    "publication": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "githubOwner": { "type": "string" },
-        "githubRepo": { "type": "string" },
-        "reuseExisting": { "type": "boolean" },
-        "replaceRepositoryContents": { "type": "boolean" },
-        "vercelProject": { "type": "string" },
-        "skipVercel": { "type": "boolean" }
       }
     }
   }

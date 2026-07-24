@@ -62,22 +62,22 @@ Supervisor 只执行 `docs/background-jobs.md` 中的确定性白名单策略。
 /usr/local/bin/gamewiki jobs cancel JOB_ID
 ```
 
-新站和旧站都使用同一个配置契约。旧站设置：
+所有未来游戏都使用新站配置。可以随基础信息提交手工关键词：
 
 ```json
 {
   "schemaVersion": 3,
   "taskType": "site",
-  "operation": "rebuild",
   "game": "Existing Game",
   "platform": "roblox",
   "officialUrl": "https://www.roblox.com/games/123/example",
-  "siteUrl": "https://existing-game.wiki",
+  "siteUrl": "https://new-game.wiki",
+  "manualKeywords": ["Existing Game codes", "Existing Game best units"],
   "publish": true
 }
 ```
 
-正常情况不需要填写 repo 或 Vercel project。系统会从旧 workspace receipt 或游戏 slug 恢复目标；只有非标准历史名称且 receipt 丢失、自动解析明确报歧义时才使用高级 `publication` 覆盖项。发布器会先创建 `pre-rebuild-<UTC>` 远端备份 tag，再用已通过 build/QA 的新站替换 `main`；Vercel 项目、正式域名和已有环境变量会被复用而不是删除。
+不要填写 repo、Vercel project、`operation: rebuild`、`fullBuild` 或覆盖参数。同名 workspace/repo 已存在时任务应停止并交给维护者确认，不得自动替换。
 
 ## OpenClaw 专用 Agent
 
@@ -94,7 +94,7 @@ openclaw agent --local --agent game-wiki-operator --message \
 
 自动化验收或脚本查询应附加一个新的 `--session-key agent:game-wiki-operator:ops-<日期或批次>`，避免复用很久以前的聊天上下文。实际聊天渠道可以保留自己的连续会话，但 Agent 仍必须每次执行实时 `jobs list --json`。
 
-尚未给 Agent 绑定聊天渠道，这是有意的：绑定错误会抢占现有 OpenClaw 渠道路由。需要从微信、飞书或其他渠道下达任务时，应先决定专用账号/路由，再只把该路由绑定给 `game-wiki-operator`。
+聊天渠道、收件人和通知命令属于服务器私有配置，不写入 Git。接手者只通过一次端到端测试确认：产生测试终态、渠道收到消息、ack 后 outbox 为空。不要从历史聊天推断当前绑定，也不要让 `game-wiki-operator` 抢占其他 Agent 的路由。
 
 推荐提交 Prompt：
 
@@ -106,7 +106,7 @@ openclaw agent --local --agent game-wiki-operator --message \
 
 ## 凭据维护
 
-服务器私有环境至少需要内容 API key、GitHub token 和 Vercel token。推荐使用可撤销的专用生产 Token，不依赖个人电脑 CLI 的临时登录缓存。更新凭据后：
+服务器私有环境至少需要内容 API key 和 GitHub token；广告 Job 还需要 Vercel token。推荐使用可撤销的专用生产 Token，不依赖个人电脑 CLI 的临时登录缓存。更新凭据后：
 
 ```bash
 sudo chmod 600 /srv/game-wiki-factory/secrets/factory.env
@@ -115,17 +115,63 @@ sudo systemctl restart gamewiki-worker gamewiki-control
 
 禁止把环境文件内容粘贴到 OpenClaw Prompt、GitHub Issue、日志或 AI 对话。
 
-## 发布验收
+## Factory 更新流程
+
+服务器地址、SSH 用户和私钥位置保存在团队的私有运维清单或本机 SSH config，不写入仓库。更新前先执行：
+
+```bash
+/usr/local/bin/gamewiki jobs list --json
+cd /srv/game-wiki-factory/app
+git status --short
+git rev-parse HEAD
+cp /srv/game-wiki-factory/data/jobs.sqlite3 /srv/game-wiki-factory/data/jobs.sqlite3.pre-update
+```
+
+必须确认无 `running` Job 且工作树干净。服务器配置了 Private GitHub deploy key 时：
+
+```bash
+git pull --ff-only
+```
+
+如果 remote 是 HTTPS 且服务器没有 GitHub 凭据，不要读取或临时打印 token。由已认证维护机创建增量 bundle：
+
+```powershell
+git fetch origin
+git bundle create gamewiki-update.bundle main ^<SERVER_HEAD>
+git bundle verify gamewiki-update.bundle
+scp gamewiki-update.bundle <ssh-host>:/tmp/gamewiki-update.bundle
+```
+
+服务器只做快进：
+
+```bash
+cd /srv/game-wiki-factory/app
+git fetch /tmp/gamewiki-update.bundle main
+git merge --ff-only FETCH_HEAD
+```
+
+然后运行三套 Python 测试；模板或跨模块变更再运行模板脚本语法检查和 `npx tsc --noEmit`。测试通过后：
+
+```bash
+sudo systemctl restart gamewiki-worker gamewiki-control
+sudo systemctl --no-pager --full status gamewiki-worker gamewiki-control
+sudo systemctl list-timers 'gamewiki-*'
+git rev-parse HEAD
+/usr/local/bin/gamewiki jobs list --json
+```
+
+OpenClaw 的 workspace 指令如果变化，还要把 `deploy/openclaw/AGENTS.md`、`SOUL.md`、`TOOLS.md` 同步到 `/home/ubuntu/.openclaw/workspace-game-wiki-operator/`；仅更新 Factory Git checkout 不会自动更新这个独立 workspace。
+
+## 生成与上线验收
 
 每个成功任务必须同时满足：
 
 1. 任务状态 `succeeded`，manifest 所有必需阶段完成。
-2. Next.js production build 和部署检查通过。
-3. GitHub repo 为 Private；旧站有本次重建前的备份 tag。
-4. Vercel production deployment 成功并关联指定项目。
-5. canonical、sitemap、robots 不包含 `example.com`。
-6. 未配置广告变量时页面不渲染广告；发布过程不删除已有广告或域名环境变量。
-7. `.gamewiki/publish.json` 的 `stages.onlineVerification.status` 为 `complete`；线上验证日志无错误。Vercel READY 本身不算完成。
+2. Next.js production build 和本地站点检查通过。
+3. GitHub repo 为 Private。
+4. `result.vercel.status=manual_action_required`，并明确告知运营者后续步骤。
+
+以上代表“生成完成”。要称为“上线完成”，还必须由运营者在 Vercel 手工导入、绑定域名、设置 `NEXT_PUBLIC_SITE_URL`、部署，并让 `npm run verify:deploy` 通过。canonical、sitemap、robots 不得包含 `example.com`。Vercel READY 本身不算线上验收。
 
 ## 2026-07-22 真实验收记录
 

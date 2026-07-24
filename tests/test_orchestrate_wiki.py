@@ -96,6 +96,17 @@ class OrchestratorTests(unittest.TestCase):
         args = orchestrator.build_parser().parse_args(["Hellhole", "--recluster-keywords"])
         self.assertTrue(args.recluster_keywords)
 
+    def test_manual_keywords_can_be_repeated(self) -> None:
+        args = orchestrator.build_parser().parse_args([
+            "Keyword Game",
+            "--manual-keyword", "Keyword Game codes",
+            "--manual-keyword", "Keyword Game best units",
+        ])
+        self.assertEqual(
+            args.manual_keyword,
+            ["Keyword Game codes", "Keyword Game best units"],
+        )
+
     def test_run_command_writes_stage_and_complete_run_logs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

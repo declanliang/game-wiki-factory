@@ -26,17 +26,41 @@ PROJECTS_ROOT = Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)).expa
 RUNTIME_ROOT = ROOT / ".gamewiki" / "runs"
 
 
+def normalize_manual_keywords(value: object) -> list[str]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ValueError("config.manualKeywords must be an array of strings")
+    if len(value) > 200:
+        raise ValueError("config.manualKeywords cannot contain more than 200 items")
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for index, item in enumerate(value):
+        if not isinstance(item, str):
+            raise ValueError(f"config.manualKeywords[{index}] must be a string")
+        keyword = " ".join(item.split())
+        if not keyword:
+            raise ValueError(f"config.manualKeywords[{index}] cannot be empty")
+        if len(keyword) > 200:
+            raise ValueError(f"config.manualKeywords[{index}] cannot exceed 200 characters")
+        marker = keyword.casefold()
+        if marker not in seen:
+            seen.add(marker)
+            normalized.append(keyword)
+    return normalized
+
+
 def _config_command(config: dict[str, object]) -> tuple[str, list[str]]:
-    allowed = {"schemaVersion", "taskType", "operation", "game", "platform", "officialUrl", "siteUrl", "publish", "refresh"}
+    allowed = {"schemaVersion", "taskType", "operation", "game", "platform", "officialUrl", "siteUrl", "publish", "refresh", "manualKeywords"}
     unknown = sorted(set(config) - allowed)
     if unknown:
         raise ValueError(f"unknown config field(s): {', '.join(unknown)}")
     task_type = str(config.get("taskType") or "site").casefold()
     if task_type != "site":
         raise ValueError("foreground --config only accepts taskType=site; submit ads through jobs")
-    operation = str(config.get("operation") or "auto").casefold()
+    operation = str(config.get("operation") or "new").casefold()
     if operation not in {"auto", "new"}:
-        raise ValueError("operation=rebuild must use `gamewiki.py jobs submit` for safe archival and replacement")
+        raise ValueError("config.operation must be new; legacy rebuild jobs are no longer accepted")
     game_value = config.get("game")
     if not isinstance(game_value, str) or not game_value.strip():
         raise ValueError("config.game must be a non-empty string")
@@ -58,6 +82,8 @@ def _config_command(config: dict[str, object]) -> tuple[str, list[str]]:
         raise ValueError("config.publish must be true or false")
     if publish:
         args.append("--publish")
+    for keyword in normalize_manual_keywords(config.get("manualKeywords")):
+        args.extend(["--manual-keyword", keyword])
     refresh = config.get("refresh") or {}
     if not isinstance(refresh, dict):
         raise ValueError("config.refresh must be an object")

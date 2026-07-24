@@ -9,6 +9,21 @@ from get_search.manual_inputs import load_manual_inputs, merge_manual_candidates
 
 
 class ManualInputTests(unittest.TestCase):
+    def test_job_config_keywords_are_audited_as_user_provided(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            candidates, rejected, summary = load_manual_inputs(
+                "Example Game Roblox",
+                Path(temporary),
+                ["Example Game Roblox codes", "discord", "Example Game Roblox units"],
+            )
+        self.assertEqual(
+            {item.keyword for item in candidates},
+            {"example game roblox codes", "example game roblox units"},
+        )
+        self.assertTrue(all(item.sources == {"user_provided"} for item in candidates))
+        self.assertEqual(len(rejected), 1)
+        self.assertEqual(summary["files"][0]["source"], "user_provided")
+
     def test_loads_similarweb_and_google_suggest_formats(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             folder = Path(temp)

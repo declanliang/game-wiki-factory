@@ -57,6 +57,12 @@ def parser() -> argparse.ArgumentParser:
         type=Path,
         help="Verified upstream game identity/content JSON used to disambiguate guide topics.",
     )
+    result.add_argument(
+        "--manual-keyword",
+        action="append",
+        default=[],
+        help="User-provided keyword to merge with automatic discovery. May be repeated.",
+    )
     return result
 
 
@@ -93,6 +99,7 @@ def main(argv: list[str] | None = None) -> int:
             cluster_model=args.cluster_model,
             trusted_context=trusted_context,
             output_run_dir=args.run_dir.resolve() if args.run_dir else None,
+            manual_keywords=args.manual_keyword,
         )
     else:
         if not args.topic:
@@ -119,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
             cluster_model=args.cluster_model,
             trusted_context=trusted_context,
             output_run_dir=args.run_dir.resolve() if args.run_dir else None,
+            manual_keywords=args.manual_keyword,
         )
     manifest = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     print(f"Output: {run_dir}")

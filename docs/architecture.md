@@ -41,7 +41,7 @@ Games/
   → pipeline/seo-scout
       search → collect → generate → topic QA → translate
   → intake
-      identity + site content + site plan + assets + 6-language articles
+      identity + site content + site plan + assets + 5-language articles
   → template scripts
       content/locales/navigation/assets → TypeScript → Next build → HTTP/SEO verification
 ```
@@ -108,4 +108,4 @@ SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。生成阶
 
 每个游戏 GitHub 仓库强制为 Private，发布器没有 Public 模式，并在推送前后验证可见性。游戏目录的 `package.json` 位于仓库根，因此 Vercel Root Directory 留空。部署只运行确定性 Next.js build；所有 AI 工作在本地工厂完成。
 
-发布器只在调用者明确传入 `--site-url` 时写入 `NEXT_PUBLIC_SITE_URL`；否则模板使用 Vercel 自动 production URL。站点负责人绑定最终域名后再完成生产验证。模板集中把裸域名规范为 HTTPS origin，并让 metadata、JSON-LD、sitemap 与 robots 共享 locale-aware URL 构造器；非英语页面必须 self-canonical。部署验收拒绝重定向 sitemap URL、域名后双斜杠、canonical/hreflang 冲突和 metadata 缺失。
+后台站点 Job 总是传入 `--skip-vercel`：发布器完成 Private GitHub 后写入 `vercel.status=manual_action_required`，Job 可以标记 `succeeded`。这表示生成完成，不表示线上完成。运营者在 Vercel 手工导入、绑定域名、设置 `NEXT_PUBLIC_SITE_URL` 并部署后，必须运行 `verify:deploy`。模板集中把 origin 规范为 HTTPS，并让 metadata、JSON-LD、sitemap 与 robots 共享 locale-aware URL 构造器；非英语页面必须 self-canonical。线上验收拒绝重定向 sitemap URL、域名后双斜杠、canonical/hreflang 冲突和 metadata 缺失。

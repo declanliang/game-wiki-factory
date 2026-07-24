@@ -31,19 +31,20 @@ python gamewiki.py --config jobs/<game>.json
 - 不打印或提交任何 .env/API key。
 - 先确认 platform；Steam 身份使用 App ID，Roblox 身份使用 Place/Universe，不能混用事实字段。
 - 所有游戏 GitHub 仓库只能是 Private；发布器不得创建 Public repo。
-- 有正式域名时传 `--site-url`；没有时模板使用 Vercel 自动域名，禁止 `example.com` 出现在生产 sitemap/canonical。
+- 有正式域名时填写 `siteUrl`，让生成项目携带预期公开 origin。后台任务仍只发布 Private GitHub；Vercel 导入、`NEXT_PUBLIC_SITE_URL` 和线上验收由运营者完成，禁止 `example.com` 出现在真实生产 sitemap/canonical。
 - 不接纳完全无关主题，不为凑数量降低门槛；也不要把资料丰富的游戏强行压成 3–5 篇长文。
 - 检查 Guide Search 的 page_opportunities 及审计结果；Codes、Tier List、Updates 和实体资料页必须保留其页面类型元数据。
 - 不生成 Calculator、Planner、Team Builder 等工具页。
 - 不手工补标签掩盖被截断的翻译。
 
-完成标准：只保留有证据的 published 分类；简单游戏允许少量页面，资料丰富的游戏要保留不同意图和实体入口；en/es/de/fr/ja；五语言文章树一致；
-intake、MDX、TypeScript、production build、线上首页、metadata、sitemap、robots、所有 loc/hreflang 直接 200、self-canonical、OG 全部通过。Vercel READY 不等于完成，必须确认 `publish.json` 的 `stages.onlineVerification.status=complete`。
+生成完成标准：只保留有证据的 published 分类；简单游戏允许少量页面，资料丰富的游戏要保留不同意图和实体入口；en/es/de/fr/ja；五语言文章树一致；intake、MDX、TypeScript、production build、Private GitHub 全部通过。`result.vercel.status=manual_action_required` 是后台站点任务的预期结果，不代表已上线。
 
-最终报告：网站根目录、分类、语言、文章数、首页视频来源、manifest、最新日志、API 是否复用、Private repo 状态、Vercel 待配置域名与环境变量。
+上线完成标准：运营者手工导入 Vercel、绑定域名、设置 `NEXT_PUBLIC_SITE_URL` 并部署后，线上首页、metadata、sitemap、robots、所有 loc/hreflang 直接 200、self-canonical、OG 全部通过。Vercel READY 本身不算线上验收。
+
+最终报告：网站根目录、分类、语言、文章数、首页视频来源、manifest、最新日志、API 是否复用、Private repo 状态，以及 Vercel 是否仍需手工导入/域名/环境变量/线上验收。不得把“生成成功”简写成“已上线”。
 ```
 
-多个游戏要求并发时使用监督器，不要自行开多个无协调终端：
+用户可在配置中增加 `manualKeywords` 字符串数组。它们是补充发现源，仍必须通过风险过滤、证据门、Basic Info profile 和最终编辑门。多个游戏要求并发时使用监督器，不要自行开多个无协调终端：
 
 ```powershell
 python gamewiki.py run-many "GAME A" "GAME B" --jobs 2

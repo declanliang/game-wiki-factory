@@ -657,6 +657,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--platform", choices=["auto", "roblox", "steam"], default="auto")
     parser.add_argument("--official-url", help="Optional Roblox game or Steam app URL for deterministic identity selection.")
     parser.add_argument("--site-url", help="Optional final site domain/URL; passed to Vercel when --publish is used.")
+    parser.add_argument(
+        "--manual-keyword",
+        action="append",
+        default=[],
+        help="User-provided keyword to merge into Guide Search. May be repeated.",
+    )
     parser.add_argument("--template-dir", type=Path, default=ROOT / "template")
     parser.add_argument("--seo-scout-dir", type=Path, default=ROOT / "pipeline" / "seo-scout")
     parser.add_argument(
@@ -894,6 +900,8 @@ def main(argv: list[str] | None = None) -> int:
                     "--trusted-context-file",
                     str(keyword_context_path),
                 ]
+                for manual_keyword in args.manual_keyword:
+                    command.extend(["--manual-keyword", manual_keyword])
                 if reusable_run:
                     command.extend(["--from-run", str(reusable_run)])
                     record("keywords", "resuming", output=str(reusable_run))

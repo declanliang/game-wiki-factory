@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from adsterra import normalize_adsterra_config
-from factory_cli import PermitState, _config_command, _handler
+from factory_cli import PermitState, _config_command, _handler, normalize_manual_keywords
 from http.server import ThreadingHTTPServer
 from orchestrate_wiki import build_subprocess_env, read_json, slugify, write_json
 
@@ -223,7 +223,7 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("config.taskType must be site or ads")
     allowed = {
         "schemaVersion", "taskType", "operation", "game", "platform", "officialUrl",
-        "siteUrl", "publish", "refresh", "fullBuild", "publication",
+        "siteUrl", "publish", "refresh", "manualKeywords",
     }
     unknown = sorted(set(config) - allowed)
     if unknown:
@@ -236,32 +236,20 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("config.game must be a non-empty string")
     normalized.setdefault("platform", "auto")
     normalized.setdefault("publish", False)
-    operation = str(normalized.get("operation") or "auto").strip().casefold()
-    if operation not in {"auto", "new", "rebuild"}:
-        raise ValueError("config.operation must be auto, new, or rebuild")
-    normalized["operation"] = operation
-    normalized.setdefault("fullBuild", operation == "rebuild")
-    if operation == "rebuild":
-        normalized["fullBuild"] = True
-    publication = normalized.get("publication") or {}
-    if not isinstance(publication, dict):
-        raise ValueError("config.publication must be an object")
-    publication_allowed = {
-        "githubOwner", "githubRepo", "reuseExisting", "replaceRepositoryContents",
-        "vercelProject", "skipVercel",
-    }
-    unknown_publication = sorted(set(publication) - publication_allowed)
-    if unknown_publication:
-        raise ValueError(f"unknown publication field(s): {', '.join(unknown_publication)}")
-    if normalized.get("fullBuild") and normalized.get("publish"):
-        publication.setdefault("reuseExisting", True)
-        publication.setdefault("replaceRepositoryContents", True)
+    operation = str(normalized.get("operation") or "new").strip().casefold()
+    if operation not in {"auto", "new"}:
+        raise ValueError("config.operation must be new; legacy rebuild jobs are no longer accepted")
+    normalized["operation"] = "new"
+    normalized["manualKeywords"] = normalize_manual_keywords(
+        normalized.get("manualKeywords")
+    )
+    publication: dict[str, Any] = {}
     # Background jobs publish the private GitHub repository only. Vercel
     # import, domain selection, and runtime variables remain operator-owned.
     publication.setdefault("skipVercel", True)
     normalized["publication"] = publication
     # Validate the fields shared with the foreground CLI.
-    foreground = {k: normalized[k] for k in ("schemaVersion", "game", "platform", "officialUrl", "siteUrl", "publish", "refresh") if k in normalized}
+    foreground = {k: normalized[k] for k in ("schemaVersion", "game", "platform", "officialUrl", "siteUrl", "publish", "refresh", "manualKeywords") if k in normalized}
     foreground["schemaVersion"] = 1
     _config_command(foreground)
     return normalized
@@ -417,15 +405,13 @@ def classify_failure(text: str) -> str:
 
 
 def _execution_config(config: dict[str, Any], attempt_number: int) -> dict[str, Any]:
-    result = {k: config[k] for k in ("game", "platform", "officialUrl", "siteUrl") if k in config}
+    result = {k: config[k] for k in ("game", "platform", "officialUrl", "siteUrl", "manualKeywords") if k in config}
     result["schemaVersion"] = 1
     result["publish"] = False
     if attempt_number != 1:
         # A retry resumes the checkpoints written by the previous attempt.  It must
         # never repeat paid refresh work merely because a later stage failed.
         result["refresh"] = {"basicInfo": False, "keywords": False, "articles": False}
-    elif config.get("fullBuild"):
-        result["refresh"] = {"basicInfo": True, "keywords": True, "articles": True}
     else:
         requested = config.get("refresh") or {}
         result["refresh"] = {
@@ -441,21 +427,15 @@ def _ad_execution_config(config: dict[str, Any]) -> dict[str, Any]:
     return config
 
 
-def _prepare_full_build(config: dict[str, Any], slug: str, attempt_number: int) -> Path | None:
-    """Move an old local project aside once so full_build starts from an empty workspace."""
-    if not config.get("fullBuild") or attempt_number != 1:
+def _new_workspace_conflict(slug: str, attempt_number: int) -> Path | None:
+    """Reject a newly submitted site job if its workspace is not empty."""
+    if attempt_number != 1:
         return None
     projects_root = Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)).expanduser().resolve()
     project = (projects_root / slug).resolve()
     if project.parent != projects_root:
-        raise RuntimeError("refusing to rebuild a project outside GAMEWIKI_PROJECTS_ROOT")
-    if not project.exists():
-        return None
-    backup = projects_root / f"{slug}.pre-full-build-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
-    if backup.exists():
-        raise RuntimeError(f"full-build backup already exists: {backup}")
-    project.rename(backup)
-    return backup
+        raise RuntimeError("refusing to inspect a project outside GAMEWIKI_PROJECTS_ROOT")
+    return project if project.exists() else None
 
 
 def _prune_success_build_artifacts(config: dict[str, Any], slug: str) -> list[str]:
@@ -521,8 +501,6 @@ def _publish_command(config: dict[str, Any], slug: str) -> list[str]:
         command.extend(["--owner", str(publication["githubOwner"])])
     if publication.get("githubRepo"):
         command.extend(["--repo", str(publication["githubRepo"])])
-    if publication.get("replaceRepositoryContents") or config.get("fullBuild"):
-        command.append("--replace-existing")
     if publication.get("vercelProject"):
         command.extend(["--vercel-project", str(publication["vercelProject"])])
     if publication.get("skipVercel", True):
@@ -530,28 +508,6 @@ def _publish_command(config: dict[str, Any], slug: str) -> list[str]:
     if config.get("siteUrl"):
         command.extend(["--site-url", str(config["siteUrl"])])
     return command
-
-
-def _reuse_publication_from_backup(config: dict[str, Any], backup: Path | None) -> None:
-    """Recover nonstandard repo/project names before an old workspace is rebuilt."""
-    if backup is None:
-        return
-    receipt_path = backup / ".gamewiki" / "publish.json"
-    if not receipt_path.is_file():
-        return
-    receipt = read_json(receipt_path)
-    stages = receipt.get("stages") or {}
-    github = stages.get("github") or {}
-    vercel = stages.get("vercel") or {}
-    publication = config.setdefault("publication", {})
-    full_repo = str(github.get("repo") or "").strip()
-    if "/" in full_repo:
-        owner, repo = full_repo.split("/", 1)
-        publication.setdefault("githubOwner", owner)
-        publication.setdefault("githubRepo", repo)
-    project_name = str(vercel.get("projectName") or "").strip()
-    if project_name:
-        publication.setdefault("vercelProject", project_name)
 
 
 def _run_process(command: list[str], log, env: dict[str, str], job_id: str) -> int:
@@ -591,18 +547,14 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
     log_path = logs / f"attempt-{attempt}.log"
     config_path = configs / f"attempt-{attempt}.json"
     task_type = str(config.get("taskType") or "site")
-    backup = _prepare_full_build(config, job["slug"], attempt) if task_type == "site" else None
-    _reuse_publication_from_backup(config, backup)
+    workspace_conflict = (
+        _new_workspace_conflict(job["slug"], attempt) if task_type == "site" else None
+    )
     write_json(
         config_path,
         _ad_execution_config(config) if task_type == "ads" else _execution_config(config, attempt),
     )
     env = build_subprocess_env(ROOT)
-    if task_type == "site" and config.get("fullBuild"):
-        # Preserve the original paid full-rebuild certification intent across
-        # retries. The foreground resume heuristic alone cannot distinguish a
-        # legacy incremental resume from attempt 2+ of a new full rebuild.
-        env["GAMEWIKI_CERTIFY_RELEASE"] = "1"
     stop = threading.Event()
     heartbeat = threading.Thread(target=_heartbeat, args=(job_id, job["slug"], worker, stop, lease_seconds, task_type), daemon=True)
     heartbeat.start()
@@ -614,19 +566,23 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
             (job_id, attempt, worker, "running", _now(), str(log_path)),
         )
         _event(db, job_id, "attempt.started", attempt=attempt, worker=worker)
-        if backup:
-            _event(db, job_id, "workspace.archived", path=str(backup))
     code = 1
     completion_result: dict[str, Any] | None = None
     try:
         with log_path.open("w", encoding="utf-8") as log:
             log.write(f"job={job_id}\nattempt={attempt}\nstarted={_now()}\n")
-            command = (
-                [sys.executable, str(ROOT / "gamewiki.py"), "ads", "import", "--config", str(config_path)]
-                if task_type == "ads"
-                else [sys.executable, str(ROOT / "gamewiki.py"), "--config", str(config_path)]
-            )
-            code = _run_process(command, log, env, job_id)
+            if workspace_conflict is not None:
+                log.write(
+                    "[failed] new site job requires an empty workspace; "
+                    f"existing workspace: {workspace_conflict}\n"
+                )
+            else:
+                command = (
+                    [sys.executable, str(ROOT / "gamewiki.py"), "ads", "import", "--config", str(config_path)]
+                    if task_type == "ads"
+                    else [sys.executable, str(ROOT / "gamewiki.py"), "--config", str(config_path)]
+                )
+                code = _run_process(command, log, env, job_id)
             if code == 0 and task_type == "site" and config.get("publish"):
                 with connect() as db:
                     db.execute("UPDATE jobs SET current_stage='publish',updated_at=? WHERE id=?", (_now(), job_id))

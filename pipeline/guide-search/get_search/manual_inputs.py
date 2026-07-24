@@ -95,6 +95,7 @@ def _candidates_from_values(
 def load_manual_inputs(
     topic: str,
     input_dir: Path,
+    extra_keywords: list[str] | None = None,
 ) -> tuple[list[Candidate], list[dict[str, str]], dict[str, Any]]:
     candidates: list[Candidate] = []
     rejected: list[dict[str, str]] = []
@@ -156,6 +157,22 @@ def load_manual_inputs(
                 "file": suggest_path.name,
                 "source": "google_suggest_manual",
                 "raw_keywords": len(values),
+                "accepted_keywords": len(accepted),
+                "rejected_keywords": len(invalid),
+            }
+        )
+
+    if extra_keywords:
+        accepted, invalid = _candidates_from_values(
+            topic, extra_keywords, "user_provided"
+        )
+        candidates.extend(accepted)
+        rejected.extend(invalid)
+        files.append(
+            {
+                "file": "job-config:manualKeywords",
+                "source": "user_provided",
+                "raw_keywords": len(extra_keywords),
                 "accepted_keywords": len(accepted),
                 "rejected_keywords": len(invalid),
             }

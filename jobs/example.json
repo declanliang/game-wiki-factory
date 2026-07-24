@@ -3,5 +3,9 @@
   "platform": "roblox",
   "officialUrl": "https://www.roblox.com/games/PLACE_ID/GAME-SLUG",
   "siteUrl": "https://game-domain.example",
+  "manualKeywords": [
+    "GAME NAME beginner guide",
+    "GAME NAME best units"
+  ],
   "publish": true
 }

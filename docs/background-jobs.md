@@ -4,7 +4,7 @@
 
 ## 目标与边界
 
-Factory 用同一条 `full_build` 流水线处理新站和旧站。旧站不是另一套内容升级逻辑：它重新执行最新的信息采集、关键词、页面规划、文章、翻译、模板、构建和 QA，仅复用指定 GitHub repo、Vercel project、域名及线上环境变量。发布前必须完成本地生产验收。
+Factory 只接收新站任务。每个游戏从空 workspace 执行信息采集、关键词、页面规划、文章、翻译、模板、构建和 QA，并创建自己的 Private GitHub repo。Vercel 由运营者手工导入。GitHub 发布前必须完成本地生产验收。
 
 OpenClaw、命令行和未来管理界面只提交或控制任务；真正的长任务由独立 Worker 进程执行。关闭终端或 Agent 对话不得改变数据库中的任务状态，服务器重启后 Worker 可重新领取中断任务。
 
@@ -27,7 +27,7 @@ gamewiki.py jobs submit/status/logs/retry/cancel
 ```
 
 - SQLite 保存任务、attempt、状态和非敏感发布信息，不保存 API key。
-- 成功时把文章/分类数量、Private repo、Vercel 和线上验收写入 `result_json`；`jobs status --json` 会返回为 `result`，因此 workspace 清理后 OpenClaw 仍能准确汇报。
+- 成功时把文章/分类数量、Private repo 和 Vercel 手工操作提示写入 `result_json`；`jobs status --json` 会返回为 `result`，因此 workspace 清理后 OpenClaw 仍能准确汇报生成结果。
 - 每个任务使用独立 sibling workspace 和 `.gamewiki` checkpoint。
 - Worker 通过原子 lease 防止两个进程领取同一任务。
 - 流水线内部 checkpoint 仍是阶段恢复的事实源；任务数据库不复制内容产物。
@@ -96,24 +96,22 @@ python gamewiki.py jobs notifications --ack 12 13
 
 ## 配置契约
 
-站点任务只要求 `game`。平台、官网和域名已知时应填写；GitHub repo 与 Vercel project 由系统创建或解析，不属于日常输入：
+站点任务只要求 `game`。平台、官网、域名和手工关键词已知时应填写；GitHub repo 与 Vercel project 不属于输入：
 
 ```json
 {
   "schemaVersion": 3,
   "taskType": "site",
-  "operation": "rebuild",
   "game": "Example Game",
   "platform": "roblox",
   "officialUrl": "https://www.roblox.com/games/123/example",
+  "manualKeywords": ["Example Game codes", "Example Game best units"],
   "publish": true,
   "siteUrl": "https://example-game.wiki"
 }
 ```
 
-`operation: rebuild` 是 `fullBuild: true` 的清晰入口，强制刷新 Basic Info、关键词规划和文章/翻译。旧 workspace 会先改名备份；发布目标从旧 `.gamewiki/publish.json` 恢复，缺少 receipt 时使用游戏 slug 查找默认 repo/project。普通失败恢复不再次刷新，Worker 重试依赖已落盘 checkpoint。
-
-`replaceRepositoryContents: true` 表示旧 repo 的 tracked tree 由新站完整替换，不解决历史代码冲突。发布器先创建远端备份 tag，再以经过 QA 的新 `main` 覆盖远端；当前线上部署在新 Push 成功前不受影响。Repo 必须为 Private。
+`manualKeywords` 最多 200 项，规范化和去重后作为 `user_provided` 来源进入 Guide Search；它们不会绕过风险过滤、证据门或 Basic Info profile。普通失败恢复不刷新，Worker 重试依赖已落盘 checkpoint。
 
 一次提交 10 个游戏使用 `jobs/batch.example.json`：
 
@@ -184,7 +182,7 @@ JINA_API_KEY_2=
 2. 同一 job 不会被两个 Worker 同时执行。
 3. 发布失败不会重跑已完成内容阶段。
 4. 临时错误有界重试，永久错误进入 `needs_attention`。
-5. 新站创建 Private repo/Vercel；旧站复用目标并替换 repo 内容。
+5. 每个站点创建新的 Private repo；Vercel 由运营者手工导入。
 6. 未提供广告变量时零广告渲染；已有 Vercel 环境变量不被发布器删除。
 7. 广告 JSON 的域名不属于目标 Vercel project，或标题与代码尺寸不一致时，任务必须在写入任何变量前失败。
-8. 每次 production deployment 后自动执行线上验收；只有 `publish.json` 中 `stages.onlineVerification.status=complete` 才能把站点任务标记成功。验证日志固定保存为项目 `.gamewiki/deploy-verification.log`。
+8. 站点 Job 成功时必须有 Private GitHub 和 `vercel.manual_action_required`；运营者完成 Vercel 手工部署后，另行执行 `verify:deploy` 才能把网站称为“已上线并验证”。验证日志固定保存为项目 `.gamewiki/deploy-verification.log`。

@@ -4,7 +4,7 @@
 
 ## 用户应该提供什么
 
-新站/续跑只要求游戏名；已知信息应尽量填写，避免身份歧义。不要填写 GitHub repo、Vercel project 或任何密钥：新站由系统创建，旧站由 receipt/slug 自动复用。
+新站只要求游戏名；已知信息应尽量填写，避免身份歧义。不要填写 GitHub repo、Vercel project 或任何密钥。所有未来游戏都按新项目处理，不接受 rebuild/旧 repo 覆盖输入。
 
 ```json
 {
@@ -12,27 +12,17 @@
   "platform": "roblox",
   "officialUrl": "https://www.roblox.com/games/PLACE_ID/SLUG",
   "siteUrl": "https://game-domain.example",
+  "manualKeywords": ["GAME NAME codes", "GAME NAME best units"],
   "publish": true
 }
 ```
 
 - `platform`：`roblox`、`steam` 或 `auto`。
 - Steam 的 `officialUrl` 必须是 Steam Store App URL。
-- `siteUrl` 可省略；省略时使用并验证 Vercel 默认 production 域名。
+- `siteUrl` 可省略；运营者手工导入 Vercel 后再决定正式域名，并设置匹配的 `NEXT_PUBLIC_SITE_URL`。
 - 单站的 `schemaVersion`、`taskType: site` 和默认 operation 由系统自动补齐，用户无需填写。
-- 新站不填写 `operation`；失败续跑仍提交/重试原 job。
-- 旧半成品彻底重做时，在与 `game` 同级的顶层填写 `"operation": "rebuild"`。它会完整重新付费采集/生成，创建 repo 备份 tag 后替换原站：
-
-```json
-{
-  "operation": "rebuild",
-  "game": "OLD GAME NAME",
-  "platform": "roblox",
-  "officialUrl": "https://www.roblox.com/games/PLACE_ID/SLUG",
-  "siteUrl": "https://existing-domain.example",
-  "publish": true
-}
-```
+- `manualKeywords` 可选，最多 200 项。它们会作为 `user_provided` 来源进入 Guide Search，但仍受风险、证据和分类边界约束。
+- 不填写 `operation`；失败续跑只重试原 Job。
 
 推荐给 OpenClaw 的话：
 
@@ -78,7 +68,7 @@ Prompt：
 
 ## 生产版本认定
 
-当前稳定版本读取根目录 `release.json`。普通 Git commit 不改变产品版本。OpenClaw 不得按日期、外观或文章数量推断版本；必须检查任务结果中的 `factoryRelease`、站点的 `intake/factory-release.json`，并以 `docs/releases/v1_0722-sites.json` 为最终登记依据。旧站普通续跑不会获得版本标记，必须提交顶层 `operation: rebuild`。
+当前稳定版本读取根目录 `release.json`。普通 Git commit 不改变产品版本。OpenClaw 不得按日期、外观或文章数量推断版本；必须检查任务结果中的 `factoryRelease` 和站点的 `intake/factory-release.json`。线上认证还必须由运营者完成 Vercel 验收并登记到 release 站点清单。
 
 ## 查询、异常和完成汇报
 
@@ -162,5 +152,5 @@ Agent 发现疑似代码 bug 时只能报告证据并保持任务为 `needs_atte
 - GitHub 只能是 Private；拒绝 Public 请求。
 - 不因文章数量少就造 fallback。先读 `content-opportunity-report.json`：公开资料少可以接受；明显跨游戏内容必须删除。
 - Vercel READY、Git push 成功或本地 build 成功都不是最终成功；线上自动验证是发布事务的最后一步。
-- 旧站重建不解决旧代码冲突，直接使用当前流程重做并替换 repo；失败时保留旧线上版本和备份 tag。
+- 同名目标目录或 repo 已存在时停止并升级，不得自动删除、覆盖或把它解释为旧站升级。
 - 广告标题是严格协议：`Native Banner`、`Banner 468x60`、`Banner 300x250`、`Banner 160x300`、`Banner 160x600`、`Banner 320x50`、`Banner 728x90`，不可凭 alias 猜测位置。

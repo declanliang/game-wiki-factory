@@ -103,11 +103,11 @@ sudo systemctl list-timers 'gamewiki-*'
 df -h / /srv/game-wiki-factory
 ```
 
-在服务器执行根测试，再提交一个 `publish: false` 的已知游戏冒烟任务。发布能力只在 GitHub Private 后置校验、Vercel deployment 和线上 canonical/sitemap/robots/hreflang 验证全部通过后视为恢复完成。
+在服务器执行根测试，再提交一个 `publish: false` 的测试游戏冒烟任务。后台生成能力在本地 QA 和 GitHub Private 后置校验通过后视为恢复；Vercel 手工导入和线上 canonical/sitemap/robots/hreflang 验收作为独立运营步骤验证。
 
 ## 更新、回滚与全损恢复
 
-更新前确认没有 `running` 任务，备份 `data/jobs.sqlite3`，然后在 `app/` 执行 `git pull --ff-only`、安装依赖、跑测试，最后重启受影响服务。不要在服务器直接提交或热修。
+更新前确认没有 `running` 任务，备份 `data/jobs.sqlite3`，然后在 `app/` 执行 `git pull --ff-only`、安装依赖、跑测试，最后重启受影响服务。Private repo 应配置只读 deploy key；若服务器没有 GitHub 凭据，可由已认证维护机创建并验证 Git bundle，通过 SSH 传输后在服务器 `git fetch <bundle> main` 与 `git merge --ff-only FETCH_HEAD`。不要在服务器直接提交或热修。
 
 回滚使用已知良好 commit：停止领取新任务，切到该 commit，重新安装锁定依赖、跑测试并重启。数据库 schema 变更前必须另存 SQLite 备份。
 

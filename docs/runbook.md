@@ -11,7 +11,7 @@ Copy-Item jobs\example.json jobs\my-game.json
 python gamewiki.py --config jobs\my-game.json
 ```
 
-配置文件必须明确 `game`、`platform` 和已知的 `officialUrl`；Steam 使用 Store App URL，Roblox 使用 Experience URL。`publish: true` 会完成 Private GitHub 和 Vercel production 发布。真实 `jobs/*.json`、配置快照和日志都被 Git 忽略。
+配置文件必须明确 `game`、`platform` 和已知的 `officialUrl`；Steam 使用 Store App URL，Roblox 使用 Experience URL。`publish: true` 会完成本地生产验收和 Private GitHub 发布；后台站点 Job 默认不部署 Vercel。真实 `jobs/*.json`、配置快照和日志都被 Git 忽略。
 
 直接参数模式仍可用于调试：
 
@@ -42,19 +42,21 @@ python gamewiki.py logs <slug> --tail 150
 python gamewiki.py resume <slug>
 ```
 
-## 自动发布
+## GitHub 发布与 Vercel 手工上线
 
-GitHub Actions 设置 Secrets：`FACTORY_GITHUB_TOKEN`、`VERCEL_TOKEN` 以及生成/搜索/翻译 API key；设置 Variables：`FACTORY_GITHUB_OWNER`、可选 `VERCEL_TEAM_ID`。本地发布会优先读取 factory `.env`，没有 token 时复用 `gh auth login` 与 `vercel login` 会话。发布器强制 GitHub 仓库为 Private；只有明确传入 `--site-url` 才会写 Production 的公开 canonical 环境变量，并在环境配置完成后触发 production deployment。
+GitHub Actions 设置 Secrets：`FACTORY_GITHUB_TOKEN` 以及生成/搜索/翻译 API key；设置 Variable：`FACTORY_GITHUB_OWNER`。本地发布会优先读取 factory `.env`，没有 token 时复用 `gh auth login` 会话。发布器强制 GitHub 仓库为 Private。
 
 ```powershell
 python gamewiki.py publish <slug>
 ```
 
-需要无人值守生成后立即发布时，可用单游戏 `python gamewiki.py "GAME" --publish` 或多游戏 `python gamewiki.py run-many "A" "B" --jobs 2 --publish`。
+需要无人值守生成后立即推送 Private GitHub 时，可用单游戏 `python gamewiki.py "GAME" --publish` 或多游戏 `python gamewiki.py run-many "A" "B" --jobs 2 --publish`。
 
-已存在的 GitHub/Vercel 项目会复用。GitHub integration 未授权读取 Private repo 时，完成授权后重复同一命令。Actions 中运行 `Generate and publish game wikis`，`games_json` 输入合法 JSON 数组，例如 `["Game A", "Game B"]`。
+每个新游戏创建自己的 Private GitHub repo。GitHub integration 未授权读取 Private repo 时，完成授权后重复同一命令。Actions 中运行 `Generate and publish game wikis`，`games_json` 输入合法 JSON 数组，例如 `["Game A", "Game B"]`。
 
-未传 `--site-url` 时，模板使用并自动验证 Vercel 默认 production URL；已知正式域名时传 `--site-url`，发布器配置 Production 并以该域名验收。每次 production deployment 都用最终公开 origin 重新做一次确定性 production build 并自动运行 `verify:deploy`；它不调用 LLM/API。失败会阻止任务成功并把完整输出保存到 `.gamewiki/deploy-verification.log`。下面的手动命令只用于诊断或域名/DNS 修复后的独立复查。
+后台配置会把 `publication.skipVercel` 默认为 `true`。成功回执必须包含 Private GitHub 和 `vercel.status=manual_action_required`。此时只可报告“生成完成”，不得报告“已上线”。
+
+Vercel 上线由运营者完成：导入游戏 Private repo，Root Directory 留空，绑定最终域名，把 Production 的 `NEXT_PUBLIC_SITE_URL` 设为完整 HTTPS origin，然后部署。部署后在游戏根运行 `npm run verify:deploy`；它不调用 LLM/API，会检查首页 metadata/canonical、sitemap、robots 和全部 loc/hreflang 直接 200。完整输出保存在 `.gamewiki/deploy-verification.log`。
 
 ## 排查顺序
 
@@ -127,13 +129,13 @@ npm run verify:deploy
 
 `NEXT_PUBLIC_SITE_URL` 推荐填写完整 `https://...`；裸域名会自动补 HTTPS。它是公开站点 origin，不需要 Sensitive。`verify:deploy` 会读取线上 HTML 并检查 title、canonical、`og:url`、图片绝对 URL、sitemap/robots 和全部 loc/hreflang 直接 200，避免把跳转或 metadata 崩溃的 HTTP 200 当成成功。
 
-## 已有网站的两类操作
+## 已生成项目的维护
 
 固定语言策略减少时，先运行 `python migrate_language_policy.py <游戏项目目录>`，再同步当前模板并执行完整 build/线上验收。该命令只删除退出产品策略的 locale，不调用 API，也不修改仍受支持的文章。
 
 仅修复通用模板或编排器时，从 Factory 再次执行同一游戏名。同步模板不会覆盖游戏的 `intake/`、`content/`、`.gamewiki/`、`node_modules/` 或本地环境文件；不使用 refresh，即可复用内容 checkpoint、重新物化并验证站点。
 
-旧站尚未使用当前信息扩充流程时，不走模板升级捷径，提交 `operation: rebuild`。系统把它视为新站完整采集和生成，旧 workspace 先归档，旧 Private repo 在创建备份 tag 后整树替换，原 Vercel project、域名和广告等环境变量继续复用。
+未来输入不再处理历史旧站或覆盖已有 repo。若同名目标目录已经存在且不是当前 Job 的 checkpoint，停止并核对身份，不得自动删除或替换。
 
 ## Adsterra 配置
 

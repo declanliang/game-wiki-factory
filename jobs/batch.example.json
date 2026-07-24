@@ -11,7 +11,8 @@
       "game": "GAME ONE",
       "platform": "roblox",
       "officialUrl": "https://www.roblox.com/games/PLACE_ID/GAME-SLUG",
-      "siteUrl": "https://game-one.example"
+      "siteUrl": "https://game-one.example",
+      "manualKeywords": ["GAME ONE codes", "GAME ONE progression"]
     },
     {
       "game": "GAME TWO",

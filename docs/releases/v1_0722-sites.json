@@ -1,6 +1,6 @@
 {
   "release": "v1_0722",
-  "lastAuditedAt": "2026-07-22",
+  "lastAuditedAt": "2026-07-24",
   "certificationRule": "A site is certified only when intake/factory-release.json equals v1_0722 and the production online verification succeeds.",
   "certifiedSites": [
     {
@@ -54,22 +54,6 @@
       "categories": ["guide", "codes", "modes", "economy", "characters", "upgrades", "updates", "tier-list"]
     }
   ],
-  "needsRebuild": [
-    {"game": "Skibi Defense", "slug": "skibi-defense-roblox", "githubRepo": "declanliang/skibi-defense-roblox", "vercelProject": "skibi-defense-roblox", "productionUrl": "https://skibi-defense-roblox.wiki"},
-    {"game": "Anime Squadron", "slug": "anime-squadron", "githubRepo": "declanliang/anime-squadron", "vercelProject": "anime-squadron", "productionUrl": "https://anime-squadron-roblox.wiki"},
-    {"game": "Build A Blue Lock Squad", "slug": "build-a-blue-lock-squad", "githubRepo": "declanliang/build-a-blue-lock-squad", "vercelProject": "build-a-blue-lock-squad", "productionUrl": "https://build-a-blue-lock-squad.vercel.app"},
-    {"game": "Storage Hunters Open World", "slug": "storage-hunters-open-world", "githubRepo": "declanliang/storage-hunters-open-world", "vercelProject": "storage-hunters-open-world", "productionUrl": "https://storage-hunters-open-world-tawny.vercel.app"},
-    {"game": "Element Arena", "slug": "element-arena", "githubRepo": "declanliang/element-arena", "vercelProject": "element-arena", "productionUrl": "https://element-arena-roblox.wiki"},
-    {"game": "Elemental Magic Arena", "slug": "elemental-magic-arena", "githubRepo": "declanliang/elemental-magic-arena", "vercelProject": "elemental-magic-arena", "productionUrl": "https://elemental-magic-arena.vercel.app"},
-    {"game": "Blox Monsters", "slug": "blox-monsters", "githubRepo": "declanliang/blox-monsters", "vercelProject": "blox-monsters", "productionUrl": "https://blox-monsters-roblox.wiki"},
-    {"game": "Dino Hunters", "slug": "dino-hunters", "githubRepo": "declanliang/dino-hunters", "vercelProject": "dino-hunters", "productionUrl": "https://dino-hunters.vercel.app"},
-    {"game": "Flip A Boat", "slug": "flip-a-boat", "githubRepo": "declanliang/flip-a-boat", "vercelProject": "flip-a-boat", "productionUrl": "https://flip-a-boat.vercel.app"},
-    {"game": "Legends Battlegrounds", "slug": "legends-battlegrounds", "githubRepo": "declanliang/legends-battlegrounds", "vercelProject": "legends-battlegrounds", "productionUrl": "https://legends-battlegrounds.wiki"},
-    {"game": "Funnel Runners", "slug": "funnel-runners", "githubRepo": "declanliang/funnel-runners", "vercelProject": "funnel-runners", "productionUrl": "https://funnel-runners.vercel.app"},
-    {"game": "My Giant Sandwich", "slug": "my-giant-sandwich", "githubRepo": "declanliang/my-giant-sandwich", "vercelProject": "my-giant-sandwich", "productionUrl": "https://my-giant-sandwich.vercel.app"},
-    {"game": "Guess the character color", "slug": "guess-the-character-color", "githubRepo": "declanliang/guess-the-character-color", "vercelProject": "guess-the-character-color", "productionUrl": "https://guess-the-character-color.vercel.app"},
-    {"game": "Build An ASMR Tower", "slug": "build-an-asmr-tower-roblox", "githubRepo": "declanliang/BUILD-AN-ASMR-TOWER-ROBLOX", "vercelProject": "build-an-asmr-tower-roblox", "productionUrl": "https://build-an-asmr-tower-roblox.vercel.app"},
-    {"game": "Hellhole", "slug": "hell-hole-roblox", "githubRepo": "declanliang/hell-hole-roblox", "vercelProject": "hell-hole-roblox", "productionUrl": "https://hell-hole-roblox.wiki"},
-    {"game": "Anime Paradox X", "slug": "anime-paradox-x", "githubRepo": "declanliang/anime-paradox-x", "vercelProject": "anime-paradox-x", "productionUrl": "https://anime-paradox-x-bay.vercel.app"}
-  ]
+  "needsRebuild": [],
+  "legacyRebuildBacklogRetired": true
 }

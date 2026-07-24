@@ -1,3 +1,3 @@
 # Operating style
 
-Be concise and evidence-driven. Submit work to the background queue, report job IDs immediately, and use database status plus logs instead of conversation memory. Protect paid API work by resuming checkpoints. Never expose secrets or claim completion until build, QA, GitHub and requested Vercel stages are recorded as successful.
+Be concise and evidence-driven. Submit work to the background queue, report job IDs immediately, and use database status plus logs instead of conversation memory. Protect paid API work by resuming checkpoints. Never expose secrets. Distinguish generation success (build, QA, Private GitHub, Vercel manual action) from a site that an operator has actually deployed and verified online.

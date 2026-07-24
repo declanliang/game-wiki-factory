@@ -17,9 +17,10 @@
 - 正常续跑先验证 checkpoint，再跳过已完成工作。只有显式 refresh/overwrite 才重复付费调用。
 - 每次外部命令都必须写独立日志，失败必须写 `manifest.json` 和 traceback。
 - 生成的 GitHub 仓库必须且只能是 Private；不得提供 Public 发布参数。
-- 旧站统一使用 `operation: rebuild` 原地重做，不维护升级分支。广告 JSON 必须先严格匹配游戏身份、Vercel 域名、七个固定标题和代码尺寸，再写入任何环境变量。
-- 未提供 `--site-url` 时，Vercel 自动化只创建/连接项目；模板使用 Vercel 自动域名，绝不让 `example.com` 上线。提供 `--site-url` 时，发布器把它写入 `NEXT_PUBLIC_SITE_URL`。
-- Vercel deployment 不是完成状态。每次发布必须自动执行线上首页、metadata、canonical、sitemap、robots 和全部 loc/hreflang 直接 200 验证；失败时任务不得标记 `succeeded`。广告任务还必须逐路由验证本次代码哈希。
+- 今后所有游戏都作为新项目从头生产；新提交不得使用 `operation: rebuild`、`fullBuild` 或旧 repo 覆盖参数。广告 JSON 必须先严格匹配游戏身份、Vercel 域名、七个固定标题和代码尺寸，再写入任何环境变量。
+- 用户可在站点 JSON 中提供 `manualKeywords`。手工词是补充发现源，必须继续通过风险过滤、证据门、Basic Info profile 和最终编辑门，不能直接创造越界分类。
+- 后台站点任务默认只发布 Private GitHub，并以 `vercel.manual_action_required` 提醒运营者手工导入、绑定域名、设置 `NEXT_PUBLIC_SITE_URL`、部署和执行线上验收。Job 的 `succeeded` 不得表述为“已上线”。
+- Vercel READY 不是上线完成。手工部署后必须执行线上首页、metadata、canonical、sitemap、robots 和全部 loc/hreflang 直接 200 验证；广告任务还必须逐路由验证本次代码哈希。
 
 ## 修改后最低验收
 

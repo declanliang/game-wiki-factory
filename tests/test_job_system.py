@@ -9,13 +9,13 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _completion_result, _event, _execution_config, _prepare_full_build, _prune_success_build_artifacts, acknowledge_notifications, classify_failure, claim, connect, normalize_config, pending_notifications, submit, submit_batch
+from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _prune_success_build_artifacts, acknowledge_notifications, classify_failure, claim, connect, normalize_config, pending_notifications, submit, submit_batch
 
 
 class JobSystemTests(unittest.TestCase):
-    def test_full_build_refreshes_only_first_attempt(self) -> None:
-        config = normalize_config({"game": "Test Game", "platform": "roblox", "fullBuild": True})
-        self.assertEqual(_execution_config(config, 1)["refresh"], {"basicInfo": True, "keywords": True, "articles": True})
+    def test_new_job_does_not_force_paid_refresh(self) -> None:
+        config = normalize_config({"game": "Test Game", "platform": "roblox"})
+        self.assertEqual(_execution_config(config, 1)["refresh"], {"basicInfo": False, "keywords": False, "articles": False})
         self.assertEqual(_execution_config(config, 2)["refresh"], {"basicInfo": False, "keywords": False, "articles": False})
 
     def test_incremental_refresh_is_honored_once_then_resumes(self) -> None:
@@ -34,12 +34,21 @@ class JobSystemTests(unittest.TestCase):
             "articles": False,
         })
 
-    def test_rebuild_operation_automatically_replaces_existing_publication(self) -> None:
-        config = normalize_config({"game": "Old Site", "operation": "rebuild", "publish": True})
-        self.assertTrue(config["fullBuild"])
-        self.assertTrue(config["publication"]["reuseExisting"])
-        self.assertTrue(config["publication"]["replaceRepositoryContents"])
-        self.assertTrue(config["publication"]["skipVercel"])
+    def test_new_jobs_reject_legacy_rebuild_mode(self) -> None:
+        with self.assertRaisesRegex(ValueError, "legacy rebuild jobs are no longer accepted"):
+            normalize_config({"game": "Old Site", "operation": "rebuild"})
+
+    def test_manual_keywords_are_normalized_and_preserved_on_retry(self) -> None:
+        config = normalize_config({
+            "game": "Keyword Game",
+            "manualKeywords": [" Keyword Game codes ", "keyword game CODES", "Keyword Game units"],
+        })
+        self.assertEqual(config["operation"], "new")
+        self.assertEqual(config["manualKeywords"], ["Keyword Game codes", "Keyword Game units"])
+        self.assertEqual(
+            _execution_config(config, 2)["manualKeywords"],
+            ["Keyword Game codes", "Keyword Game units"],
+        )
 
     def test_batch_is_validated_then_submitted_as_independent_jobs(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):
@@ -98,30 +107,16 @@ class JobSystemTests(unittest.TestCase):
             self.assertEqual(claimed["id"], retry_id)
             self.assertNotEqual(claimed["id"], queued_id)
 
-    def test_publication_contract_accepts_replace_existing(self) -> None:
-        config = normalize_config({
-            "game": "Old Site",
-            "platform": "roblox",
-            "publish": True,
-            "fullBuild": True,
-            "publication": {
-                "githubRepo": "old-site",
-                "reuseExisting": True,
-                "replaceRepositoryContents": True,
-                "vercelProject": "old-site",
-            },
-        })
-        self.assertTrue(config["publication"]["replaceRepositoryContents"])
+    def test_full_build_is_rejected_for_new_jobs(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unknown config field"):
+            normalize_config({"game": "Old Site", "fullBuild": True})
 
-    def test_full_build_archives_existing_workspace_once(self) -> None:
+    def test_new_job_requires_empty_workspace_but_retry_can_resume(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_PROJECTS_ROOT": temporary}):
-            project = Path(temporary) / "old-site"
+            project = Path(temporary) / "new-site"
             project.mkdir()
-            (project / "old.txt").write_text("old", encoding="utf-8")
-            backup = _prepare_full_build({"fullBuild": True}, "old-site", 1)
-            self.assertFalse(project.exists())
-            self.assertTrue((backup / "old.txt").is_file())
-            self.assertIsNone(_prepare_full_build({"fullBuild": True}, "old-site", 2))
+            self.assertEqual(_new_workspace_conflict("new-site", 1), project)
+            self.assertIsNone(_new_workspace_conflict("new-site", 2))
 
     def test_successful_published_job_prunes_only_reproducible_build_caches(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(

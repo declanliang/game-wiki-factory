@@ -19,8 +19,24 @@ class PermitStateTests(unittest.TestCase):
         self.assertIn("auto", args)
 
     def test_rebuild_requires_background_job_safety(self) -> None:
-        with self.assertRaisesRegex(ValueError, "jobs submit"):
+        with self.assertRaisesRegex(ValueError, "legacy rebuild jobs are no longer accepted"):
             _config_command({"game": "Game", "operation": "rebuild"})
+
+    def test_config_maps_normalized_manual_keywords(self) -> None:
+        game, args = _config_command({
+            "game": "Keyword Game",
+            "manualKeywords": ["  Keyword Game codes  ", "keyword game CODES", "Keyword Game units"],
+        })
+        self.assertEqual(game, "Keyword Game")
+        self.assertEqual(args, [
+            "--platform", "auto",
+            "--manual-keyword", "Keyword Game codes",
+            "--manual-keyword", "Keyword Game units",
+        ])
+
+    def test_config_rejects_invalid_manual_keywords(self) -> None:
+        with self.assertRaisesRegex(ValueError, "must be an array"):
+            _config_command({"game": "Game", "manualKeywords": "game codes"})
 
     def test_config_normalizes_game_whitespace_and_maps_options(self) -> None:
         game, args = _config_command({
