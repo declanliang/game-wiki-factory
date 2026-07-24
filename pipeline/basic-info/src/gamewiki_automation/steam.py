@@ -89,6 +89,12 @@ class SteamClient:
         if not candidates:
             raise IdentityError(f"No Steam candidates found for {game_name!r}")
         best = candidates[0]
+        # A valid official URL supplies the immutable Steam App ID. Steam's
+        # app-details response for that ID is authoritative even when the user
+        # provides a shortened label. Preserve matchScore as an audit signal.
+        if best.get("source") == "explicit-official-url":
+            best["identitySelection"] = "explicit-app-id"
+            return best, candidates
         if best["matchScore"] < 0.9:
             raise IdentityError(
                 f"Top Steam candidate confidence {best['matchScore']:.2f} is below 0.90; review candidates in raw/identity.json",
@@ -129,7 +135,8 @@ class SteamClient:
             "identity": {
                 "query": query, "canonicalName": name, "currentPlatformName": name,
                 "slug": slugify(name), "platform": "Steam", "appId": app_id,
-                "canonicalUrl": canonical_url, "matchConfidence": selected["matchScore"],
+                "canonicalUrl": canonical_url,
+                "matchConfidence": 1.0 if selected.get("identitySelection") == "explicit-app-id" else selected["matchScore"],
             },
             "developer": {"name": developer, "type": "Studio", "id": None, "url": website, "verified": None},
             "game": {

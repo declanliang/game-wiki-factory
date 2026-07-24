@@ -201,6 +201,27 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(evidence["sources"][0]["publisher"], "Steam")
         self.assertEqual(raw["appDetails"]["controller_support"], "full")
 
+    def test_steam_official_url_allows_shortened_search_label(self):
+        class LongTitleSteamHttp(FakeSteamHttp):
+            def get_json(self, url, **kwargs):
+                if "appdetails" in url:
+                    payload = super().get_json(url.replace("3950130", "3712080"), **kwargs)
+                    details = payload["3712080"]["data"]
+                    details["name"] = "Database Detective: Minor Crimes Division"
+                    return {"3950130": {"success": True, "data": details}}
+                return super().get_json(url, **kwargs)
+
+        url = "https://store.steampowered.com/app/3950130/Database_Detective_Minor_Crimes_Division/"
+        client = SteamClient(LongTitleSteamHttp())
+        selected, candidates = client.select_identity("Database Detective", url)
+        facts, _, _ = client.collect("Database Detective", selected)
+
+        self.assertEqual(selected["appId"], "3950130")
+        self.assertEqual(selected["identitySelection"], "explicit-app-id")
+        self.assertEqual(selected["matchScore"], 0.0)
+        self.assertEqual(facts["identity"]["matchConfidence"], 1.0)
+        self.assertEqual(len(candidates), 1)
+
     def test_provider_schema_removes_format_without_mutating_local_schema(self):
         compatible = _provider_schema(HOMEPAGE_SCHEMA)
         serialized = json.dumps(compatible)
