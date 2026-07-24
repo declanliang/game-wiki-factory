@@ -109,9 +109,12 @@ openclaw agent --local --agent game-wiki-operator --message \
 服务器私有环境至少需要内容 API key、GitHub token、`CLOUDFLARE_ACCOUNT_ID` 和具有 Pages Edit 权限的 `CLOUDFLARE_API_TOKEN`。Factory 自动创建 Pages Direct Upload 项目、设置 `NEXT_PUBLIC_SITE_URL` 并部署；默认流程仍不运行广告 Job。更新凭据后：
 
 ```bash
+printf '%s\n%s\n' "$ACCOUNT_ID" "$API_TOKEN" | sudo /srv/game-wiki-factory/app/deploy/merge-cloudflare-credentials
 sudo chmod 600 /srv/game-wiki-factory/secrets/factory.env
 sudo systemctl restart gamewiki-worker gamewiki-control
 ```
+
+维护脚本只从标准输入读取两行并原子替换两个 Cloudflare key；不要把真实值直接写进命令参数、shell history 或日志。
 
 禁止把环境文件内容粘贴到 OpenClaw Prompt、GitHub Issue、日志或 AI 对话。
 
