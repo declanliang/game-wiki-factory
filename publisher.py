@@ -352,12 +352,14 @@ def publish(argv: list[str]) -> int:
     write_json(receipt_path, receipt)
 
     if args.skip_vercel:
-        receipt["stages"]["vercel"] = {
+        receipt["stages"]["hosting"] = {
+            "provider": "cloudflare-pages",
             "status": "manual_action_required",
-            "nextAction": "Import this private GitHub repository in Vercel, configure the final domain and NEXT_PUBLIC_SITE_URL, then deploy and run npm run verify:deploy.",
-            "dashboardUrl": "https://vercel.com/dashboard",
+            "nextAction": "Connect this private GitHub repository in Cloudflare Pages, set the build output directory to out, configure the final domain and NEXT_PUBLIC_SITE_URL, then deploy and run npm run verify:deploy.",
+            "dashboardUrl": "https://dash.cloudflare.com/",
             "updatedAt": _now(),
         }
+        receipt["stages"].pop("vercel", None)
         receipt["stages"].pop("onlineVerification", None)
         write_json(receipt_path, receipt)
     else:

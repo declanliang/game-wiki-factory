@@ -7,14 +7,16 @@ export function normalizePathname(pathname = "/") {
   return normalized.length > 1 ? normalized.replace(/\/$/, "") : normalized;
 }
 
-export function localizedPathname(pathname, locale, defaultLocale = "en") {
+export function localizedPathname(pathname, locale) {
+  // Cloudflare Pages branch: every locale (including the default) is prefixed —
+  // static export has no middleware to rewrite "/" to "/en" at request time.
   const normalized = normalizePathname(pathname);
-  if (!locale || locale === defaultLocale) return normalized;
+  if (!locale) return normalized;
   return `/${locale}${normalized === "/" ? "" : normalized}`;
 }
 
-export function absoluteLocalizedUrl(origin, pathname, locale, defaultLocale = "en") {
+export function absoluteLocalizedUrl(origin, pathname, locale) {
   const cleanOrigin = new URL(origin).origin;
-  const localized = localizedPathname(pathname, locale, defaultLocale);
+  const localized = localizedPathname(pathname, locale);
   return `${cleanOrigin}${localized === "/" ? "" : localized}`;
 }

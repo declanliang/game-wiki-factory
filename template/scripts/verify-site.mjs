@@ -144,8 +144,8 @@ function inspectStructuredPageUrls(html, pageUrl) {
   let issues = 0;
   const parsedPage = new URL(pageUrl);
   const firstSegment = parsedPage.pathname.split("/").filter(Boolean)[0];
-  const locale = ["es", "de", "fr", "ja"].includes(firstSegment) ? firstSegment : "en";
-  const localeBase = `${parsedPage.origin}${locale === "en" ? "" : `/${locale}`}`;
+  const locale = ["en", "es", "de", "fr", "ja"].includes(firstSegment) ? firstSegment : "en";
+  const localeBase = `${parsedPage.origin}/${locale}`;
   const isLocaleUrl = (value) => {
     try {
       const parsed = new URL(value);
@@ -243,7 +243,9 @@ let serverArgs = [nextBin, "start", "-p", String(port)];
 let serverCwd = root;
 let serverEnv = process.env;
 
-if (fs.existsSync(standaloneServer)) {
+if (fs.existsSync(path.join(root, "out"))) {
+  serverArgs = [path.join(root, "scripts", "static-export-server.mjs"), String(port)];
+} else if (fs.existsSync(standaloneServer)) {
   // Next's standalone trace intentionally omits public and .next/static. Production
   // containers copy both next to server.js, so reproduce that exact runtime for QA.
   const publicSource = path.join(root, "public");
@@ -294,6 +296,14 @@ function killServer() {
 try {
   await waitForServer(`${localOrigin}/`, 30000);
 
+  const rootRes = await fetch(`${localOrigin}/`, { redirect: "manual" });
+  const rootLocation = rootRes.headers.get("location");
+  if (rootRes.status !== 301 || !rootLocation || new URL(rootLocation, localOrigin).pathname !== "/en") {
+    fail(`根路径应以 301 跳转到 /en，实际为 HTTP ${rootRes.status} Location=${rootLocation || "缺失"}`);
+  } else {
+    ok("根路径以 301 跳转到 /en");
+  }
+
   const sitemapRes = await fetch(`${localOrigin}/sitemap.xml`);
   let sitemapXml = "";
   if (!sitemapRes.ok) {
@@ -330,9 +340,12 @@ try {
     if (badCount === 0) ok(`sitemap.xml 的 ${locs.length} 个 loc 和 ${hreflangTargets.length} 个 hreflang 目标均为 self-canonical 且直接返回 200`);
   }
 
-  const homeRes = await fetch(`${localOrigin}/`);
+  const sitemapLocs = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+  const homeUrl = sitemapLocs.find((value) => new URL(value).pathname === "/en") || sitemapLocs[0] || null;
+  const homePath = homeUrl ? new URL(homeUrl).pathname : "/en";
+  const homeRes = await fetch(`${localOrigin}${homePath}`, { redirect: "manual" });
+  if (homeRes.status !== 200) fail(`本地生产首页 ${homePath} 返回 ${homeRes.status}（期望直接 200）`);
   const homeHtml = await homeRes.text();
-  const homeUrl = sitemapXml.match(/<loc>([^<]+)<\/loc>/)?.[1] || null;
   const metadata = inspectHtmlMetadata(homeHtml, "本地生产首页：", null, homeUrl);
   if (metadata.ogUrl) {
     const expectedOrigin = new URL(metadata.ogUrl).origin;
@@ -387,8 +400,15 @@ if (args.includes("--deploy")) {
     fail(`NEXT_PUBLIC_SITE_URL（${siteUrl}）还是模板占位域名 —— 换成真实部署域名再上线`);
   } else if (siteUrl) {
     ok(`NEXT_PUBLIC_SITE_URL = ${siteUrl}（规范化后）`);
+    const rootResponse = await fetch(`${siteUrl}/`, { redirect: "manual" });
+    const rootLocation = rootResponse.headers.get("location");
+    if (rootResponse.status !== 301 || !rootLocation || new URL(rootLocation, siteUrl).pathname !== "/en") {
+      fail(`线上根路径应以 301 跳转到 /en，实际为 HTTP ${rootResponse.status} Location=${rootLocation || "缺失"}`);
+    } else {
+      ok("线上根路径以 301 跳转到 /en");
+    }
     const live = {};
-    for (const p of ["/", "/sitemap.xml", "/robots.txt"]) {
+    for (const p of ["/en", "/sitemap.xml", "/robots.txt"]) {
       try {
         const res = await fetch(`${siteUrl}${p}`, { redirect: "manual" });
         const body = await res.text();
@@ -401,12 +421,13 @@ if (args.includes("--deploy")) {
         fail(`线上 ${p} 请求失败：${err.message} —— 域名是否已经解析并部署完成？`);
       }
     }
-    if (live["/"]) {
-      const metadata = inspectHtmlMetadata(live["/"], "线上首页：", siteUrl, siteUrl);
-      const hreflangs = [...live["/"].matchAll(/rel="alternate"\s+hreflang="([^"]+)"/gi)].map((match) => match[1]);
+    if (live["/en"]) {
+      const homeUrl = `${siteUrl}/en`;
+      const metadata = inspectHtmlMetadata(live["/en"], "线上首页：", siteUrl, homeUrl);
+      const hreflangs = [...live["/en"].matchAll(/rel="alternate"\s+hreflang="([^"]+)"/gi)].map((match) => match[1]);
       verifyRequiredHreflangs(hreflangs, "线上首页");
       if (!metadata.title || !metadata.ogUrl) {
-        fail("线上首页虽然返回 200，但 metadata 不完整；请检查 NEXT_PUBLIC_SITE_URL 和 Vercel Function 日志");
+        fail("线上首页虽然返回 200，但 metadata 不完整；请检查 NEXT_PUBLIC_SITE_URL 和 Cloudflare Pages 构建日志");
       }
     }
     if (live["/sitemap.xml"]) {

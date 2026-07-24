@@ -38,6 +38,10 @@ class JobSystemTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "legacy rebuild jobs are no longer accepted"):
             normalize_config({"game": "Old Site", "operation": "rebuild"})
 
+    def test_cloudflare_branch_rejects_vercel_ads_jobs(self) -> None:
+        with self.assertRaisesRegex(ValueError, "unavailable on the Cloudflare Pages branch"):
+            normalize_config({"taskType": "ads", "game": "Ads Game"})
+
     def test_manual_keywords_are_normalized_and_preserved_on_retry(self) -> None:
         config = normalize_config({
             "game": "Keyword Game",
@@ -151,7 +155,7 @@ class JobSystemTests(unittest.TestCase):
             (project / ".gamewiki" / "publish.json").write_text(json.dumps({
                 "stages": {
                     "github": {"visibility": "PRIVATE", "repo": "owner/verified-game"},
-                    "vercel": {"status": "complete", "deploymentUrl": "https://verified-game.vercel.app"},
+                    "hosting": {"provider": "cloudflare-pages", "status": "manual_action_required"},
                     "onlineVerification": {"status": "complete", "origin": "https://verified.game"},
                 },
             }), encoding="utf-8")
@@ -159,6 +163,7 @@ class JobSystemTests(unittest.TestCase):
         self.assertEqual(result["articles"]["english"], 1)
         self.assertEqual(result["factoryRelease"], "v1_0722")
         self.assertEqual(result["categories"], ["guide"])
+        self.assertEqual(result["hosting"]["provider"], "cloudflare-pages")
         self.assertEqual(result["onlineVerification"]["status"], "complete")
         self.assertNotIn("token", json.dumps(result).casefold())
 

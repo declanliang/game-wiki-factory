@@ -11,7 +11,7 @@
 
 ## Windows 本地恢复
 
-安装 Python 3.11+、Node.js 20–24、npm、Git、GitHub CLI、Vercel CLI 和 ffmpeg，然后：
+安装 Python 3.11+、Node.js 20–24、npm、Git、GitHub CLI 和 ffmpeg，然后：
 
 ```powershell
 cd C:\Users\liang\Documents\Games
@@ -26,7 +26,6 @@ npm ci
 cd ..
 Copy-Item .env.example .env
 gh auth login
-vercel login
 ```
 
 在 `.env` 中只填写实际使用的变量。内容流水线至少需要 ToAPIs/LLM key；搜索源按启用情况需要 DataForSEO、Serper、Jina；无人值守发布需要 `FACTORY_GITHUB_TOKEN`、`FACTORY_GITHUB_OWNER`、`VERCEL_TOKEN`，团队账号另填 `VERCEL_TEAM_ID`。不要删除 `.env.example` 中未知变量，它是当前配置清单。
@@ -60,7 +59,7 @@ python3 -m venv /srv/game-wiki-factory/venv
 cd /srv/game-wiki-factory/app/template && npm ci
 ```
 
-系统还需 Node.js 20–24、npm、Git、`gh`、Vercel CLI 和 ffmpeg。Private clone 使用只读 deploy key 或最小权限 token；运行时 GitHub token 只授予创建/更新目标 Private repo 所需权限。
+系统还需 Node.js 20–24、npm、Git、`gh` 和 ffmpeg。Private clone 使用只读 deploy key 或最小权限 token；运行时 GitHub token 只授予创建/更新目标 Private repo 所需权限。
 
 从 `.env.example` 创建 `/srv/game-wiki-factory/secrets/factory.env`，并至少设置：
 
@@ -71,7 +70,7 @@ GAMEWIKI_DISK_PAUSE_PERCENT=90
 GAMEWIKI_SUCCESS_RETENTION_HOURS=0
 ```
 
-再填写 API、GitHub、Vercel、通知渠道和随机生成的 `GAMEWIKI_CONTROL_TOKEN`。设置权限：
+再填写 API、GitHub、通知渠道和随机生成的 `GAMEWIKI_CONTROL_TOKEN`。Cloudflare Pages 不需要服务器 token。设置权限：
 
 ```bash
 sudo chown root:root /srv/game-wiki-factory/secrets/factory.env
@@ -103,7 +102,7 @@ sudo systemctl list-timers 'gamewiki-*'
 df -h / /srv/game-wiki-factory
 ```
 
-在服务器执行根测试，再提交一个 `publish: false` 的测试游戏冒烟任务。后台生成能力在本地 QA 和 GitHub Private 后置校验通过后视为恢复；Vercel 手工导入和线上 canonical/sitemap/robots/hreflang 验收作为独立运营步骤验证。
+在服务器执行根测试，再提交一个 `publish: false` 的测试游戏冒烟任务。后台生成能力在本地 QA 和 GitHub Private 后置校验通过后视为恢复；Cloudflare Pages 手工连接和线上 canonical/sitemap/robots/hreflang 验收作为独立运营步骤验证。
 
 ## 更新、回滚与全损恢复
 
@@ -111,6 +110,6 @@ df -h / /srv/game-wiki-factory
 
 回滚使用已知良好 commit：停止领取新任务，切到该 commit，重新安装锁定依赖、跑测试并重启。数据库 schema 变更前必须另存 SQLite 备份。
 
-需要备份的生产资产：Factory Private repo、每个游戏 Private repo、域名/Vercel/GitHub 账户、服务器外的加密 secrets 备份，以及需要保留运营历史时的 `data/jobs.sqlite3`、任务配置和日志。不要备份或处理其他业务目录。
+需要备份的生产资产：Factory Private repo、每个游戏 Private repo、域名/Cloudflare/GitHub 账户、服务器外的加密 secrets 备份，以及需要保留运营历史时的 `data/jobs.sqlite3`、任务配置和日志。不要备份或处理其他业务目录。
 
 服务器全损后，按本文重建控制面；从各游戏 repo 可恢复线上源码。尚未发布任务如果没有外部 checkpoint 备份，只能重新提交并承担对应 API 成本。

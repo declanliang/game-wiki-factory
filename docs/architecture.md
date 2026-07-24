@@ -7,11 +7,11 @@
 ```text
 Games/
 ├─ game-wiki-factory/       通用代码、模板、契约、测试、文档
-├─ hellhole/                独立 Next.js/GitHub/Vercel 项目
-└─ another-game/            独立 Next.js/GitHub/Vercel 项目
+├─ hellhole/                独立 Next.js/GitHub/Cloudflare Pages 项目
+└─ another-game/            独立 Next.js/GitHub/Cloudflare Pages 项目
 ```
 
-工厂不保存真实游戏 output。游戏仓库不保存 API key，也不在 Vercel 调用搜索或 LLM。
+工厂不保存真实游戏 output。游戏仓库不保存 API key，也不在 Cloudflare Pages 调用搜索或 LLM。
 
 ## 控制面
 
@@ -104,8 +104,8 @@ SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。生成阶
 
 `manifest.json.stages` 记录 generated/reused/migrated/reconciled/failed。日志按 UTC attempt 命名，不覆盖失败现场。
 
-## 发布与 Vercel 边界
+## 发布与 Cloudflare Pages 边界
 
-每个游戏 GitHub 仓库强制为 Private，发布器没有 Public 模式，并在推送前后验证可见性。游戏目录的 `package.json` 位于仓库根，因此 Vercel Root Directory 留空。部署只运行确定性 Next.js build；所有 AI 工作在本地工厂完成。
+每个游戏 GitHub 仓库强制为 Private，发布器没有 Public 模式，并在推送前后验证可见性。游戏目录的 `package.json` 位于仓库根，因此 Cloudflare Pages Root directory 留空，Build output directory 固定为 `out`。部署只运行确定性静态 Next.js build；所有 AI 工作在本地工厂完成。
 
-后台站点 Job 总是传入 `--skip-vercel`：发布器完成 Private GitHub 后写入 `vercel.status=manual_action_required`，Job 可以标记 `succeeded`。这表示生成完成，不表示线上完成。运营者在 Vercel 手工导入、绑定域名、设置 `NEXT_PUBLIC_SITE_URL` 并部署后，必须运行 `verify:deploy`。模板集中把 origin 规范为 HTTPS，并让 metadata、JSON-LD、sitemap 与 robots 共享 locale-aware URL 构造器；非英语页面必须 self-canonical。线上验收拒绝重定向 sitemap URL、域名后双斜杠、canonical/hreflang 冲突和 metadata 缺失。
+后台站点 Job 仍通过内部 `--skip-vercel` 开关停止自动托管，但公开回执写入 `hosting.provider=cloudflare-pages` 和 `hosting.status=manual_action_required`。这表示生成完成，不表示线上完成。运营者在 Cloudflare Pages 手工连接 Private GitHub、设置 `out`、绑定域名、设置 `NEXT_PUBLIC_SITE_URL` 并部署后，必须运行 `verify:deploy`。模板使用 `/en` 等固定语言前缀；根路径必须 301 到 `/en`，sitemap 的所有 loc/hreflang 必须 self-canonical 且直接返回 200。

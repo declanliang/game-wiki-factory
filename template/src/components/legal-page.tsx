@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getMessages } from "next-intl/server";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import { getSiteName, localizedSiteUrl } from "@/config/site";
 import { languageAlternates, type Locale } from "@/i18n/routing";
 import { localizeHref } from "@/lib/locale-path";
@@ -31,6 +31,7 @@ export async function buildLegalMetadata(locale: Locale, pageKey: LegalPageKey):
 }
 
 export async function LegalPage({ locale, pageKey }: { locale: Locale; pageKey: LegalPageKey }) {
+  setRequestLocale(locale);
   const messages = (await getMessages({ locale })) as Messages;
   const page = messages.legal[pageKey];
   return (

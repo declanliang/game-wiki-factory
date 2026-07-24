@@ -4,7 +4,7 @@
 
 ## 目标与边界
 
-Factory 只接收新站任务。每个游戏从空 workspace 执行信息采集、关键词、页面规划、文章、翻译、模板、构建和 QA，并创建自己的 Private GitHub repo。Vercel 由运营者手工导入。GitHub 发布前必须完成本地生产验收。
+Factory 只接收新站任务。每个游戏从空 workspace 执行信息采集、关键词、页面规划、文章、翻译、模板、构建和 QA，并创建自己的 Private GitHub repo。Cloudflare Pages 由运营者手工连接。GitHub 发布前必须完成本地生产验收。
 
 OpenClaw、命令行和未来管理界面只提交或控制任务；真正的长任务由独立 Worker 进程执行。关闭终端或 Agent 对话不得改变数据库中的任务状态，服务器重启后 Worker 可重新领取中断任务。
 
@@ -27,7 +27,7 @@ gamewiki.py jobs submit/status/logs/retry/cancel
 ```
 
 - SQLite 保存任务、attempt、状态和非敏感发布信息，不保存 API key。
-- 成功时把文章/分类数量、Private repo 和 Vercel 手工操作提示写入 `result_json`；`jobs status --json` 会返回为 `result`，因此 workspace 清理后 OpenClaw 仍能准确汇报生成结果。
+- 成功时把文章/分类数量、Private repo 和 Cloudflare Pages 手工操作提示写入 `result_json`；`jobs status --json` 会返回为 `result`，因此 workspace 清理后 OpenClaw 仍能准确汇报生成结果。
 - 每个任务使用独立 sibling workspace 和 `.gamewiki` checkpoint。
 - Worker 通过原子 lease 防止两个进程领取同一任务。
 - 流水线内部 checkpoint 仍是阶段恢复的事实源；任务数据库不复制内容产物。
@@ -51,7 +51,7 @@ API quota/credit/balance 耗尽会记录为 `quota_exhausted` 原因并立即进
 
 同一个 Job 冷却后进入 `retry_wait`，下一次继续跳过已有文章、QA verdict 和翻译文件。默认最多自动恢复 6 次。自动恢复发生后，对应的临时终态通知会被抑制；最终成功正常通知，超过恢复预算仍失败才发送 `needs_attention/failed`。
 
-以下问题永不自动恢复：身份或官网歧义、API Key/余额/权限、schema、代码和构建错误、GitHub/Vercel 安全问题、Secret 扫描失败。它们必须保持终态并升级给基础设施维护者。
+以下问题永不自动恢复：身份或官网歧义、API Key/余额/权限、schema、代码和构建错误、GitHub/Cloudflare 安全问题、Secret 扫描失败。它们必须保持终态并升级给基础设施维护者。
 
 ```bash
 /usr/local/bin/gamewiki supervisor --once
@@ -96,7 +96,7 @@ python gamewiki.py jobs notifications --ack 12 13
 
 ## 配置契约
 
-站点任务只要求 `game`。平台、官网、域名和手工关键词已知时应填写；GitHub repo 与 Vercel project 不属于输入：
+站点任务只要求 `game`。平台、官网、域名和手工关键词已知时应填写；GitHub repo 与 Cloudflare Pages project 不属于输入：
 
 ```json
 {
@@ -121,7 +121,7 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 整个 batch 先完整验证，任意一项字段错误时一个任务也不会入队；通过后每个游戏成为独立 job，互不阻塞。
 
-广告是独立的 `taskType: ads` job。它接收 Adsterra 原始 JSON，在不重跑内容的情况下完成目标身份/域名/标题/尺寸四层校验、Vercel Production 环境变量写入、重新部署和同源广告路由验收。原始代码只存在于私有任务数据库和配置快照，不进入 Git 或控制台日志。
+Cloudflare Pages 分支暂不接受 `taskType: ads` job；提交会在入队前失败，并提示运营者手工配置 Pages 环境变量。广告仍可在单站使用 `npm run ads:import` 完成身份、标题、尺寸和脚本 key 校验，原始代码不得进入 Git 或控制台日志。
 
 ## 常用命令
 
@@ -182,7 +182,7 @@ JINA_API_KEY_2=
 2. 同一 job 不会被两个 Worker 同时执行。
 3. 发布失败不会重跑已完成内容阶段。
 4. 临时错误有界重试，永久错误进入 `needs_attention`。
-5. 每个站点创建新的 Private repo；Vercel 由运营者手工导入。
-6. 未提供广告变量时零广告渲染；已有 Vercel 环境变量不被发布器删除。
-7. 广告 JSON 的域名不属于目标 Vercel project，或标题与代码尺寸不一致时，任务必须在写入任何变量前失败。
-8. 站点 Job 成功时必须有 Private GitHub 和 `vercel.manual_action_required`；运营者完成 Vercel 手工部署后，另行执行 `verify:deploy` 才能把网站称为“已上线并验证”。验证日志固定保存为项目 `.gamewiki/deploy-verification.log`。
+5. 每个站点创建新的 Private repo；Cloudflare Pages 由运营者手工连接。
+6. 未提供广告变量时零广告渲染；发布器不修改 Cloudflare Pages 环境变量。
+7. `taskType: ads` 必须在入队前明确拒绝，不能误用旧 Vercel 自动化。
+8. 站点 Job 成功时必须有 Private GitHub 和 `hosting.status=manual_action_required`；运营者完成 Cloudflare Pages 手工部署后，另行执行 `verify:deploy` 才能把网站称为“已上线并验证”。验证日志固定保存为项目 `.gamewiki/deploy-verification.log`。

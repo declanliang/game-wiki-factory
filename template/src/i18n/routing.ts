@@ -11,10 +11,11 @@ import { defineRouting } from "next-intl/routing";
 export const routing = defineRouting({
   locales: ["en", "es", "de", "fr", "ja"],
   defaultLocale: "en",
-  // English is served without a `/en` prefix (e.g. `/bosses`, `/bosses/gelum`).
-  localePrefix: "as-needed",
-  // Keep `/` stable as English/x-default. Language changes are explicit via
-  // the switcher, avoiding request-header/cookie redirects and private caches.
+  // Cloudflare Pages branch: static export has no middleware, so "as-needed"
+  // (bare English URLs via a runtime rewrite) isn't possible. Every locale,
+  // including English, gets an explicit prefix; public/_redirects 301s the
+  // old bare paths (from the Vercel deployment) to /en/... for SEO.
+  localePrefix: "always",
   localeDetection: false,
 });
 
@@ -26,10 +27,7 @@ export type Locale = (typeof routing.locales)[number];
  * `pathname` is locale-agnostic, e.g. "/" or "/guide/some-article".
  */
 export function languageAlternates(pathname: string): Record<string, string> {
-  const perLocale = routing.locales.map((locale): [string, string] => [
-    locale,
-    locale === routing.defaultLocale ? pathname : `/${locale}${pathname === "/" ? "" : pathname}`,
-  ]);
+  const perLocale = routing.locales.map((locale): [string, string] => [locale, `/${locale}${pathname === "/" ? "" : pathname}`]);
   const defaultUrl = perLocale.find(([locale]) => locale === routing.defaultLocale)?.[1] ?? pathname;
   return Object.fromEntries([...perLocale, ["x-default", defaultUrl]]);
 }

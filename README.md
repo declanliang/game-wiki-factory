@@ -1,6 +1,6 @@
 # Game Wiki Factory
 
-输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库。Vercel 的导入、域名和环境变量配置默认由站点运营者手动完成。
+输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库。新游戏使用 Cloudflare Pages；仓库连接、域名和环境变量由站点运营者手动完成。历史站点继续保留原 Vercel 部署，不在新任务中重建或迁移。
 
 第一次接手先读 [立即接手指南](docs/takeover.md)。全新电脑或服务器仅凭 GitHub 恢复时，再按 [从零恢复手册](docs/bootstrap-from-github.md) 操作。当前生产风险见 [生产就绪审计](docs/production-readiness-audit-2026-07-23.md)。
 
@@ -8,7 +8,7 @@
 
 ## 首次安装
 
-要求 Python 3.11+、Node.js 20–24、npm、Git、GitHub CLI、Vercel CLI 和 ffmpeg。
+要求 Python 3.11+、Node.js 20–24、npm、Git、GitHub CLI 和 ffmpeg。
 
 ```powershell
 cd C:\Users\liang\Documents\Games\game-wiki-factory
@@ -29,10 +29,9 @@ Basic Info、Guide Search、SEO Scout 和发布器都会从这里读取配置。
 
 ```powershell
 gh auth login
-vercel login
 ```
 
-无人值守或 GitHub Actions 使用 `.env`/Secrets 中的 `FACTORY_GITHUB_TOKEN` 和 `VERCEL_TOKEN`；本地没有 token 时自动复用上述 CLI 登录会话。
+无人值守或 GitHub Actions 使用 `.env`/Secrets 中的 `FACTORY_GITHUB_TOKEN`；本地没有 token 时自动复用上述 GitHub CLI 登录会话。Cloudflare Pages 连接与配置在 Dashboard 手工完成，不向 Factory 提供 Cloudflare token。
 
 ## 推荐执行方式：JSON 配置
 
@@ -117,8 +116,8 @@ python gamewiki.py --config jobs\my-game.json
 - `platform` 只能是 `roblox`、`steam` 或 `auto`。
 - `siteUrl` 可以是裸域名或完整 HTTPS URL；已知正式域名时填写。
 - `manualKeywords` 是可选字符串数组，最多 200 项；系统会清理空白、按大小写去重，并作为 `user_provided` 来源进入 Guide Search。它们仍受风险过滤、证据门和 Basic Info 分类边界约束。
-- `publish: true` 会创建新的 Private GitHub 仓库，随后任务即可标记成功。回执会标记 `vercel.manual_action_required`，提示运营者在 Vercel 导入仓库、配置域名和 `NEXT_PUBLIC_SITE_URL` 后手动部署；后台任务默认不调用 Vercel API 或 CLI。
-- 日常配置不需要 GitHub repo 或 Vercel project。每个游戏都创建新的 Private GitHub repo。
+- `publish: true` 会创建新的 Private GitHub 仓库，随后任务即可标记成功。回执会标记 `hosting.provider=cloudflare-pages` 和 `hosting.status=manual_action_required`，提示运营者在 Cloudflare Pages 连接仓库、把构建输出设为 `out`、配置域名和 `NEXT_PUBLIC_SITE_URL` 后手动部署。
+- 日常配置不需要 GitHub repo 或托管平台项目名。每个游戏都创建新的 Private GitHub repo。
 - `refresh` 默认全部为 `false`。普通续跑不要开启，防止重复 API 成本。
 - 配置中的多余换行和连续空格会在执行前规范化，未知字段和拼写错误会直接报错。
 
@@ -227,20 +226,20 @@ npm run build
 npm run verify:deploy
 ```
 
-后台站点任务不会自动部署 Vercel。运营者在 Vercel 导入 Private repo 后，必须绑定域名并把 Production 的 `NEXT_PUBLIC_SITE_URL` 设为最终公开 origin；随后部署并执行 `npm run verify:deploy`。未完成这一步时，Job 的 `succeeded` 只代表生成、构建、QA 和 Private GitHub 完成，不代表网站已上线。
+后台站点任务不会自动部署 Cloudflare Pages。运营者连接 Private repo，设置 Build command 为 `npm run build`、Build output directory 为 `out`，绑定域名并把 Production 的 `NEXT_PUBLIC_SITE_URL` 设为最终公开 origin；随后部署并执行 `npm run verify:deploy`。未完成这一步时，Job 的 `succeeded` 只代表生成、构建、QA 和 Private GitHub 完成，不代表网站已上线。
 
 ## 可选 Adsterra 广告
 
-每个网站使用自己申请的 Adsterra ad units。把平台返回的原始 JSON 保存为私有配置即可，不改代码，也不手工 Base64：
+每个网站使用自己申请的 Adsterra ad units。在目标游戏仓库把平台返回的原始 JSON 保存为不会提交的 `ad.txt`，然后本地校验和转换：
 
 ```powershell
-Copy-Item jobs\adsterra.example.json jobs\my-game-ads.json
-python gamewiki.py jobs submit --config jobs\my-game-ads.json
+Set-Location ..\<game-slug>
+npm run ads:import
 ```
 
-系统写入 Vercel 前会严格验证：可选 `game` 与本地游戏身份一致；`domain_name` 已绑定到目标 Vercel project；七个 `title` 逐字匹配且不缺失/重复；标题尺寸、代码 width/height、脚本路径和 key 相互一致。随后自动编码到严格对应的 server-only `AD_*_B64` 变量、production deployment，并逐个验证 `/api/ads/<format>` 已加载本次代码。日志和 receipt 只保存 placement ID、目标变量和代码哈希，不打印原始代码。
+Cloudflare Pages 分支暂不接受后台 `taskType: ads`：Cloudflare 的环境变量和部署仍由运营者在 Dashboard 手工完成。先用 `npm run ads:import` 校验并转换配置，再把对应 `AD_*_B64` Secret 逐项写入 Pages Production 环境；部署后逐个验证 `/api/ads/<format>`。不得把广告原始代码写入 Git 或日志。
 
-广告任务可以晚于网站生产单独提交，不会重跑内容。变量全部留空时，不会渲染广告 iframe、占位或空白。Adsterra 素材实际填充可能仍受平台同步延迟影响。
+广告可以晚于网站生产单独配置，不会重跑内容。变量全部留空时，不会渲染广告 iframe、占位或空白。Adsterra 素材实际填充可能仍受平台同步延迟影响。
 
 失败后的同一任务重试自动复用 checkpoint，不会重复已经完成的付费阶段。不要为同一个失败任务创建替代 Job。
 
@@ -254,7 +253,7 @@ python gamewiki.py jobs submit --config jobs\my-game-ads.json
 读取该项目 .gamewiki/manifest.json、configs 和最新 logs。
 已完成的 Basic Info、关键词、文章和翻译不要重新生成。
 修复实际问题后从 checkpoint 继续，使用最新版 factory 模板。
-GitHub 仓库必须为 Private。后台任务完成后，明确汇报 Vercel 仍需手工导入、域名、`NEXT_PUBLIC_SITE_URL`、部署和线上验收。
+GitHub 仓库必须为 Private。后台任务完成后，明确汇报 Cloudflare Pages 仍需手工连接仓库、设置 `out`、域名、`NEXT_PUBLIC_SITE_URL`、部署和线上验收。
 最后检查 canonical、sitemap、robots 和 hreflang。
 ```
 
@@ -266,8 +265,8 @@ game-wiki-factory/
 ├─ factory_cli.py          配置、批量、状态和日志命令
 ├─ orchestrate_wiki.py     主流水线
 ├─ project_contract.py     跨阶段内容契约
-├─ publisher.py            GitHub/Vercel 发布
-├─ adsterra.py             广告 JSON 校验、Vercel 配置与验证
+├─ publisher.py            Private GitHub 发布与托管平台回执
+├─ adsterra.py             广告 JSON 校验（Cloudflare 环境变量需手工配置）
 ├─ jobs/example.json       游戏配置示例
 ├─ pipeline/
 │  ├─ basic-info/

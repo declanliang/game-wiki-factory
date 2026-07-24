@@ -54,7 +54,7 @@ class JobNotifierTests(unittest.TestCase):
         self.assertIn("不会自动重试付费阶段", message)
         self.assertIn("重试同一 Job ID", message)
 
-    def test_success_message_calls_out_manual_vercel_import(self) -> None:
+    def test_success_message_calls_out_manual_cloudflare_connection(self) -> None:
         item = {
             "event_status": "succeeded",
             "game": "Published Game",
@@ -64,10 +64,10 @@ class JobNotifierTests(unittest.TestCase):
             "max_attempts": 4,
             "result": {
                 "articles": {"english": 8, "allLanguages": 40},
-                "vercel": {"status": "manual_action_required"},
+                "hosting": {"provider": "cloudflare-pages", "status": "manual_action_required"},
             },
         }
-        self.assertIn("Vercel 手动导入", notification_message(item))
+        self.assertIn("Cloudflare Pages 连接仓库", notification_message(item))
 
     def test_successful_delivery_acknowledges_outbox_row(self) -> None:
         env = {

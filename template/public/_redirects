@@ -1,0 +1,26 @@
+# Cloudflare Pages branch: localePrefix is "always" (see src/i18n/routing.ts) —
+# static export has no middleware to rewrite bare "/" to "/en" at request
+# time, so every locale including English is prefixed. These 301s exist so
+# that if this site was previously live elsewhere with unprefixed English
+# URLs (e.g. migrating from the Vercel/"as-needed" setup), old links/SEO
+# equity still resolve instead of 404ing.
+#
+# _redirects is evaluated top-to-bottom, first match wins, BEFORE static
+# asset serving. Do NOT add a generic `/:type -> /en/:type` catch-all rule —
+# it will also match `/_next/*`, `/api/*`, `/images/*`, etc. and break asset
+# loading. List only the actual top-level content-type slugs for this game
+# (matches CONTENT_TYPES / the published categories in src/config/site-plan.json).
+#
+# TODO (per-site setup step): fill in one pair of rules per published content
+# type below, following this pattern:
+#   /<type>         /en/<type>         301
+#   /<type>/*       /en/<type>/:splat  301
+# If this site was never live with unprefixed URLs (e.g. brand-new site,
+# Cloudflare Pages from day one), these legacy-redirect rules aren't needed —
+# just keep the three lines below.
+
+/                    /en                    301
+/about               /en/about              301
+/copyright           /en/copyright          301
+/privacy-policy      /en/privacy-policy     301
+/terms-of-service    /en/terms-of-service   301

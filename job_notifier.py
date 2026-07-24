@@ -38,9 +38,9 @@ def notification_message(item: dict[str, Any]) -> str:
         origin = online.get("origin")
         if origin:
             lines.append(f"线上：{origin}")
-        vercel = result.get("vercel") or {}
-        if vercel.get("status") == "manual_action_required":
-            lines.append("发布：Private GitHub 仓库已完成；请在 Vercel 手动导入仓库、配置域名和 NEXT_PUBLIC_SITE_URL 后部署。")
+        hosting = result.get("hosting") or {}
+        if hosting.get("status") == "manual_action_required":
+            lines.append("发布：Private GitHub 仓库已完成；请在 Cloudflare Pages 连接仓库，设置构建输出目录 out、域名和 NEXT_PUBLIC_SITE_URL 后部署。")
     elif status in {"needs_attention", "failed"}:
         error_class = str((item.get("detail") or {}).get("errorClass") or "")
         if error_class == "quota_exhausted":

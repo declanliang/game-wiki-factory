@@ -8,9 +8,9 @@
 - 固定语言及顺序为 `en/es/de/fr/ja`。
 - Factory 源码只在本仓库；游戏产物位于 Factory 同级的 `../<slug>/`，游戏目录本身就是 Next.js 根。
 - 付费、可恢复状态在游戏根 `.gamewiki/`；最终可部署输入在 `intake/`。
-- 后台站点任务默认完成到 Private GitHub。Vercel 导入、域名和 `NEXT_PUBLIC_SITE_URL` 由运营者手工完成。
+- 后台站点任务默认完成到 Private GitHub。Cloudflare Pages 仓库连接、`out` 构建输出、域名和 `NEXT_PUBLIC_SITE_URL` 由运营者手工完成。
 - 所有未来游戏都作为新项目从空 workspace 生产；不再接收 `operation: rebuild` 或旧 repo 覆盖输入。
-- 广告是独立 `taskType: ads` Job；它在严格匹配游戏、域名和七个广告位后才会修改 Vercel 并验证代码哈希。
+- Cloudflare Pages 分支不接受后台 `taskType: ads` Job；广告校验后由运营者手工配置 Pages Secret 并部署验证。
 
 ## 2. 接手顺序
 
@@ -88,13 +88,13 @@ git rev-parse HEAD
 
 - 内容、五语言一致性、MDX、TypeScript 和 production build 通过；
 - 新 GitHub 仓库已创建且为 Private；
-- `result.vercel.status` 为 `manual_action_required`。
+- `result.hosting.provider` 为 `cloudflare-pages`，且 `result.hosting.status` 为 `manual_action_required`。
 
 这时只能说“生成完成并已推送 Private GitHub”，不能说“网站已上线”。
 
 ### 上线完成
 
-运营者在 Vercel 手工导入游戏 Private repo，项目 Root Directory 留空，然后：
+运营者在 Cloudflare Pages 手工连接游戏 Private repo，Root directory 留空、Build output directory 设为 `out`，然后：
 
 1. 绑定最终域名；
 2. 设置 Production 的 `NEXT_PUBLIC_SITE_URL=https://最终域名`；

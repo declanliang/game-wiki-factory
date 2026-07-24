@@ -5,6 +5,8 @@ import { getAllContent } from "@/lib/content";
 import { languageAlternates, routing } from "@/i18n/routing";
 import { localizedSiteUrl } from "@/config/site";
 
+export const dynamic = "force-static";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Legal / info pages that always exist regardless of game — we don't know when
   // their content last meaningfully changed, so lastModified is omitted rather

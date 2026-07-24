@@ -11,7 +11,7 @@ Copy-Item jobs\example.json jobs\my-game.json
 python gamewiki.py --config jobs\my-game.json
 ```
 
-配置文件必须明确 `game`、`platform` 和已知的 `officialUrl`；Steam 使用 Store App URL，Roblox 使用 Experience URL。`publish: true` 会完成本地生产验收和 Private GitHub 发布；后台站点 Job 默认不部署 Vercel。真实 `jobs/*.json`、配置快照和日志都被 Git 忽略。
+配置文件必须明确 `game`、`platform` 和已知的 `officialUrl`；Steam 使用 Store App URL，Roblox 使用 Experience URL。`publish: true` 会完成本地生产验收和 Private GitHub 发布；后台站点 Job 不自动创建或部署 Cloudflare Pages。真实 `jobs/*.json`、配置快照和日志都被 Git 忽略。
 
 直接参数模式仍可用于调试：
 
@@ -42,7 +42,7 @@ python gamewiki.py logs <slug> --tail 150
 python gamewiki.py resume <slug>
 ```
 
-## GitHub 发布与 Vercel 手工上线
+## GitHub 发布与 Cloudflare Pages 手工上线
 
 GitHub Actions 设置 Secrets：`FACTORY_GITHUB_TOKEN` 以及生成/搜索/翻译 API key；设置 Variable：`FACTORY_GITHUB_OWNER`。本地发布会优先读取 factory `.env`，没有 token 时复用 `gh auth login` 会话。发布器强制 GitHub 仓库为 Private。
 
@@ -54,9 +54,9 @@ python gamewiki.py publish <slug>
 
 每个新游戏创建自己的 Private GitHub repo。GitHub integration 未授权读取 Private repo 时，完成授权后重复同一命令。Actions 中运行 `Generate and publish game wikis`，`games_json` 输入合法 JSON 数组，例如 `["Game A", "Game B"]`。
 
-后台配置会把 `publication.skipVercel` 默认为 `true`。成功回执必须包含 Private GitHub 和 `vercel.status=manual_action_required`。此时只可报告“生成完成”，不得报告“已上线”。
+后台配置会把内部 `publication.skipVercel` 默认为 `true`。成功回执必须包含 Private GitHub、`hosting.provider=cloudflare-pages` 和 `hosting.status=manual_action_required`。此时只可报告“生成完成”，不得报告“已上线”。
 
-Vercel 上线由运营者完成：导入游戏 Private repo，Root Directory 留空，绑定最终域名，把 Production 的 `NEXT_PUBLIC_SITE_URL` 设为完整 HTTPS origin，然后部署。部署后在游戏根运行 `npm run verify:deploy`；它不调用 LLM/API，会检查首页 metadata/canonical、sitemap、robots 和全部 loc/hreflang 直接 200。完整输出保存在 `.gamewiki/deploy-verification.log`。
+Cloudflare Pages 上线由运营者完成：连接游戏 Private repo，Root directory 留空，Build command 设为 `npm run build`，Build output directory 设为 `out`，绑定最终域名，把 Production 的 `NEXT_PUBLIC_SITE_URL` 设为完整 HTTPS origin，然后部署。部署后在游戏根运行 `npm run verify:deploy`；它不调用 LLM/API，会检查根路径 301 到 `/en`、首页 metadata/canonical、sitemap、robots 和全部 loc/hreflang 直接 200。完整输出保存在 `.gamewiki/deploy-verification.log`。
 
 ## 排查顺序
 
@@ -139,4 +139,4 @@ npm run verify:deploy
 
 ## Adsterra 配置
 
-每个网站单独申请 Adsterra app/ad units。广告配置全部可选：缺少某一格式时，该格式及其外层间距均不渲染。Factory 日常操作应提交 `taskType: ads` 的原始平台 JSON；系统严格校验游戏/域名、7 个逐字标题、尺寸和脚本 key，自动转换并写入对应 Vercel Production 变量，不需要人工 Base64。单站本地调试仍可使用 `ad.txt` + `npm run ads:import`。环境变量更新后必须重新部署。
+每个网站单独申请 Adsterra app/ad units。广告配置全部可选：缺少某一格式时，该格式及其外层间距均不渲染。Cloudflare Pages 分支拒绝后台 `taskType: ads`，因为 Pages 环境变量尚未自动化。运营者在单站使用 `ad.txt` + `npm run ads:import` 完成校验和转换，再把生成的 `AD_*_B64` 作为 Pages Production Secret 手工录入；更新后必须重新部署并验证 `/api/ads/<format>`。

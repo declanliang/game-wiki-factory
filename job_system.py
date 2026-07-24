@@ -18,7 +18,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from adsterra import normalize_adsterra_config
 from factory_cli import PermitState, _config_command, _handler, normalize_manual_keywords
 from http.server import ThreadingHTTPServer
 from orchestrate_wiki import build_subprocess_env, read_json, slugify, write_json
@@ -218,7 +217,10 @@ def defer_notification(notification_id: int, error: str) -> None:
 def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     task_type = str(config.get("taskType") or "site").strip().casefold()
     if task_type == "ads":
-        return normalize_adsterra_config(config)
+        raise ValueError(
+            "taskType ads is unavailable on the Cloudflare Pages branch; "
+            "configure AD_* environment variables manually in Cloudflare Pages"
+        )
     if task_type != "site":
         raise ValueError("config.taskType must be site or ads")
     allowed = {
@@ -244,8 +246,8 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized.get("manualKeywords")
     )
     publication: dict[str, Any] = {}
-    # Background jobs publish the private GitHub repository only. Vercel
-    # import, domain selection, and runtime variables remain operator-owned.
+    # Background jobs publish the private GitHub repository only. Cloudflare
+    # Pages connection, domain selection, and runtime variables remain operator-owned.
     publication.setdefault("skipVercel", True)
     normalized["publication"] = publication
     # Validate the fields shared with the foreground CLI.
@@ -489,7 +491,7 @@ def _completion_result(config: dict[str, Any], slug: str) -> dict[str, Any]:
             if item.get("status") == "published"
         ],
         "github": stages.get("github"),
-        "vercel": stages.get("vercel"),
+        "hosting": stages.get("hosting"),
         "onlineVerification": stages.get("onlineVerification"),
     }
 

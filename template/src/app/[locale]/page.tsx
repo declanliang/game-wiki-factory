@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getMessages } from "next-intl/server";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import { JsonLd } from "@/components/site-widgets";
 import { getAllContent, type ContentItem, CONTENT_TYPES } from "@/lib/content";
 import { NAVIGATION_CONFIG } from "@/config/navigation";
@@ -29,6 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 export default async function LocaleHomePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const loc = locale as Locale;
+  setRequestLocale(locale);
   const messages = (await getMessages({ locale })) as Messages;
   // FAQ answers may contain `[label](href)` links for the on-page accordion; structured
   // data expects plain text, so strip the Markdown syntax down to just the link label.

@@ -25,7 +25,7 @@ for (const invalid of invalidCases) {
 console.log(`site URL normalization: ${cases.length} valid and ${invalidCases.length} invalid cases passed`);
 
 assert.equal(normalizePathname("//guide//tips/"), "/guide/tips");
-assert.equal(localizedPathname("/guide/tips", "en"), "/guide/tips");
+assert.equal(localizedPathname("/guide/tips", "en"), "/en/guide/tips");
 assert.equal(localizedPathname("/guide/tips", "es"), "/es/guide/tips");
 assert.equal(localizedPathname("/", "ja"), "/ja");
 assert.equal(absoluteLocalizedUrl("https://game.example.com/", "/guide", "de"), "https://game.example.com/de/guide");

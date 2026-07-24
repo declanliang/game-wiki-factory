@@ -77,7 +77,7 @@ Supervisor 只执行 `docs/background-jobs.md` 中的确定性白名单策略。
 }
 ```
 
-不要填写 repo、Vercel project、`operation: rebuild`、`fullBuild` 或覆盖参数。同名 workspace/repo 已存在时任务应停止并交给维护者确认，不得自动替换。
+不要填写 repo、Cloudflare Pages project、`operation: rebuild`、`fullBuild` 或覆盖参数。同名 workspace/repo 已存在时任务应停止并交给维护者确认，不得自动替换。
 
 ## OpenClaw 专用 Agent
 
@@ -100,13 +100,13 @@ openclaw agent --local --agent game-wiki-operator --message \
 
 ```text
 请验证并提交我附带的 Game Wiki JSON；它包含游戏名、平台、官网、域名和新建/重建意图。
-不要向我索要 repo 或 Vercel project，除非自动解析明确报歧义。提交后返回 job ID。
+不要向我索要 repo 或 Cloudflare Pages project。提交后返回 job ID。
 之后只查询后台任务，不要在对话里运行完整流水线；遇到 needs_attention 时返回首个失败阶段、日志路径、原因和建议动作。
 ```
 
 ## 凭据维护
 
-服务器私有环境至少需要内容 API key 和 GitHub token；广告 Job 还需要 Vercel token。推荐使用可撤销的专用生产 Token，不依赖个人电脑 CLI 的临时登录缓存。更新凭据后：
+服务器私有环境至少需要内容 API key 和 GitHub token。Cloudflare Pages 分支不运行广告 Job，也不需要 Cloudflare API token；Pages 项目、环境变量和部署由运营者在 Dashboard 手工完成。更新凭据后：
 
 ```bash
 sudo chmod 600 /srv/game-wiki-factory/secrets/factory.env
@@ -169,9 +169,9 @@ OpenClaw 的 workspace 指令如果变化，还要把 `deploy/openclaw/AGENTS.md
 1. 任务状态 `succeeded`，manifest 所有必需阶段完成。
 2. Next.js production build 和本地站点检查通过。
 3. GitHub repo 为 Private。
-4. `result.vercel.status=manual_action_required`，并明确告知运营者后续步骤。
+4. `result.hosting.provider=cloudflare-pages` 且 `status=manual_action_required`，并明确告知运营者后续步骤。
 
-以上代表“生成完成”。要称为“上线完成”，还必须由运营者在 Vercel 手工导入、绑定域名、设置 `NEXT_PUBLIC_SITE_URL`、部署，并让 `npm run verify:deploy` 通过。canonical、sitemap、robots 不得包含 `example.com`。Vercel READY 本身不算线上验收。
+以上代表“生成完成”。要称为“上线完成”，还必须由运营者在 Cloudflare Pages 手工连接 Private GitHub、把构建输出设为 `out`、绑定域名、设置 `NEXT_PUBLIC_SITE_URL`、部署，并让 `npm run verify:deploy` 通过。canonical、sitemap、robots 不得包含 `example.com`；根路径必须 301 到 `/en`。Pages 部署成功本身不算线上验收。
 
 ## 2026-07-22 真实验收记录
 

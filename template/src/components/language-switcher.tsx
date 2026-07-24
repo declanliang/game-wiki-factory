@@ -35,20 +35,10 @@ export function LanguageSwitcher({ locale }: { locale: string }) {
   const handleSwitch = (nextLocale: Locale) => {
     if (nextLocale === locale) return;
 
-    let newPath = pathname;
-
-    // 移除当前 locale 前缀（如果有）
-    if (locale !== routing.defaultLocale) {
-      newPath = newPath.replace(`/${locale}`, "") || "/";
-    }
-
-    // 添加新 locale 前缀（如果不是默认语言）
-    if (nextLocale !== routing.defaultLocale) {
-      newPath = `/${nextLocale}${newPath === "/" ? "" : newPath}`;
-    }
-
-    // 设置 NEXT_LOCALE cookie，防止 middleware 重定向回原语言
-    document.cookie = `NEXT_LOCALE=${nextLocale};path=/;max-age=${60 * 60 * 24 * 365};SameSite=Lax`;
+    // Every locale is prefixed (localePrefix: "always") — swap the current
+    // prefix for the new one; no bare/unprefixed English case here.
+    const bare = pathname.replace(`/${locale}`, "") || "/";
+    const newPath = `/${nextLocale}${bare === "/" ? "" : bare}`;
 
     router.push(newPath);
   };

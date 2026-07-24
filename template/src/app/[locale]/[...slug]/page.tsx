@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronRight, Swords } from "lucide-react";
-import { getMessages } from "next-intl/server";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { getAllContent, getAllContentPaths, getContent, getDynamicNavigation, type ContentItem } from "@/lib/content";
 import { WikiSidebar } from "@/components/site";
@@ -67,6 +67,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: L
 
 export default async function SlugPage({ params }: { params: Promise<{ locale: Locale; slug: string[] }> }) {
   const { locale, slug } = await params;
+  setRequestLocale(locale);
   const navGroups = getDynamicNavigation(locale);
   if (slug.length === 1) return <NavigationPage locale={locale} contentType={slug[0]} navGroups={navGroups} />;
   return <DetailPage locale={locale} contentType={slug[0]} slug={slug.slice(1)} />;
