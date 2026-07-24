@@ -31,17 +31,17 @@ python gamewiki.py --config jobs/<game>.json
 - 不打印或提交任何 .env/API key。
 - 先确认 platform；Steam 身份使用 App ID，Roblox 身份使用 Place/Universe，不能混用事实字段。
 - 所有游戏 GitHub 仓库只能是 Private；发布器不得创建 Public repo。
-- 有正式域名时填写 `siteUrl`，让生成项目携带预期公开 origin。后台任务仍只发布 Private GitHub；Cloudflare Pages 仓库连接、`NEXT_PUBLIC_SITE_URL` 和线上验收由运营者完成，禁止 `example.com` 出现在真实生产 sitemap/canonical。
+- 有正式域名时填写 `siteUrl`。后台任务自动发布 Private GitHub、创建 Pages Direct Upload 项目、设置 `NEXT_PUBLIC_SITE_URL` 并部署；运营者只负责自定义域名绑定/DNS，禁止 `example.com` 出现在真实生产 sitemap/canonical。
 - 不接纳完全无关主题，不为凑数量降低门槛；也不要把资料丰富的游戏强行压成 3–5 篇长文。
 - 检查 Guide Search 的 page_opportunities 及审计结果；Codes、Tier List、Updates 和实体资料页必须保留其页面类型元数据。
 - 不生成 Calculator、Planner、Team Builder 等工具页。
 - 不手工补标签掩盖被截断的翻译。
 
-生成完成标准：只保留有证据的 published 分类；简单游戏允许少量页面，资料丰富的游戏要保留不同意图和实体入口；en/es/de/fr/ja；五语言文章树一致；intake、MDX、TypeScript、production build、Private GitHub 全部通过。`result.hosting.provider=cloudflare-pages` 且 `status=manual_action_required` 是后台站点任务的预期结果，不代表已上线。
+生成发布标准：只保留有证据的 published 分类；简单游戏允许少量页面，资料丰富的游戏要保留不同意图和实体入口；en/es/de/fr/ja；五语言文章树一致；intake、MDX、TypeScript、production build、Private GitHub 和 Pages 部署全部通过。正式域名未绑定时 `result.hosting.status=awaiting_domain_configuration`，不代表该域名已上线。
 
-上线完成标准：运营者在 Cloudflare Pages 连接 Private GitHub、设置构建输出为 `out`、绑定域名、设置 `NEXT_PUBLIC_SITE_URL` 并部署后，根路径 301 到 `/en`，线上首页、metadata、sitemap、robots、所有 loc/hreflang 直接 200、self-canonical、OG 全部通过。Pages 部署成功本身不算线上验收。
+上线完成标准：Pages 部署后目标 origin 的根路径 301 到 `/en`，线上首页、metadata、sitemap、robots、所有 loc/hreflang 直接 200、self-canonical、OG 全部通过。自定义域名尚未绑定时，由运营者完成绑定/DNS后再执行最终域名验收。
 
-最终报告：网站根目录、分类、语言、文章数、首页视频来源、manifest、最新日志、API 是否复用、Private repo 状态，以及 Cloudflare Pages 是否仍需手工连接/域名/环境变量/线上验收。不得把“生成成功”简写成“已上线”。
+最终报告：网站根目录、分类、语言、文章数、首页视频来源、manifest、最新日志、API 是否复用、Private repo、Pages project/deployment URL、hosting 状态，以及是否只剩域名绑定/DNS和最终验收。
 ```
 
 用户可在配置中增加 `manualKeywords` 字符串数组。它们是补充发现源，仍必须通过风险过滤、证据门、Basic Info profile 和最终编辑门。多个游戏要求并发时使用监督器，不要自行开多个无协调终端：
@@ -52,7 +52,7 @@ python gamewiki.py status
 python gamewiki.py logs <slug> --tail 150
 ```
 
-只有用户明确授权创建 GitHub 外部资源时才运行 `python gamewiki.py publish <slug>`；Cloudflare Pages 项目和域名始终由运营者手工创建或连接。
+只有用户明确授权创建 GitHub/Cloudflare 外部资源时才运行 `python gamewiki.py publish <slug>`；该命令会创建 Pages Direct Upload 项目，域名绑定和 DNS 始终由运营者处理。
 
 ## 只做诊断的 Prompt
 

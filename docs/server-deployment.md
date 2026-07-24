@@ -106,7 +106,7 @@ openclaw agent --local --agent game-wiki-operator --message \
 
 ## 凭据维护
 
-服务器私有环境至少需要内容 API key 和 GitHub token。Factory 默认流程不运行广告 Job；在 Pages 自动化正式接入服务器前，Pages 项目、环境变量和部署由运营者在 Dashboard 手工完成。更新凭据后：
+服务器私有环境至少需要内容 API key、GitHub token、`CLOUDFLARE_ACCOUNT_ID` 和具有 Pages Edit 权限的 `CLOUDFLARE_API_TOKEN`。Factory 自动创建 Pages Direct Upload 项目、设置 `NEXT_PUBLIC_SITE_URL` 并部署；默认流程仍不运行广告 Job。更新凭据后：
 
 ```bash
 sudo chmod 600 /srv/game-wiki-factory/secrets/factory.env
@@ -169,9 +169,9 @@ OpenClaw 的 workspace 指令如果变化，还要把 `deploy/openclaw/AGENTS.md
 1. 任务状态 `succeeded`，manifest 所有必需阶段完成。
 2. Next.js production build 和本地站点检查通过。
 3. GitHub repo 为 Private。
-4. `result.hosting.provider=cloudflare-pages` 且 `status=manual_action_required`，并明确告知运营者后续步骤。
+4. `result.hosting.provider=cloudflare-pages` 且 `status=complete` 或 `awaiting_domain_configuration`，并明确告知运营者是否只剩域名绑定/DNS。
 
-以上代表“生成完成”。要称为“上线完成”，还必须由运营者在 Cloudflare Pages 手工连接 Private GitHub、把构建输出设为 `out`、绑定域名、设置 `NEXT_PUBLIC_SITE_URL`、部署，并让 `npm run verify:deploy` 通过。canonical、sitemap、robots 不得包含 `example.com`；根路径必须 301 到 `/en`。Pages 部署成功本身不算线上验收。
+`complete` 代表 Pages 部署和目标 origin 线上验收完成。`awaiting_domain_configuration` 代表 Pages、`NEXT_PUBLIC_SITE_URL` 和部署已完成，运营者仍需绑定自定义域名/DNS，再让 `npm run verify:deploy` 通过。canonical、sitemap、robots 不得包含 `example.com`；根路径必须 301 到 `/en`。
 
 ## 2026-07-22 真实验收记录
 

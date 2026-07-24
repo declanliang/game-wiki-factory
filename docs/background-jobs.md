@@ -4,7 +4,7 @@
 
 ## 目标与边界
 
-Factory 只接收新站任务。每个游戏从空 workspace 执行信息采集、关键词、页面规划、文章、翻译、模板、构建和 QA，并创建自己的 Private GitHub repo。Cloudflare Pages 由运营者手工连接。GitHub 发布前必须完成本地生产验收。
+Factory 只接收新站任务。每个游戏从空 workspace 执行信息采集、关键词、页面规划、文章、翻译、模板、构建和 QA，并创建自己的 Private GitHub repo 与 Cloudflare Pages Direct Upload 项目。GitHub 发布前必须完成本地生产验收。
 
 OpenClaw、命令行和未来管理界面只提交或控制任务；真正的长任务由独立 Worker 进程执行。关闭终端或 Agent 对话不得改变数据库中的任务状态，服务器重启后 Worker 可重新领取中断任务。
 
@@ -27,7 +27,7 @@ gamewiki.py jobs submit/status/logs/retry/cancel
 ```
 
 - SQLite 保存任务、attempt、状态和非敏感发布信息，不保存 API key。
-- 成功时把文章/分类数量、Private repo 和 Cloudflare Pages 手工操作提示写入 `result_json`；`jobs status --json` 会返回为 `result`，因此 workspace 清理后 OpenClaw 仍能准确汇报生成结果。
+- 成功时把文章/分类数量、Private repo、Pages project/deployment 和域名交接状态写入 `result_json`；`jobs status --json` 会返回为 `result`，因此 workspace 清理后 OpenClaw 仍能准确汇报发布结果。
 - 每个任务使用独立 sibling workspace 和 `.gamewiki` checkpoint。
 - Worker 通过原子 lease 防止两个进程领取同一任务。
 - 流水线内部 checkpoint 仍是阶段恢复的事实源；任务数据库不复制内容产物。
@@ -182,7 +182,7 @@ JINA_API_KEY_2=
 2. 同一 job 不会被两个 Worker 同时执行。
 3. 发布失败不会重跑已完成内容阶段。
 4. 临时错误有界重试，永久错误进入 `needs_attention`。
-5. 每个站点创建新的 Private repo；Cloudflare Pages 由运营者手工连接。
+5. 每个站点创建新的 Private repo 和 Pages Direct Upload 项目，自动设置 `NEXT_PUBLIC_SITE_URL` 并部署。
 6. 未提供广告变量时零广告渲染；发布器不修改 Cloudflare Pages 环境变量。
 7. `taskType: ads` 必须在入队前明确拒绝，不能误用旧 Vercel 自动化。
-8. 站点 Job 成功时必须有 Private GitHub 和 `hosting.status=manual_action_required`；运营者完成 Cloudflare Pages 手工部署后，另行执行 `verify:deploy` 才能把网站称为“已上线并验证”。验证日志固定保存为项目 `.gamewiki/deploy-verification.log`。
+8. 站点 Job 成功时必须有 Private GitHub，且 `hosting.status` 为 `complete` 或 `awaiting_domain_configuration`。后者由运营者绑定自定义域名/DNS后另行执行 `verify:deploy`；验证日志固定保存为项目 `.gamewiki/deploy-verification.log`。

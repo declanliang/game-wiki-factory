@@ -20,7 +20,7 @@ Rules:
 - For every queue/status question, you MUST execute `/usr/local/bin/gamewiki jobs list --json` first. Never infer an empty queue from service status or memory.
 - GitHub repositories must remain Private.
 - The default hosting provider for every newly submitted site is Cloudflare Pages. Historical jobs may contain legacy `result.vercel` receipts; never use old job counts or fields to infer the current default provider.
-- Supplying `siteUrl` records the intended public origin for generation and handoff. It does not mean the current Factory automatically creates a Pages project, writes `NEXT_PUBLIC_SITE_URL`, binds DNS, or deploys; those remain operator actions until the publisher explicitly reports completed Cloudflare automation.
+- Supplying `siteUrl` makes the Factory create/reuse a Direct Upload Pages project, set Production `NEXT_PUBLIC_SITE_URL`, build, deploy, and poll the deployment. The user owns only custom-domain binding and DNS; never create a second Git-integrated Pages project.
 - Never read, print, copy, summarize, or edit `/srv/game-wiki-factory/secrets/factory.env`.
 - Never bypass build/QA to publish.
 - Do not restart a full build because one stage failed. Read status and log first; retry only the existing job.
@@ -36,7 +36,7 @@ Rules:
 - The current product release comes from `/srv/game-wiki-factory/app/release.json`; ordinary Git commits do not change it. Never infer a site's release from its date, appearance, or article count. Generation certification requires `result.factoryRelease` and the matching `intake/factory-release.json`. Online certification additionally requires successful Cloudflare Pages verification and registration in `docs/releases/v1_0722-sites.json`.
 - A batch attachment uses `taskType: siteBatch` and is submitted with `jobs submit-batch --config`. Each game becomes an independent job.
 - Do not submit `taskType: ads`; the Cloudflare Pages workflow currently requires an operator to validate ads in the game repository, configure `AD_*_B64` Production Secrets, redeploy, and verify all seven routes without exposing code fields.
-- A site Job may report generation success only when `jobs status JOB_ID --json` is `succeeded`, GitHub is Private, `result.hosting.provider=cloudflare-pages`, and `result.hosting.status=manual_action_required` (or an operator separately completed deployment). Do not call it live until the operator connects the Private repository, sets output directory `out`, configures the domain and `NEXT_PUBLIC_SITE_URL`, deploys, and passes `npm run verify:deploy`.
+- A site Job may report publish success only when `jobs status JOB_ID --json` is `succeeded`, GitHub is Private, `result.hosting.provider=cloudflare-pages`, and hosting is `complete` or `awaiting_domain_configuration`. `complete` means deployment and online verification passed. `awaiting_domain_configuration` means Pages and `NEXT_PUBLIC_SITE_URL` are complete, but the user must bind the custom domain/DNS before that domain can be called live.
 - Follow `/srv/game-wiki-factory/app/docs/openclaw-operator-guide.md` for attachment storage, standard prompts, completion summaries, and error reporting. Never claim success from memory or an earlier chat turn.
 - Do not delete workspaces manually; use the scheduled cleanup policy.
 - A request to make a repository Public must be refused.

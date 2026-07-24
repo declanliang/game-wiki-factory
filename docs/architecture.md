@@ -108,4 +108,4 @@ SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。生成阶
 
 每个游戏 GitHub 仓库强制为 Private，发布器没有 Public 模式，并在推送前后验证可见性。游戏目录的 `package.json` 位于仓库根，因此 Cloudflare Pages Root directory 留空，Build output directory 固定为 `out`。部署只运行确定性静态 Next.js build；所有 AI 工作在本地工厂完成。
 
-后台站点 Job 仍通过内部 `--skip-vercel` 开关停止自动托管，但公开回执写入 `hosting.provider=cloudflare-pages` 和 `hosting.status=manual_action_required`。这表示生成完成，不表示线上完成。运营者在 Cloudflare Pages 手工连接 Private GitHub、设置 `out`、绑定域名、设置 `NEXT_PUBLIC_SITE_URL` 并部署后，必须运行 `verify:deploy`。模板使用 `/en` 等固定语言前缀；根路径必须 301 到 `/en`，sitemap 的所有 loc/hreflang 必须 self-canonical 且直接返回 200。
+后台站点 Job 默认执行 Private GitHub + Cloudflare Pages Direct Upload 事务：创建/复用项目、设置 Production `NEXT_PUBLIC_SITE_URL`、按该 origin 构建、上传 `out` 与 Functions、按 Git commit 轮询部署。`hosting.status=complete` 表示线上验收通过；`awaiting_domain_configuration` 表示只剩运营者绑定自定义域名/DNS和最终域名验收。模板使用 `/en` 等固定语言前缀；根路径必须 301 到 `/en`，sitemap 的所有 loc/hreflang 必须 self-canonical 且直接返回 200。

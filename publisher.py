@@ -1,4 +1,4 @@
-"""Idempotently publish a completed generated project to GitHub and Vercel."""
+"""Idempotently publish a completed generated project to GitHub and Cloudflare Pages."""
 
 from __future__ import annotations
 
@@ -9,10 +9,12 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
+from html.parser import HTMLParser
 from pathlib import Path
 
 from orchestrate_wiki import build_subprocess_env, read_json, write_json
@@ -46,6 +48,247 @@ def _request(method: str, url: str, token: str, payload: dict | None = None) -> 
     except urllib.error.HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")[:1000]
         raise RuntimeError(f"HTTP {exc.code} from {url}: {detail}") from exc
+
+
+def _normalize_origin(value: str) -> str:
+    configured = value.strip()
+    if not re.match(r"^https?://", configured, flags=re.I):
+        configured = f"https://{configured}"
+    parsed = urllib.parse.urlparse(configured)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise RuntimeError("site URL must be a valid hostname or HTTP(S) URL")
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _cloudflare_credentials(env: dict[str, str]) -> tuple[str, str]:
+    account_id = next(
+        (env.get(name, "").strip() for name in (
+            "CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID", "cf_accountid",
+        ) if env.get(name, "").strip()),
+        "",
+    )
+    token = next(
+        (env.get(name, "").strip() for name in (
+            "CLOUDFLARE_API_TOKEN", "CF_PAGES_API_TOKEN", "cf_pages_api_key",
+        ) if env.get(name, "").strip()),
+        "",
+    )
+    if not account_id or not token:
+        raise RuntimeError(
+            "Cloudflare Pages publishing requires CLOUDFLARE_ACCOUNT_ID and "
+            "CLOUDFLARE_API_TOKEN (legacy cf_accountid/cf_pages_api_key are also accepted)"
+        )
+    return account_id, token
+
+
+def _cloudflare_request(
+    method: str,
+    account_id: str,
+    token: str,
+    path: str,
+    payload: dict | None = None,
+) -> object:
+    envelope = _request(
+        method,
+        f"https://api.cloudflare.com/client/v4/accounts/{urllib.parse.quote(account_id)}/{path.lstrip('/')}",
+        token,
+        payload,
+    )
+    if not envelope.get("success", False):
+        errors = envelope.get("errors") or []
+        summary = "; ".join(str(item.get("message") or item.get("code") or "unknown error") for item in errors[:3])
+        raise RuntimeError(f"Cloudflare API request failed: {summary or 'unknown error'}")
+    return envelope.get("result")
+
+
+def _ensure_cloudflare_project(
+    account_id: str,
+    token: str,
+    project_name: str,
+) -> dict:
+    encoded_name = urllib.parse.quote(project_name)
+    try:
+        project = _cloudflare_request(
+            "GET", account_id, token, f"pages/projects/{encoded_name}"
+        )
+    except RuntimeError as exc:
+        if "HTTP 404" not in str(exc):
+            raise
+        project = _cloudflare_request(
+            "POST",
+            account_id,
+            token,
+            "pages/projects",
+            {"name": project_name, "production_branch": "main"},
+        )
+    if not isinstance(project, dict):
+        raise RuntimeError("Cloudflare Pages project response was not an object")
+    if project.get("source"):
+        raise RuntimeError(
+            f"Cloudflare Pages project {project_name!r} uses Git integration and cannot be "
+            "reused by the Factory Direct Upload transaction"
+        )
+    return project
+
+
+def _set_cloudflare_site_url(
+    account_id: str,
+    token: str,
+    project_name: str,
+    origin: str,
+) -> None:
+    _cloudflare_request(
+        "PATCH",
+        account_id,
+        token,
+        f"pages/projects/{urllib.parse.quote(project_name)}",
+        {
+            "deployment_configs": {
+                "production": {
+                    "env_vars": {
+                        "NEXT_PUBLIC_SITE_URL": {
+                            "type": "plain_text",
+                            "value": origin,
+                        }
+                    }
+                }
+            }
+        },
+    )
+
+
+def _run_logged(
+    command: list[str],
+    cwd: Path,
+    env: dict[str, str],
+    log_path: Path,
+) -> str:
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+    )
+    output = (result.stdout or "") + (result.stderr or "")
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("a", encoding="utf-8") as log:
+        log.write(f"\n[{_now()}]\n[run] {' '.join(command)}\n[cwd] {cwd}\n")
+        log.write(output)
+        if output and not output.endswith("\n"):
+            log.write("\n")
+        log.write(f"[exitCode] {result.returncode}\n")
+    if result.returncode:
+        raise RuntimeError((result.stderr or result.stdout or "command failed").strip())
+    return (result.stdout or "").strip()
+
+
+def _find_cloudflare_deployment(
+    account_id: str,
+    token: str,
+    project_name: str,
+    commit_sha: str,
+    *,
+    attempts: int = 30,
+) -> dict:
+    encoded_name = urllib.parse.quote(project_name)
+    matched: dict | None = None
+    for attempt in range(attempts):
+        deployments = _cloudflare_request(
+            "GET", account_id, token, f"pages/projects/{encoded_name}/deployments"
+        )
+        if isinstance(deployments, list):
+            for candidate in deployments:
+                metadata = ((candidate.get("deployment_trigger") or {}).get("metadata") or {})
+                if metadata.get("commit_hash") == commit_sha:
+                    matched = candidate
+                    break
+        status = str(((matched or {}).get("latest_stage") or {}).get("status") or "").casefold()
+        if status in {"success", "failure"}:
+            break
+        if attempt + 1 < attempts:
+            time.sleep(3)
+    if not matched:
+        raise RuntimeError(
+            f"Cloudflare Pages deployment for commit {commit_sha} was not returned by the API"
+        )
+    status = str((matched.get("latest_stage") or {}).get("status") or "").casefold()
+    if status != "success":
+        raise RuntimeError(
+            f"Cloudflare Pages deployment {matched.get('id') or '<unknown>'} ended with status {status or 'unknown'}"
+        )
+    return matched
+
+
+def _deploy_cloudflare_pages(
+    project: Path,
+    project_name: str,
+    site_url: str,
+    commit_sha: str,
+    env: dict[str, str],
+) -> dict:
+    account_id, token = _cloudflare_credentials(env)
+    cloudflare_project = _ensure_cloudflare_project(account_id, token, project_name)
+    subdomain = str(cloudflare_project.get("subdomain") or f"{project_name}.pages.dev").strip()
+    pages_origin = _normalize_origin(subdomain)
+    canonical_origin = _normalize_origin(site_url) if site_url.strip() else pages_origin
+    _set_cloudflare_site_url(account_id, token, project_name, canonical_origin)
+
+    command_env = dict(env)
+    command_env.update({
+        "CLOUDFLARE_ACCOUNT_ID": account_id,
+        "CLOUDFLARE_API_TOKEN": token,
+        "NEXT_PUBLIC_SITE_URL": canonical_origin,
+        "CF_PAGES": "1",
+    })
+    npm = shutil.which("npm.cmd") or shutil.which("npm")
+    npx = shutil.which("npx.cmd") or shutil.which("npx")
+    if not npm or not npx:
+        raise RuntimeError("npm and npx are required for Cloudflare Pages publishing")
+    log_path = project / ".gamewiki" / "logs" / "cloudflare-pages-publish.log"
+    _run_logged([npm, "run", "build"], project, command_env, log_path)
+    output = _run_logged(
+        [
+            npx,
+            "wrangler",
+            "pages",
+            "deploy",
+            "out",
+            "--project-name",
+            project_name,
+            "--branch",
+            "main",
+            "--commit-hash",
+            commit_sha,
+            "--commit-message",
+            "Generate game wiki site",
+        ],
+        project,
+        command_env,
+        log_path,
+    )
+    deployment = _find_cloudflare_deployment(
+        account_id, token, project_name, commit_sha
+    )
+    output_urls = [item.rstrip(".,)") for item in re.findall(r"https://[^\s\"']+", output)]
+    deployment_url = str(deployment.get("url") or (output_urls[-1] if output_urls else "")).rstrip("/")
+    return {
+        "provider": "cloudflare-pages",
+        "status": "deployed",
+        "projectId": cloudflare_project.get("id"),
+        "projectName": cloudflare_project.get("name") or project_name,
+        "productionBranch": "main",
+        "deploymentId": deployment.get("id"),
+        "deploymentUrl": deployment_url,
+        "pagesOrigin": pages_origin,
+        "siteUrl": canonical_origin,
+        "environmentVariables": ["NEXT_PUBLIC_SITE_URL"],
+        "deploymentMode": "direct-upload",
+        "log": str(log_path),
+        "updatedAt": _now(),
+    }
 
 
 def _publish_with_vercel_cli(project: Path, project_name: str, full_repo: str, env: dict[str, str]) -> dict:
@@ -172,6 +415,33 @@ def _verify_online_deployment(project: Path, origin: str, env: dict[str, str]) -
     }
 
 
+class _CanonicalParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.canonical = ""
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.casefold() != "link":
+            return
+        values = {key.casefold(): value or "" for key, value in attrs}
+        if "canonical" in values.get("rel", "").casefold().split():
+            self.canonical = values.get("href", "")
+
+
+def _custom_origin_is_ready(origin: str) -> bool:
+    expected = f"{origin.rstrip('/')}/en"
+    try:
+        request = urllib.request.Request(expected, headers={"User-Agent": "GameWikiFactory/1.0"})
+        with urllib.request.urlopen(request, timeout=15) as response:
+            if response.status != 200:
+                return False
+            parser = _CanonicalParser()
+            parser.feed(response.read().decode("utf-8", errors="replace"))
+            return parser.canonical.rstrip("/") == expected
+    except (OSError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError):
+        return False
+
+
 def _ensure_private_github_repo(full_repo: str, project: Path, env: dict[str, str]) -> None:
     """Enforce the factory's private-only repository contract before any update push."""
     visibility = _run(
@@ -294,8 +564,9 @@ def publish(argv: list[str]) -> int:
     parser.add_argument("--owner", default=runtime_env.get("FACTORY_GITHUB_OWNER") or "declanliang")
     parser.add_argument("--repo")
     parser.add_argument("--project-dir", type=Path)
-    parser.add_argument("--site-url", help="Optional final domain/URL to configure in Vercel.")
-    parser.add_argument("--skip-vercel", action="store_true")
+    parser.add_argument("--site-url", help="Optional final canonical domain/URL for Cloudflare Pages.")
+    parser.add_argument("--skip-cloudflare", action="store_true")
+    parser.add_argument("--skip-vercel", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--replace-existing", action="store_true", help="Replace an existing repository tree after creating a backup tag.")
     parser.add_argument("--vercel-project", help="Reuse a Vercel project name that differs from the GitHub repository name.")
     args = parser.parse_args(argv)
@@ -351,11 +622,11 @@ def publish(argv: list[str]) -> int:
     }
     write_json(receipt_path, receipt)
 
-    if args.skip_vercel:
+    if args.skip_cloudflare or args.skip_vercel:
         receipt["stages"]["hosting"] = {
             "provider": "cloudflare-pages",
             "status": "manual_action_required",
-            "nextAction": "Connect this private GitHub repository in Cloudflare Pages, set the build output directory to out, configure the final domain and NEXT_PUBLIC_SITE_URL, then deploy and run npm run verify:deploy.",
+            "nextAction": "Create a Cloudflare Pages project, set NEXT_PUBLIC_SITE_URL, deploy, and run npm run verify:deploy.",
             "dashboardUrl": "https://dash.cloudflare.com/",
             "updatedAt": _now(),
         }
@@ -363,68 +634,54 @@ def publish(argv: list[str]) -> int:
         receipt["stages"].pop("onlineVerification", None)
         write_json(receipt_path, receipt)
     else:
-        vercel_token = runtime_env.get("VERCEL_TOKEN")
-        project_name = args.vercel_project or re.sub(r"[^a-z0-9-]+", "-", repo.casefold()).strip("-")[:100]
-        if vercel_token:
-            team_id = runtime_env.get("VERCEL_TEAM_ID", "").strip()
-            query = f"?teamId={urllib.parse.quote(team_id)}" if team_id else ""
-            try:
-                vercel = _request("GET", f"https://api.vercel.com/v9/projects/{project_name}{query}", vercel_token)
-            except RuntimeError as exc:
-                if "HTTP 404" not in str(exc):
-                    raise
-                vercel = _request(
-                    "POST",
-                    f"https://api.vercel.com/v11/projects{query}",
-                    vercel_token,
-                    _vercel_project_payload(project_name, full_repo),
-                )
-            receipt["stages"]["vercel"] = {
-                "status": "awaiting_domain_configuration",
-                "projectId": vercel.get("id"),
-                "projectName": vercel.get("name", project_name),
-                "requiredEnvironmentVariables": ["NEXT_PUBLIC_SITE_URL"],
-                "nextAction": "Set the final custom domain and NEXT_PUBLIC_SITE_URL in Vercel, then run npm run verify:deploy.",
-                "dashboardUrl": "https://vercel.com/dashboard",
-                "updatedAt": _now(),
-            }
-        else:
-            receipt["stages"]["vercel"] = _publish_with_vercel_cli(project, project_name, full_repo, env)
-        configured_origin = ""
-        if args.site_url:
-            configured_origin = _set_vercel_site_url(project, project_name, args.site_url, env)
-            receipt["stages"]["vercel"].update({
-                "status": "configured",
-                "siteUrl": configured_origin,
-                "requiredEnvironmentVariables": [],
-                "nextAction": "Trigger a production deployment, then run npm run verify:deploy.",
-                "updatedAt": _now(),
-            })
-        try:
-            deployment_url = _deploy_with_vercel_cli(project, project_name, env)
-        finally:
-            _remove_vercel_oidc_env(project)
-        receipt["stages"]["vercel"].update({
+        project_name = re.sub(r"[^a-z0-9-]+", "-", repo.casefold()).strip("-")[:58]
+        hosting = _deploy_cloudflare_pages(
+            project,
+            project_name,
+            args.site_url or "",
+            receipt["stages"]["github"]["commit"],
+            env,
+        )
+        hosting.update({
             "status": "verifying",
-            "deploymentUrl": deployment_url,
-            "requiredEnvironmentVariables": [],
-            "nextAction": "Automated online production verification is running.",
+            "dashboardUrl": "https://dash.cloudflare.com/",
+            "nextAction": "Automated deployment verification is running.",
             "updatedAt": _now(),
         })
+        receipt["stages"]["hosting"] = hosting
+        receipt["stages"].pop("vercel", None)
         receipt["stages"]["onlineVerification"] = {
             "status": "running",
-            "origin": configured_origin or f"https://{project_name}.vercel.app",
+            "origin": hosting["siteUrl"],
             "updatedAt": _now(),
         }
         write_json(receipt_path, receipt)
-        verification_origin = configured_origin or f"https://{project_name}.vercel.app"
-        verification = _verify_online_deployment(project, verification_origin, env)
-        receipt["stages"]["onlineVerification"] = verification
-        receipt["stages"]["vercel"].update({
-            "status": "complete",
-            "nextAction": "Production deployment and online verification are complete.",
-            "updatedAt": _now(),
-        })
+
+        custom_domain_pending = (
+            hosting["siteUrl"] != hosting["pagesOrigin"]
+            and not _custom_origin_is_ready(hosting["siteUrl"])
+        )
+        if custom_domain_pending:
+            receipt["stages"]["onlineVerification"] = {
+                "status": "awaiting_domain_configuration",
+                "origin": hosting["siteUrl"],
+                "deploymentUrl": hosting["deploymentUrl"],
+                "nextAction": "Bind the custom domain in Cloudflare Pages, then run npm run verify:deploy.",
+                "updatedAt": _now(),
+            }
+            receipt["stages"]["hosting"].update({
+                "status": "awaiting_domain_configuration",
+                "nextAction": "Pages deployment is complete. Bind the custom domain; NEXT_PUBLIC_SITE_URL is already configured.",
+                "updatedAt": _now(),
+            })
+        else:
+            verification = _verify_online_deployment(project, hosting["siteUrl"], env)
+            receipt["stages"]["onlineVerification"] = verification
+            receipt["stages"]["hosting"].update({
+                "status": "complete",
+                "nextAction": "Cloudflare Pages production deployment and online verification are complete.",
+                "updatedAt": _now(),
+            })
         write_json(receipt_path, receipt)
     print(json.dumps(receipt, ensure_ascii=False, indent=2))
     return 0

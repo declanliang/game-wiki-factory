@@ -9,10 +9,27 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _prune_success_build_artifacts, acknowledge_notifications, classify_failure, claim, connect, normalize_config, pending_notifications, submit, submit_batch
+from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _prune_success_build_artifacts, _publish_command, acknowledge_notifications, classify_failure, claim, connect, normalize_config, pending_notifications, submit, submit_batch
 
 
 class JobSystemTests(unittest.TestCase):
+    def test_new_job_defaults_to_automatic_cloudflare_publish(self) -> None:
+        config = normalize_config({
+            "game": "Pages Game",
+            "siteUrl": "https://pages-game.example",
+            "publish": True,
+        })
+        self.assertEqual(config["publication"], {"skipCloudflare": False})
+        command = _publish_command(config, "pages-game")
+        self.assertNotIn("--skip-cloudflare", command)
+        self.assertNotIn("--skip-vercel", command)
+        self.assertEqual(command[-2:], ["--site-url", "https://pages-game.example"])
+
+    def test_cloudflare_publish_can_only_be_skipped_explicitly(self) -> None:
+        config = normalize_config({"game": "Manual Pages", "publish": True})
+        config["publication"]["skipCloudflare"] = True
+        self.assertIn("--skip-cloudflare", _publish_command(config, "manual-pages"))
+
     def test_new_job_does_not_force_paid_refresh(self) -> None:
         config = normalize_config({"game": "Test Game", "platform": "roblox"})
         self.assertEqual(_execution_config(config, 1)["refresh"], {"basicInfo": False, "keywords": False, "articles": False})

@@ -19,7 +19,7 @@
 
 - `platform`：`roblox`、`steam` 或 `auto`。
 - Steam 的 `officialUrl` 必须是 Steam Store App URL。
-- `siteUrl` 可省略；运营者手工连接 Cloudflare Pages 后再决定正式域名，并设置匹配的 `NEXT_PUBLIC_SITE_URL`。
+- `siteUrl` 可省略；省略时 Factory 使用项目的 `pages.dev` origin。提供时 Factory 自动设置匹配的 `NEXT_PUBLIC_SITE_URL` 并部署，运营者只负责自定义域名绑定和 DNS。
 - 单站的 `schemaVersion`、`taskType: site` 和默认 operation 由系统自动补齐，用户无需填写。
 - `manualKeywords` 可选，最多 200 项。它们会作为 `user_provided` 来源进入 Guide Search，但仍受风险、证据和分类边界约束。
 - 不填写 `operation`；失败续跑只重试原 Job。
@@ -78,14 +78,14 @@ Factory 默认的 Cloudflare Pages 流程不要提交 `taskType: ads` 后台任�
 不要根据之前聊天记忆回答。
 ```
 
-Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status JOB_ID --json`。成功任务的 `result` 是清理 workspace 后仍保留的非敏感摘要，包含文章数、分类、Private GitHub 和 Cloudflare Pages 手动操作提示；不要绕过 CLI 直接读取 secrets。只有下列条件全部满足才能报告生成完成：
+Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status JOB_ID --json`。成功任务的 `result` 是清理 workspace 后仍保留的非敏感摘要，包含文章数、分类、Private GitHub、Pages project/deployment 和域名交接状态；不要绕过 CLI 直接读取 secrets。只有下列条件全部满足才能报告发布完成：
 
 1. job 为 `succeeded`，manifest 必需阶段完成；
 2. GitHub repo 为 Private；
-3. `publish.json` 中 `stages.hosting.provider=cloudflare-pages` 且 `status=manual_action_required`，或运营者已另行完成线上部署和验收；
+3. `publish.json` 中 `stages.hosting.provider=cloudflare-pages` 且 `status=complete` 或 `awaiting_domain_configuration`；后者只能表述为“Pages 已部署，等待域名绑定”；
 4. Factory 默认流程不存在后台广告任务；广告由运营者另行部署和验收。
 
-完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Cloudflare Pages 手工连接提示和广告状态。未手动部署前不得声称网站已线上验证。
+完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Pages project/deployment URL、hosting 状态、是否只剩域名绑定/DNS，以及广告状态。只有 `complete` 才能声称对应 origin 已线上验证。
 
 `needs_attention` 固定汇报：第一个失败阶段、根因、日志路径、是否需要用户动作、是否会重复 API 成本。网络/429/5xx 由 Worker 有界重试；不要创建第二个同游戏任务。用户修复密钥、余额、DNS 或权限后，重试原 job，复用 checkpoint。
 

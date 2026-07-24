@@ -28,7 +28,7 @@ Copy-Item .env.example .env
 gh auth login
 ```
 
-在 `.env` 中只填写实际使用的变量。内容流水线至少需要 ToAPIs/LLM key；搜索源按启用情况需要 DataForSEO、Serper、Jina；无人值守发布需要 `FACTORY_GITHUB_TOKEN`、`FACTORY_GITHUB_OWNER`、`VERCEL_TOKEN`，团队账号另填 `VERCEL_TEAM_ID`。不要删除 `.env.example` 中未知变量，它是当前配置清单。
+在 `.env` 中只填写实际使用的变量。内容流水线至少需要 ToAPIs/LLM key；搜索源按启用情况需要 DataForSEO、Serper、Jina；无人值守发布需要 `FACTORY_GITHUB_TOKEN`、`FACTORY_GITHUB_OWNER`、`CLOUDFLARE_ACCOUNT_ID` 和具有 Pages Edit 权限的 `CLOUDFLARE_API_TOKEN`。不要删除 `.env.example` 中未知变量，它是当前配置清单。
 
 首次运行前执行：
 
@@ -102,7 +102,7 @@ sudo systemctl list-timers 'gamewiki-*'
 df -h / /srv/game-wiki-factory
 ```
 
-在服务器执行根测试，再提交一个 `publish: false` 的测试游戏冒烟任务。后台生成能力在本地 QA 和 GitHub Private 后置校验通过后视为恢复；Cloudflare Pages 手工连接和线上 canonical/sitemap/robots/hreflang 验收作为独立运营步骤验证。
+在服务器执行根测试，再提交一个 `publish: false` 的测试游戏冒烟任务。另用临时 Pages 项目验证 API 权限、环境变量最小更新、Direct Upload 和线上 canonical/sitemap/robots/hreflang；测试项目验证后删除。正式自定义域名绑定/DNS仍是运营步骤。
 
 ## 更新、回滚与全损恢复
 

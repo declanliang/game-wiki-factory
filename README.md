@@ -1,6 +1,6 @@
 # Game Wiki Factory
 
-输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库。新游戏使用 Cloudflare Pages；仓库连接、域名和环境变量由站点运营者手动完成。历史站点继续保留原 Vercel 部署，不在新任务中重建或迁移。
+输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库和 Cloudflare Pages。Factory 自动创建 Pages 项目、设置 `NEXT_PUBLIC_SITE_URL` 并 Direct Upload；自定义域名绑定和 DNS 由站点运营者完成。历史站点继续保留原托管，不在新任务中重建或迁移。
 
 第一次接手先读 [立即接手指南](docs/takeover.md)。全新电脑或服务器仅凭 GitHub 恢复时，再按 [从零恢复手册](docs/bootstrap-from-github.md) 操作。当前生产风险见 [生产就绪审计](docs/production-readiness-audit-2026-07-23.md)。
 
@@ -31,7 +31,7 @@ Basic Info、Guide Search、SEO Scout 和发布器都会从这里读取配置。
 gh auth login
 ```
 
-无人值守或 GitHub Actions 使用 `.env`/Secrets 中的 `FACTORY_GITHUB_TOKEN`；本地没有 token 时自动复用上述 GitHub CLI 登录会话。Cloudflare Pages 连接与配置在 Dashboard 手工完成，不向 Factory 提供 Cloudflare token。
+无人值守或 GitHub Actions 使用 `.env`/Secrets 中的 `FACTORY_GITHUB_TOKEN`；本地没有 token 时自动复用上述 GitHub CLI 登录会话。Pages 自动发布还需要 `CLOUDFLARE_ACCOUNT_ID` 和具有 Cloudflare Pages Edit 权限的 `CLOUDFLARE_API_TOKEN`。
 
 ## 推荐执行方式：JSON 配置
 
@@ -116,7 +116,7 @@ python gamewiki.py --config jobs\my-game.json
 - `platform` 只能是 `roblox`、`steam` 或 `auto`。
 - `siteUrl` 可以是裸域名或完整 HTTPS URL；已知正式域名时填写。
 - `manualKeywords` 是可选字符串数组，最多 200 项；系统会清理空白、按大小写去重，并作为 `user_provided` 来源进入 Guide Search。它们仍受风险过滤、证据门和 Basic Info 分类边界约束。
-- `publish: true` 会创建新的 Private GitHub 仓库，随后任务即可标记成功。回执会标记 `hosting.provider=cloudflare-pages` 和 `hosting.status=manual_action_required`，提示运营者在 Cloudflare Pages 连接仓库、把构建输出设为 `out`、配置域名和 `NEXT_PUBLIC_SITE_URL` 后手动部署。
+- `publish: true` 会创建新的 Private GitHub 仓库和 Direct Upload Pages 项目，自动设置 Production `NEXT_PUBLIC_SITE_URL`、构建、部署并轮询成功状态。未填写 `siteUrl` 时使用 `<slug>.pages.dev` 并自动验收；填写的正式域名尚未绑定时返回 `hosting.status=awaiting_domain_configuration`。
 - 日常配置不需要 GitHub repo 或托管平台项目名。每个游戏都创建新的 Private GitHub repo。
 - `refresh` 默认全部为 `false`。普通续跑不要开启，防止重复 API 成本。
 - 配置中的多余换行和连续空格会在执行前规范化，未知字段和拼写错误会直接报错。
@@ -226,7 +226,7 @@ npm run build
 npm run verify:deploy
 ```
 
-后台站点任务不会自动部署 Cloudflare Pages。运营者连接 Private repo，设置 Build command 为 `npm run build`、Build output directory 为 `out`，绑定域名并把 Production 的 `NEXT_PUBLIC_SITE_URL` 设为最终公开 origin；随后部署并执行 `npm run verify:deploy`。未完成这一步时，Job 的 `succeeded` 只代表生成、构建、QA 和 Private GitHub 完成，不代表网站已上线。
+后台站点任务会自动部署 Cloudflare Pages。若提供的 `siteUrl` 尚未绑定，运营者只需在现有 Pages 项目绑定该域名并配置 DNS；`NEXT_PUBLIC_SITE_URL` 和站点部署已经完成。域名可访问后执行同一 Job 的线上验收，或在项目根运行 `npm run verify:deploy`。`awaiting_domain_configuration` 不代表正式域名已上线。
 
 ## 可选 Adsterra 广告
 
@@ -253,7 +253,7 @@ Factory 默认的 Cloudflare Pages 流程暂不接受后台 `taskType: ads`：Cl
 读取该项目 .gamewiki/manifest.json、configs 和最新 logs。
 已完成的 Basic Info、关键词、文章和翻译不要重新生成。
 修复实际问题后从 checkpoint 继续，使用最新版 factory 模板。
-GitHub 仓库必须为 Private。后台任务完成后，明确汇报 Cloudflare Pages 仍需手工连接仓库、设置 `out`、域名、`NEXT_PUBLIC_SITE_URL`、部署和线上验收。
+GitHub 仓库必须为 Private。后台任务自动完成 Pages 项目、`NEXT_PUBLIC_SITE_URL` 和 Direct Upload；若状态为 `awaiting_domain_configuration`，明确汇报只剩自定义域名绑定/DNS和最终域名验收。
 最后检查 canonical、sitemap、robots 和 hreflang。
 ```
 

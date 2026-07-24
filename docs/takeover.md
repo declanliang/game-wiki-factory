@@ -8,7 +8,7 @@
 - 固定语言及顺序为 `en/es/de/fr/ja`。
 - Factory 源码只在本仓库；游戏产物位于 Factory 同级的 `../<slug>/`，游戏目录本身就是 Next.js 根。
 - 付费、可恢复状态在游戏根 `.gamewiki/`；最终可部署输入在 `intake/`。
-- 后台站点任务默认完成到 Private GitHub。Cloudflare Pages 仓库连接、`out` 构建输出、域名和 `NEXT_PUBLIC_SITE_URL` 由运营者手工完成。
+- 后台站点任务默认完成 Private GitHub、Pages Direct Upload、`NEXT_PUBLIC_SITE_URL` 和部署。运营者只负责自定义域名绑定/DNS；正式域名尚未可达时状态为 `awaiting_domain_configuration`。
 - 所有未来游戏都作为新项目从空 workspace 生产；不再接收 `operation: rebuild` 或旧 repo 覆盖输入。
 - Factory 默认的 Cloudflare Pages 流程不接受后台 `taskType: ads` Job；广告校验后由运营者手工配置 Pages Secret 并部署验证。
 
@@ -82,25 +82,24 @@ git rev-parse HEAD
 
 ## 5. 两种“完成”
 
-### 生成完成
+### 发布完成
 
 站点 Job 可以在以下条件下标记 `succeeded`：
 
 - 内容、五语言一致性、MDX、TypeScript 和 production build 通过；
 - 新 GitHub 仓库已创建且为 Private；
-- `result.hosting.provider` 为 `cloudflare-pages`，且 `result.hosting.status` 为 `manual_action_required`。
+- `result.hosting.provider` 为 `cloudflare-pages`，且 `result.hosting.status` 为 `complete` 或 `awaiting_domain_configuration`。
 
-这时只能说“生成完成并已推送 Private GitHub”，不能说“网站已上线”。
+`complete` 可以说对应 origin 已部署并验证；`awaiting_domain_configuration` 只能说“Pages 已部署，等待正式域名绑定”。
 
 ### 上线完成
 
-运营者在 Cloudflare Pages 手工连接游戏 Private repo，Root directory 留空、Build output directory 设为 `out`，然后：
+Factory 已创建 Direct Upload Pages 项目并部署。若状态为 `awaiting_domain_configuration`，运营者在该项目中：
 
 1. 绑定最终域名；
-2. 设置 Production 的 `NEXT_PUBLIC_SITE_URL=https://最终域名`；
-3. 部署 production；
-4. 在游戏根运行 `npm run verify:deploy`；
-5. 确认首页 metadata、canonical、sitemap、robots 和全部 loc/hreflang 直接返回 200。
+2. 配置对应 DNS；`NEXT_PUBLIC_SITE_URL` 已由 Factory 设置，不要另建 Git-integrated 项目；
+3. 在游戏根运行 `npm run verify:deploy`；
+4. 确认首页 metadata、canonical、sitemap、robots 和全部 loc/hreflang 直接返回 200。
 
 只有上述线上门通过，才能报告“已上线并验证”。
 

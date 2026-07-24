@@ -11,7 +11,7 @@ Copy-Item jobs\example.json jobs\my-game.json
 python gamewiki.py --config jobs\my-game.json
 ```
 
-配置文件必须明确 `game`、`platform` 和已知的 `officialUrl`；Steam 使用 Store App URL，Roblox 使用 Experience URL。`publish: true` 会完成本地生产验收和 Private GitHub 发布；后台站点 Job 不自动创建或部署 Cloudflare Pages。真实 `jobs/*.json`、配置快照和日志都被 Git 忽略。
+配置文件必须明确 `game`、`platform` 和已知的 `officialUrl`；Steam 使用 Store App URL，Roblox 使用 Experience URL。`publish: true` 会完成本地生产验收、Private GitHub 和 Cloudflare Pages Direct Upload。真实 `jobs/*.json`、配置快照和日志都被 Git 忽略。
 
 直接参数模式仍可用于调试：
 
@@ -42,9 +42,9 @@ python gamewiki.py logs <slug> --tail 150
 python gamewiki.py resume <slug>
 ```
 
-## GitHub 发布与 Cloudflare Pages 手工上线
+## GitHub 与 Cloudflare Pages 自动发布
 
-GitHub Actions 设置 Secrets：`FACTORY_GITHUB_TOKEN` 以及生成/搜索/翻译 API key；设置 Variable：`FACTORY_GITHUB_OWNER`。本地发布会优先读取 factory `.env`，没有 token 时复用 `gh auth login` 会话。发布器强制 GitHub 仓库为 Private。
+GitHub Actions 设置 Secrets：`FACTORY_GITHUB_TOKEN`、`CLOUDFLARE_API_TOKEN` 以及生成/搜索/翻译 API key；设置 Variables：`FACTORY_GITHUB_OWNER`、`CLOUDFLARE_ACCOUNT_ID`。本地发布会优先读取 factory `.env`，没有 GitHub token 时复用 `gh auth login` 会话。发布器强制 GitHub 仓库为 Private。
 
 ```powershell
 python gamewiki.py publish <slug>
@@ -54,9 +54,9 @@ python gamewiki.py publish <slug>
 
 每个新游戏创建自己的 Private GitHub repo。GitHub integration 未授权读取 Private repo 时，完成授权后重复同一命令。Actions 中运行 `Generate and publish game wikis`，`games_json` 输入合法 JSON 数组，例如 `["Game A", "Game B"]`。
 
-后台配置会把内部 `publication.skipVercel` 默认为 `true`。成功回执必须包含 Private GitHub、`hosting.provider=cloudflare-pages` 和 `hosting.status=manual_action_required`。此时只可报告“生成完成”，不得报告“已上线”。
+后台默认不跳过 Cloudflare。发布器创建或复用同名 Direct Upload 项目，设置 Production `NEXT_PUBLIC_SITE_URL`，用该 origin 重新构建，上传 `out` 与 Pages Functions，并按本次 Git commit 轮询部署结果。未给 `siteUrl` 时使用 `pages.dev` 并自动运行线上验收，回执为 `hosting.status=complete`。
 
-Cloudflare Pages 上线由运营者完成：连接游戏 Private repo，Root directory 留空，Build command 设为 `npm run build`，Build output directory 设为 `out`，绑定最终域名，把 Production 的 `NEXT_PUBLIC_SITE_URL` 设为完整 HTTPS origin，然后部署。部署后在游戏根运行 `npm run verify:deploy`；它不调用 LLM/API，会检查根路径 301 到 `/en`、首页 metadata/canonical、sitemap、robots 和全部 loc/hreflang 直接 200。完整输出保存在 `.gamewiki/deploy-verification.log`。
+给出正式域名但域名尚未指向项目时，部署仍成功，回执为 `hosting.status=awaiting_domain_configuration`。运营者只需在该 Pages 项目绑定自定义域名并配置 DNS；不要新建另一个 Git-integrated 项目。域名生效后在游戏根运行 `npm run verify:deploy`，检查根路径 301 到 `/en`、metadata/canonical、sitemap、robots 和全部 loc/hreflang 直接 200。完整输出保存在 `.gamewiki/deploy-verification.log`。
 
 ## 排查顺序
 

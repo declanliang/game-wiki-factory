@@ -246,9 +246,9 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized.get("manualKeywords")
     )
     publication: dict[str, Any] = {}
-    # Background jobs publish the private GitHub repository only. Cloudflare
-    # Pages connection, domain selection, and runtime variables remain operator-owned.
-    publication.setdefault("skipVercel", True)
+    # New background jobs complete the Private GitHub and Cloudflare Pages
+    # Direct Upload transaction. Custom-domain DNS/binding remains operator-owned.
+    publication.setdefault("skipCloudflare", False)
     normalized["publication"] = publication
     # Validate the fields shared with the foreground CLI.
     foreground = {k: normalized[k] for k in ("schemaVersion", "game", "platform", "officialUrl", "siteUrl", "publish", "refresh", "manualKeywords") if k in normalized}
@@ -503,10 +503,8 @@ def _publish_command(config: dict[str, Any], slug: str) -> list[str]:
         command.extend(["--owner", str(publication["githubOwner"])])
     if publication.get("githubRepo"):
         command.extend(["--repo", str(publication["githubRepo"])])
-    if publication.get("vercelProject"):
-        command.extend(["--vercel-project", str(publication["vercelProject"])])
-    if publication.get("skipVercel", True):
-        command.append("--skip-vercel")
+    if publication.get("skipCloudflare", False):
+        command.append("--skip-cloudflare")
     if config.get("siteUrl"):
         command.extend(["--site-url", str(config["siteUrl"])])
     return command
