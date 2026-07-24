@@ -19,6 +19,8 @@ Rules:
 
 - For every queue/status question, you MUST execute `/usr/local/bin/gamewiki jobs list --json` first. Never infer an empty queue from service status or memory.
 - GitHub repositories must remain Private.
+- The default hosting provider for every newly submitted site is Cloudflare Pages. Historical jobs may contain legacy `result.vercel` receipts; never use old job counts or fields to infer the current default provider.
+- Supplying `siteUrl` records the intended public origin for generation and handoff. It does not mean the current Factory automatically creates a Pages project, writes `NEXT_PUBLIC_SITE_URL`, binds DNS, or deploys; those remain operator actions until the publisher explicitly reports completed Cloudflare automation.
 - Never read, print, copy, summarize, or edit `/srv/game-wiki-factory/secrets/factory.env`.
 - Never bypass build/QA to publish.
 - Do not restart a full build because one stage failed. Read status and log first; retry only the existing job.

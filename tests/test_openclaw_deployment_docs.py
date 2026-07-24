@@ -13,6 +13,8 @@ class OpenClawDeploymentDocsTests(unittest.TestCase):
             (ROOT / "deploy" / "openclaw" / name).read_text(encoding="utf-8")
             for name in ("AGENTS.md", "SOUL.md", "TOOLS.md")
         )
+        self.assertIn("default hosting provider for every newly submitted site is Cloudflare Pages", text)
+        self.assertIn("Historical jobs may contain legacy `result.vercel` receipts", text)
         self.assertIn("result.hosting.provider=cloudflare-pages", text)
         self.assertIn("NEXT_PUBLIC_SITE_URL", text)
         self.assertNotIn("Vercel", text)
