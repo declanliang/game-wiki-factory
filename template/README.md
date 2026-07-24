@@ -1,6 +1,6 @@
 # Game Wiki 站点模板
 
-这是 `game-wiki-factory` 内置的干净 Next.js Wiki 模板。编排器把模板同步到 `Games/<game-slug>/` 根目录；该目录本身就是可推送 GitHub、可部署 Vercel 的网站项目。
+这是 `game-wiki-factory` 内置的干净 Next.js Wiki 模板。编排器把模板同步到 `Games/<game-slug>/` 根目录；该目录本身就是可推送 GitHub、可部署 Cloudflare Pages 的网站项目。
 
 模板同时支持 Roblox 与 Steam。平台差异已经由上游 Basic Info 转换为统一 intake 契约；模板不调用 Roblox/Steam API，也不根据平台自行猜测事实。
 
@@ -22,7 +22,7 @@ Steam 数据注意事项：
 - `full controller support` 不代表 Steam Deck Verified 或 Playable；没有官方等级时只能表述为未确认。
 - Windows 系统要求不能自动推导 Linux/SteamOS 兼容性或具体帧率。
 - Steam 官方 trailer、截图和 header 可作为媒体来源；第三方 YouTube 视频不得冒充官方频道。
-- 网站部署只消费 `intake/`，Vercel 不需要 Steam、搜索或 LLM API key。
+- 网站部署只消费 `intake/`，Cloudflare Pages 不需要 Steam、搜索或 LLM API key。
 
 ## 唯一输入契约
 
@@ -89,11 +89,15 @@ npm run build
 npm run ads:import
 ```
 
-脚本会校验尺寸并自动写入 `.env.local`，不需要手工转换 Base64。`ad.txt` 和 `.env.local` 均不会上传 GitHub。也可以直接把原始代码粘贴到 Vercel 的 `AD_NATIVE_BANNER`、`AD_BANNER_728X90` 等 server-only 环境变量；Base64 变量只是多行代码在本地 env 中的可靠传输格式，不参与广告网络请求。
+脚本会校验尺寸并自动写入 `.env.local`，不需要手工转换 Base64。`ad.txt` 和 `.env.local` 均不会上传 GitHub。上线时把对应的 `AD_*_B64` 值逐项写入 Cloudflare Pages Production Secret；Base64 变量只是多行代码的可靠传输格式，不参与广告网络请求。
 
-通过 Game Wiki Factory 生产时，优先把 Adsterra 导出的完整原始 JSON 作为独立 `taskType: ads` 任务提交。Factory 会先做游戏/域名和 7 个标题/尺寸的全量一致性校验，再自动写入 Vercel 并验证线上路由；操作员不需要运行本目录脚本或手工编码。
+Cloudflare Pages 分支不接受后台 `taskType: ads`，因为 Pages 环境变量尚未自动化。广告必须在目标站点本地校验，再由运营者手工配置 Pages Secret 并重新部署。
 
-广告代码在同源隔离 iframe 内执行，位置包括顶部 Sticky、Hero 后 Native、首页/分类卡片流、文章正文、宽屏侧栏和全站 Footer。修改 Vercel 环境变量后必须重新部署，Adsterra 新建或刚批准的 ad unit 还可能存在平台同步延迟。
+广告代码由 `functions/api/ads/[format].ts` 在同源隔离 iframe 内提供，位置包括顶部 Sticky、Hero 后 Native、首页/分类卡片流、文章正文、宽屏侧栏和全站 Footer。修改 Cloudflare Pages 环境变量后必须重新部署，Adsterra 新建或刚批准的 ad unit 还可能存在平台同步延迟。
+
+## Cloudflare Pages 部署
+
+在 Cloudflare Dashboard 连接 Private GitHub 仓库，Root directory 留空，Build command 设为 `npm run build`，Build output directory 设为 `out`。Production 环境必须设置最终公开域名对应的 `NEXT_PUBLIC_SITE_URL`。部署后运行 `npm run verify:deploy`；根路径应 301 到 `/en`，而 sitemap 中的所有 loc/hreflang 必须直接返回 200。详细步骤见 `doc/Cloudflare-Pages部署指南.md`。
 
 ## 设计边界
 
@@ -105,6 +109,6 @@ npm run ads:import
 - `NEXT_PUBLIC_SITE_URL` 集中规范化：裸域名自动补 HTTPS，非法协议在构建前失败；`verify:deploy` 会检查线上 metadata、self-canonical 和 sitemap 直接 200，而不只检查首页 HTTP 200。
 - 首页按“媒体入口 + 信息枢纽”组织：桌面 Hero 控制在约 576px，缩短页头后的留白，核心标题位于视觉中心、紧凑数据卡固定在内容下沿，保证常见首屏能立即看到主要信息；有可信视频时在首屏后展示点击加载的 YouTube；正文、分类和更新区使用受控宽度；专题卡片按三列从左到右排列，换行后从左侧继续；深度 section 使用醒目的无分割线编号卡片。Footer 的内容导航总标题统一为 `Wiki`，避免和其中的 Guides 分类重名。
 - 分类标签和描述来自 site-plan 的五语言 `labels` / `descriptions`，模板只负责机械使用。
-- 根 URL 固定为英语/x-default；非英语页面、JSON-LD 和 sitemap 使用 locale 前缀。缺少译文时构建失败，不做英语回退。
+- 所有语言都使用显式前缀（`/en`、`/es`、`/de`、`/fr`、`/ja`），根 URL 301 到 `/en`；JSON-LD 和 sitemap 使用同一套路径。缺少译文时构建失败，不做英语回退。
 - 具体游戏仓库必须提交 `intake/`；原始调研、cache 和日志位于被 Git 忽略的 `.gamewiki/`。
 - 广告变量全部可选；环境变量未配置时页面保持原布局，不展示广告，也不预留空白。
