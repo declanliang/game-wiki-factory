@@ -9,6 +9,7 @@ SEO_SCOUT_ROOT = Path(__file__).resolve().parents[1] / "pipeline" / "seo-scout"
 sys.path.insert(0, str(SEO_SCOUT_ROOT))
 
 from seoscout.translate import (
+    _build_repair_prompt,
     _build_mdx,
     _compact_overlong_metadata,
     _compact_serp_field,
@@ -114,6 +115,33 @@ class TranslationCompletenessTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertIn("formatted questions", error)
+
+    def test_accepts_localized_bold_question_without_question_mark(self) -> None:
+        localized = SOURCE_BODY.replace(
+            "**Q1: Is this complete?**",
+            "**Q1: これは完全です。**",
+        )
+        ok, error = validate_translation_against_source(
+            translated_mdx(localized),
+            SOURCE_BODY,
+            "ja",
+        )
+        self.assertTrue(ok, error)
+
+    def test_repair_prompt_includes_source_structure_counts(self) -> None:
+        prompt = _build_repair_prompt(
+            {
+                "lang": "ja",
+                "article_name": "example",
+                "prompt": "Translate this article.",
+                "source_body": SOURCE_BODY,
+            },
+            "invalid output",
+            "Translation dropped formatted questions (0/1)",
+        )
+        self.assertIn("standalone bold lines: 2", prompt)
+        self.assertIn("headings: 3", prompt)
+        self.assertIn("callout tags: 2", prompt)
 
 
 if __name__ == "__main__":

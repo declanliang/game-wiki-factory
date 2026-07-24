@@ -227,11 +227,11 @@ STRUCTURAL_LINE_PATTERNS = {
     'list items': re.compile(r'^\s*[-*+]\s+\S', re.MULTILINE),
     'numbered items': re.compile(r'^\s*\d+[.)]\s+\S', re.MULTILINE),
     'table rows': re.compile(r'^\s*\|.*\|\s*$', re.MULTILINE),
-    'formatted questions': re.compile(
-        r'^\s*(?:#{3,6}\s+|\*\*)[^\n]*(?:\?|？)(?:\*\*)?\s*$',
-        re.MULTILINE,
-    ),
 }
+FORMATTED_QUESTION_RE = re.compile(
+    r'^\s*\*\*[^\n]*(?:\?|？)\*\*\s*$', re.MULTILINE
+)
+BOLD_STANDALONE_RE = re.compile(r'^\s*\*\*[^\n]+\*\*\s*$', re.MULTILINE)
 
 
 def _compact_serp_field(
@@ -405,6 +405,25 @@ def validate_translation_against_source(
             return False, (
                 f"Translation dropped {label} "
                 f"({translated_count}/{source_count})"
+            )
+
+    # A Japanese FAQ prompt may legitimately end in a full stop or omit the
+    # question mark while preserving the source's standalone bold structure.
+    # Count all standalone bold lines on both sides so punctuation differences
+    # do not trigger endless retranslations, but a genuinely dropped prompt
+    # still fails deterministically.
+    source_question_count = len(FORMATTED_QUESTION_RE.findall(source_body))
+    if source_question_count:
+        source_bold_count = len(BOLD_STANDALONE_RE.findall(source_body))
+        translated_bold_count = len(BOLD_STANDALONE_RE.findall(translated_body))
+        if translated_bold_count < source_bold_count:
+            non_question_bold_count = source_bold_count - source_question_count
+            translated_question_count = max(
+                0, translated_bold_count - non_question_bold_count
+            )
+            return False, (
+                "Translation dropped formatted questions "
+                f"({translated_question_count}/{source_question_count})"
             )
 
     # CJK translations use substantially fewer characters than English;
@@ -756,12 +775,28 @@ def _build_repair_prompt(task_info: dict, content: str, error: str) -> str:
     lang_name = LANG_NAMES.get(task_info['lang'], task_info['lang'])
     article_name = task_info['article_name']
     base = task_info.get('prompt', '')
+    source_body = task_info.get('source_body', '')
+    structural_counts = {
+        label: len(pattern.findall(source_body))
+        for label, pattern in STRUCTURAL_LINE_PATTERNS.items()
+    }
+    structural_counts['standalone bold lines'] = len(
+        BOLD_STANDALONE_RE.findall(source_body)
+    )
+    structural_counts['headings'] = len(HEADING_RE.findall(source_body))
+    structural_counts['callout tags'] = len(CALLOUT_RE.findall(source_body))
+    checklist = ', '.join(
+        f"{label}: {count}" for label, count in structural_counts.items()
+    )
     return (
         base
         + f"\n\n===\n\n"
         f"The previous response for \"{article_name}\" to {lang_name} had issues:\n"
         f"  Error: {error}\n\n"
         f"Regenerate the FULL response from scratch. Fix the issue above.\n"
+        f"The BODY must preserve at least these source structures: {checklist}.\n"
+        f"Translate the text inside every heading and standalone bold line, but "
+        f"do not remove or merge any of them.\n"
         f"Output in the exact TITLE: / DESCRIPTION: / BODY: format described in the "
         f"Output Format section. Do NOT output a JS/JSON metadata block yourself. "
         f"Do NOT wrap any part of the response in code blocks. Do NOT use YAML frontmatter."
