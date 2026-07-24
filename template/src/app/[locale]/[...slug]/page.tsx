@@ -55,7 +55,9 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: L
   if (!item) return { title: "Not Found" };
   const pathname = `/${contentType}/${articleSlug.join("/")}`;
   const image = item.metadata.image?.startsWith("http") ? item.metadata.image : localizedSiteUrl(item.metadata.image ?? "/images/hero.webp", routing.defaultLocale);
-  const title = `${item.metadata.title} — ${siteName}`;
+  // Article metadata titles already contain the game identity. Appending the
+  // site name pushes a large share of SERP titles past the display limit.
+  const title = item.metadata.title;
   return {
     title,
     description: item.metadata.description,

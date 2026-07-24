@@ -59,7 +59,7 @@ Prompt：
 OpenClaw 不接收 Cloudflare Pages 广告任务，也不要让用户把原始代码粘贴进聊天正文。
 
 ```text
-Cloudflare Pages 分支不要提交 `taskType: ads` 后台任务。广告需要在目标游戏仓库用 `npm run ads:import` 校验，
+Factory 默认的 Cloudflare Pages 流程不要提交 `taskType: ads` 后台任务。广告需要在目标游戏仓库用 `npm run ads:import` 校验，
 再由运营者把 `AD_*_B64` 手工写入 Pages Production Secret 并重新部署；不得打印或提交 code 字段。
 ```
 
@@ -83,7 +83,7 @@ Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status
 1. job 为 `succeeded`，manifest 必需阶段完成；
 2. GitHub repo 为 Private；
 3. `publish.json` 中 `stages.hosting.provider=cloudflare-pages` 且 `status=manual_action_required`，或运营者已另行完成线上部署和验收；
-4. Cloudflare Pages 分支不存在后台广告任务；广告由运营者另行部署和验收。
+4. Factory 默认流程不存在后台广告任务；广告由运营者另行部署和验收。
 
 完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Cloudflare Pages 手工连接提示和广告状态。未手动部署前不得声称网站已线上验证。
 

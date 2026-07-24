@@ -218,7 +218,7 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     task_type = str(config.get("taskType") or "site").strip().casefold()
     if task_type == "ads":
         raise ValueError(
-            "taskType ads is unavailable on the Cloudflare Pages branch; "
+            "taskType ads is unavailable in the Cloudflare Pages workflow; "
             "configure AD_* environment variables manually in Cloudflare Pages"
         )
     if task_type != "site":

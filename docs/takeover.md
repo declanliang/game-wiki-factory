@@ -10,7 +10,7 @@
 - 付费、可恢复状态在游戏根 `.gamewiki/`；最终可部署输入在 `intake/`。
 - 后台站点任务默认完成到 Private GitHub。Cloudflare Pages 仓库连接、`out` 构建输出、域名和 `NEXT_PUBLIC_SITE_URL` 由运营者手工完成。
 - 所有未来游戏都作为新项目从空 workspace 生产；不再接收 `operation: rebuild` 或旧 repo 覆盖输入。
-- Cloudflare Pages 分支不接受后台 `taskType: ads` Job；广告校验后由运营者手工配置 Pages Secret 并部署验证。
+- Factory 默认的 Cloudflare Pages 流程不接受后台 `taskType: ads` Job；广告校验后由运营者手工配置 Pages Secret 并部署验证。
 
 ## 2. 接手顺序
 

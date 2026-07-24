@@ -1,6 +1,6 @@
 # Cloudflare Pages 部署指南
 
-这份文档记录本模板从 Vercel（Node Function 运行时）迁移到 Cloudflare Pages（纯静态导出）做了什么、为什么这么改，以及部署/排障的实际步骤。改动落在 `cloudflare-pages-template` 分支；`main` 分支（`output: "standalone"`，给 Vercel 用）未受影响。
+这份文档记录本模板从 Vercel（Node Function 运行时）迁移到 Cloudflare Pages（纯静态导出）做了什么、为什么这么改，以及部署/排障的实际步骤。Cloudflare Pages 现已是 Factory `main` 的唯一默认托管目标；历史 Vercel 站点保持原部署，不由新任务迁移或覆盖。
 
 首次实践于 `anime-expeditions` 项目（该项目由本模板生成），验证通过后回填到模板本身，让后续新建的站点也能直接选择 Cloudflare Pages 部署路径。
 
@@ -94,6 +94,22 @@ Next.js 的这两个元数据文件默认按需动态生成，静态导出要求
 5. **确认没问题后再接自定义域名**——这一步涉及 DNS，约定由人工在 Cloudflare 里操作，AI 不直接改 DNS 记录。
 6. 如果是从 Vercel 迁移，旧的 Vercel 项目先不要立刻下线，观察 Cloudflare Pages 跑稳（收录、广告展示都正常）一段时间后再决定。
 
+## 环境变量与 Vercel 的对应关系
+
+变量名和值可以沿用 Vercel，但作用阶段要分清：
+
+- `NEXT_PUBLIC_SITE_URL`、Analytics、Clarity、AdSense 等 `NEXT_PUBLIC_*` 是构建时公开变量，必须配置在 Pages Production（需要预览时也配置 Preview）。它们会写入静态 HTML，修改后必须重新部署。
+- `AD_*_B64`（或 `AD_*`）名称和值与 Vercel 相同，但应作为 Pages Production Secret；`functions/api/ads/[format].ts` 通过 `context.env` 在运行时读取。
+- Vercel 自动注入的 `VERCEL_*` 变量不迁移，也不应成为站点配置依赖。
+
+Factory 模板检测到 `CF_PAGES=1` 时，会拒绝缺失或仍指向 `example.com` 的 `NEXT_PUBLIC_SITE_URL`，防止一个视觉正常但 canonical/sitemap 全错的构建上线。
+
+## API 与权限边界
+
+Cloudflare Pages REST API 支持创建/配置项目、查询和触发构建、创建/查询/删除部署；自定义 API token 至少需要 Account → Cloudflare Pages → Edit。Direct Upload 可用 API 或 `wrangler pages deploy out` 自动部署，且会上传项目根的 `functions/`。
+
+Git 集成首次仍依赖 Cloudflare Workers & Pages GitHub App 的 OAuth 授权和仓库访问范围；普通 Pages API token 不能代替 GitHub App 安装。Git 集成项目建好后可以继续由 Git push 自动构建，也可以关闭自动构建后用 Wrangler 部署，但项目不能在 Git integration 与 Direct Upload 两种模式之间原地转换。
+
 ## 本地验证命令
 
 ```bash
@@ -104,6 +120,6 @@ npx tsc --noEmit
 npx tsc --noEmit -p functions/tsconfig.json   # 单独 typecheck Cloudflare Pages Function
 ```
 
-Factory 的 Cloudflare Pages 分支会拒绝后台 `taskType: ads`。广告需在单站完成 `npm run ads:import` 校验后，由运营者把 `AD_*_B64` 手工写入 Pages Production Secret；这是当前明确的人工边界，不要复用旧 Vercel 自动化。
+Factory 默认流程会拒绝后台 `taskType: ads`。广告需在单站完成 `npm run ads:import` 校验后，由运营者把 `AD_*_B64` 手工写入 Pages Production Secret；这是当前明确的人工边界，不要复用旧 Vercel 自动化。
 
 `wrangler pages deploy out --project-name <项目名>` 可以在本地直接把 `out/` 上传部署（Direct Upload 方式），不依赖 GitHub 集成，适合快速验证，但线上长期使用建议走 Dashboard 的 Git 集成（push 自动触发构建部署），不建议把 `wrangler deploy` 做成自动化脚本长期跑——避免绕过人工确认这一步。

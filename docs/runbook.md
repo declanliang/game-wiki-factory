@@ -139,4 +139,4 @@ npm run verify:deploy
 
 ## Adsterra 配置
 
-每个网站单独申请 Adsterra app/ad units。广告配置全部可选：缺少某一格式时，该格式及其外层间距均不渲染。Cloudflare Pages 分支拒绝后台 `taskType: ads`，因为 Pages 环境变量尚未自动化。运营者在单站使用 `ad.txt` + `npm run ads:import` 完成校验和转换，再把生成的 `AD_*_B64` 作为 Pages Production Secret 手工录入；更新后必须重新部署并验证 `/api/ads/<format>`。
+每个网站单独申请 Adsterra app/ad units。广告配置全部可选：缺少某一格式时，该格式及其外层间距均不渲染。Factory 默认的 Cloudflare Pages 流程拒绝后台 `taskType: ads`，因为 Pages 环境变量尚未自动化。运营者在单站使用 `ad.txt` + `npm run ads:import` 完成校验和转换，再把生成的 `AD_*_B64` 作为 Pages Production Secret 手工录入；更新后必须重新部署并验证 `/api/ads/<format>`。

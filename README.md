@@ -237,7 +237,7 @@ Set-Location ..\<game-slug>
 npm run ads:import
 ```
 
-Cloudflare Pages 分支暂不接受后台 `taskType: ads`：Cloudflare 的环境变量和部署仍由运营者在 Dashboard 手工完成。先用 `npm run ads:import` 校验并转换配置，再把对应 `AD_*_B64` Secret 逐项写入 Pages Production 环境；部署后逐个验证 `/api/ads/<format>`。不得把广告原始代码写入 Git 或日志。
+Factory 默认的 Cloudflare Pages 流程暂不接受后台 `taskType: ads`：Cloudflare 的环境变量和部署仍由运营者在 Dashboard 手工完成。先用 `npm run ads:import` 校验并转换配置，再把对应 `AD_*_B64` Secret 逐项写入 Pages Production 环境；部署后逐个验证 `/api/ads/<format>`。不得把广告原始代码写入 Git 或日志。
 
 广告可以晚于网站生产单独配置，不会重跑内容。变量全部留空时，不会渲染广告 iframe、占位或空白。Adsterra 素材实际填充可能仍受平台同步延迟影响。
 

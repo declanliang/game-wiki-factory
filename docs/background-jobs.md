@@ -121,7 +121,7 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 整个 batch 先完整验证，任意一项字段错误时一个任务也不会入队；通过后每个游戏成为独立 job，互不阻塞。
 
-Cloudflare Pages 分支暂不接受 `taskType: ads` job；提交会在入队前失败，并提示运营者手工配置 Pages 环境变量。广告仍可在单站使用 `npm run ads:import` 完成身份、标题、尺寸和脚本 key 校验，原始代码不得进入 Git 或控制台日志。
+Factory 默认的 Cloudflare Pages 流程暂不接受 `taskType: ads` job；提交会在入队前失败，并提示运营者手工配置 Pages 环境变量。广告仍可在单站使用 `npm run ads:import` 完成身份、标题、尺寸和脚本 key 校验，原始代码不得进入 Git 或控制台日志。
 
 ## 常用命令
 

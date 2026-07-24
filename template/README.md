@@ -91,7 +91,7 @@ npm run ads:import
 
 脚本会校验尺寸并自动写入 `.env.local`，不需要手工转换 Base64。`ad.txt` 和 `.env.local` 均不会上传 GitHub。上线时把对应的 `AD_*_B64` 值逐项写入 Cloudflare Pages Production Secret；Base64 变量只是多行代码的可靠传输格式，不参与广告网络请求。
 
-Cloudflare Pages 分支不接受后台 `taskType: ads`，因为 Pages 环境变量尚未自动化。广告必须在目标站点本地校验，再由运营者手工配置 Pages Secret 并重新部署。
+Factory 默认的 Cloudflare Pages 流程不接受后台 `taskType: ads`，因为 Pages 环境变量尚未自动化。广告必须在目标站点本地校验，再由运营者手工配置 Pages Secret 并重新部署。
 
 广告代码由 `functions/api/ads/[format].ts` 在同源隔离 iframe 内提供，位置包括顶部 Sticky、Hero 后 Native、首页/分类卡片流、文章正文、宽屏侧栏和全站 Footer。修改 Cloudflare Pages 环境变量后必须重新部署，Adsterra 新建或刚批准的 ad unit 还可能存在平台同步延迟。
 

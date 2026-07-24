@@ -106,7 +106,7 @@ openclaw agent --local --agent game-wiki-operator --message \
 
 ## 凭据维护
 
-服务器私有环境至少需要内容 API key 和 GitHub token。Cloudflare Pages 分支不运行广告 Job，也不需要 Cloudflare API token；Pages 项目、环境变量和部署由运营者在 Dashboard 手工完成。更新凭据后：
+服务器私有环境至少需要内容 API key 和 GitHub token。Factory 默认流程不运行广告 Job；在 Pages 自动化正式接入服务器前，Pages 项目、环境变量和部署由运营者在 Dashboard 手工完成。更新凭据后：
 
 ```bash
 sudo chmod 600 /srv/game-wiki-factory/secrets/factory.env

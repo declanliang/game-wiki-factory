@@ -39,7 +39,7 @@ class JobSystemTests(unittest.TestCase):
             normalize_config({"game": "Old Site", "operation": "rebuild"})
 
     def test_cloudflare_branch_rejects_vercel_ads_jobs(self) -> None:
-        with self.assertRaisesRegex(ValueError, "unavailable on the Cloudflare Pages branch"):
+        with self.assertRaisesRegex(ValueError, "unavailable in the Cloudflare Pages workflow"):
             normalize_config({"taskType": "ads", "game": "Ads Game"})
 
     def test_manual_keywords_are_normalized_and_preserved_on_retry(self) -> None:
