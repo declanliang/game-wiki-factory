@@ -172,11 +172,23 @@ def validate_site_content(content: dict[str, Any], facts: dict[str, Any]) -> lis
     if content.get("home", {}).get("aboutGame", {}).get("stats") != expected_content.get("home", {}).get("aboutGame", {}).get("stats"):
         errors.append(_error("TEMPLATE_FACT_MISMATCH", "site-content.home.aboutGame.stats", "About-game stats do not match evidence-backed facts.json."))
 
+    # Canonical names may contain non-Latin characters (for example the official
+    # Roblox title "(学乱) Gakuran"). They are evidence-backed proper names, not
+    # a language switch in otherwise English homepage copy. Exclude only these
+    # exact facts from the English-language check.
+    proper_names = {
+        str(facts.get("identity", {}).get("canonicalName", "")).strip(),
+        str(facts.get("identity", {}).get("developer", "")).strip(),
+    }
+    proper_names = {name for name in proper_names if name}
     for path, value in _strings(content):
         normalized = value.strip().casefold()
         if "__" in value or "replace-with" in normalized or normalized in PLACEHOLDERS:
             errors.append(_error("TEMPLATE_PLACEHOLDER", "site-content." + path, f"Placeholder-like value is forbidden: {value}"))
-        if re.search(r"[\u3400-\u9fff]", value):
+        language_probe = value
+        for proper_name in proper_names:
+            language_probe = language_probe.replace(proper_name, "")
+        if re.search(r"[\u3400-\u9fff]", language_probe):
             errors.append(_error("TEMPLATE_LANGUAGE", "site-content." + path, "Homepage content must be English."))
 
     for path, key in _keys(content):

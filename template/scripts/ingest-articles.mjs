@@ -57,7 +57,11 @@ function escapeStrayLtInBody(source) {
     autoLinkCount++;
     return `[${url}](${url})`;
   });
-  const mdxSafeBody = markdownLinkBody.replace(/<br\s*>/gi, () => {
+  // Generated articles occasionally use a component-like Link tag. The template
+  // intentionally exposes plain Markdown links, so normalize this syntax before
+  // MDX compilation rather than letting it fail at runtime.
+  const componentLinkBody = markdownLinkBody.replace(/<Link\s+url=["']([^"']+)["']\s*>([\s\S]*?)<\/Link>/gi, (_match, url, text) => `[${text.trim()}](${url})`);
+  const mdxSafeBody = componentLinkBody.replace(/<br\s*>/gi, () => {
     voidTagCount++;
     return "<br />";
   });
