@@ -95,6 +95,10 @@ Cloudflare Workers & Pages GitHub App 必须能读取 Factory 新建的 Private 
 - Codes/Tier List/实体页异常：确认 Basic Info profile 是否允许对应分类。Tier List 还必须有可比较实体证据；Codes 不得编造兑换码；Calculator/Planner 等工具页不属于当前流水线。
 - Steam Deck：`full controller support` 不等于 Deck Verified/Playable；没有官方兼容性等级时只能写“未确认”和谨慎测试建议。
 - 模板失败：修工厂 `template/` 后重跑，不能重新付费生成上游内容。
+- 新 Job 首次在 intake 生成前失败：`.gamewiki/manifest.json.factoryRelease`
+  会保留发布认证意图，普通续跑据此生成
+  `intake/factory-release.json`。如果 manifest 和 intake 两处都没有当前
+  release，仍按未认证旧项目阻止发布；不得手工伪造 stamp 或删除发布检查。
 
 ## 有成本的参数
 
