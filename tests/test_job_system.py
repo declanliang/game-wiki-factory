@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _prune_success_build_artifacts, _publish_command, acknowledge_notifications, checkpoint_safe_content_retry, classify_failure, claim, connect, normalize_config, pending_notifications, submit, submit_batch
+from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _open_quota_circuit, _prune_success_build_artifacts, _publish_command, _resume_quota_circuit, acknowledge_notifications, checkpoint_safe_content_retry, classify_failure, claim, connect, identify_quota_provider, normalize_config, pending_notifications, submit, submit_batch
 
 
 class JobSystemTests(unittest.TestCase):
@@ -103,6 +103,73 @@ class JobSystemTests(unittest.TestCase):
             ),
             "retryable",
         )
+
+    def test_quota_provider_identifies_llm_without_exposing_key_values(self) -> None:
+        provider = identify_quota_provider(
+            "All configured LLM API keys have insufficient quota "
+            "(provider=toapis.com; credential=LLM_API_KEY_1..N)"
+        )
+        self.assertEqual(provider["id"], "llm")
+        self.assertEqual(provider["endpoint"], "toapis.com")
+        self.assertEqual(provider["credential"], "LLM_API_KEY_1..N")
+        self.assertNotIn("secret", json.dumps(provider))
+
+    def test_quota_circuit_pauses_queue_and_resumes_all_jobs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ, {"GAMEWIKI_DATA_DIR": temporary}
+        ):
+            config = Path(temporary) / "game.json"
+            config.write_text(json.dumps({"game": "Quota Primary"}), encoding="utf-8")
+            primary = submit(config)
+            config.write_text(json.dumps({"game": "Quota Waiting"}), encoding="utf-8")
+            waiting = submit(config)
+            provider = identify_quota_provider(
+                "LLM key slot 1 has insufficient quota provider=api.example.test"
+            )
+            with connect() as db:
+                db.execute("UPDATE jobs SET status='running' WHERE id=?", (primary,))
+                is_primary, paused = _open_quota_circuit(db, primary, provider)
+                db.execute(
+                    "UPDATE jobs SET status='needs_attention',quota_provider=? WHERE id=?",
+                    (provider["id"], primary),
+                )
+                statuses = {
+                    row["id"]: row["status"]
+                    for row in db.execute("SELECT id,status FROM jobs").fetchall()
+                }
+                resumed = _resume_quota_circuit(db, provider["id"])
+                resumed_statuses = {
+                    row["id"]: row["status"]
+                    for row in db.execute("SELECT id,status FROM jobs").fetchall()
+                }
+            self.assertTrue(is_primary)
+            self.assertEqual(paused, 1)
+            self.assertEqual(statuses[waiting], "quota_wait")
+            self.assertEqual(resumed, 2)
+            self.assertEqual(resumed_statuses[primary], "queued")
+            self.assertEqual(resumed_statuses[waiting], "queued")
+
+    def test_new_submission_waits_behind_open_quota_circuit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ, {"GAMEWIKI_DATA_DIR": temporary}
+        ):
+            config = Path(temporary) / "game.json"
+            config.write_text(json.dumps({"game": "Circuit Source"}), encoding="utf-8")
+            source = submit(config)
+            provider = identify_quota_provider("DataForSEO insufficient balance")
+            with connect() as db:
+                db.execute("UPDATE jobs SET status='running' WHERE id=?", (source,))
+                _open_quota_circuit(db, source, provider)
+            config.write_text(json.dumps({"game": "Later Submission"}), encoding="utf-8")
+            later = submit(config)
+            with connect() as db:
+                row = db.execute(
+                    "SELECT status,quota_provider FROM jobs WHERE id=?", (later,)
+                ).fetchone()
+            self.assertEqual(dict(row), {
+                "status": "quota_wait",
+                "quota_provider": "dataforseo",
+            })
 
     def test_checkpoint_safe_content_failures_allow_bounded_extra_retries(self) -> None:
         self.assertTrue(checkpoint_safe_content_retry(
@@ -207,8 +274,16 @@ class JobSystemTests(unittest.TestCase):
                 notification_columns = {
                     row["name"] for row in db.execute("PRAGMA table_info(notifications)").fetchall()
                 }
+                tables = {
+                    row["name"]
+                    for row in db.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table'"
+                    ).fetchall()
+                }
             self.assertIn("result_json", columns)
+            self.assertIn("quota_provider", columns)
             self.assertIn("delivered_at", notification_columns)
+            self.assertIn("quota_circuits", tables)
 
     def test_terminal_event_creates_durable_acknowledgeable_notification(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(

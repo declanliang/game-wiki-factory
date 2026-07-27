@@ -12,6 +12,7 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 from .config import Config
 
@@ -29,6 +30,7 @@ class LLMClient:
     def __init__(self):
         self.api_keys = list(dict.fromkeys(Config.LLM_API_KEYS or [Config.LLM_API_KEY]))
         self.base_url = Config.LLM_API_BASE_URL.rstrip('/')
+        self.provider_host = urlparse(self.base_url).hostname or "unknown"
         self.api_url = f"{self.base_url}/chat/completions"
         self.model = Config.LLM_MODEL
         self.temperature = Config.LLM_TEMPERATURE
@@ -62,7 +64,10 @@ class LLMClient:
             self._key_index += 1
             if key not in self._exhausted_keys:
                 return key
-        raise RuntimeError("All configured LLM API keys have insufficient quota")
+        raise RuntimeError(
+            "All configured LLM API keys have insufficient quota "
+            f"(provider={self.provider_host}; credential=LLM_API_KEY_1..N)"
+        )
 
     def _has_available_key(self) -> bool:
         return any(key not in self._exhausted_keys for key in self.api_keys)
@@ -216,7 +221,8 @@ class LLMClient:
                             slot = self.api_keys.index(api_key) + 1
                             print(
                                 f"  ❌ LLM key slot {slot} has insufficient quota "
-                                f"for {label}; disabling it for this run"
+                                f"for {label}; disabling it for this run "
+                                f"(provider={self.provider_host}; credential=LLM_API_KEY_1..N)"
                             )
                             if self._has_available_key() and attempt < attempt_limit - 1:
                                 continue

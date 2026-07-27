@@ -14,7 +14,11 @@ from job_system import _event, connect, pending_notifications, submit
 
 class JobNotifierTests(unittest.TestCase):
     def _notification(
-        self, temporary: str, status: str = "needs_attention", error_class: str | None = None
+        self,
+        temporary: str,
+        status: str = "needs_attention",
+        error_class: str | None = None,
+        **detail,
     ) -> dict:
         config = Path(temporary) / "game.json"
         config.write_text(json.dumps({"game": "Notify Game"}), encoding="utf-8")
@@ -32,6 +36,7 @@ class JobNotifierTests(unittest.TestCase):
                 attempt=2,
                 status=status,
                 errorClass=error_class or status,
+                **detail,
             )
         return pending_notifications()[0]
 
@@ -48,11 +53,23 @@ class JobNotifierTests(unittest.TestCase):
             os.environ, {"GAMEWIKI_DATA_DIR": temporary}
         ):
             message = notification_message(
-                self._notification(temporary, error_class="quota_exhausted")
+                self._notification(
+                    temporary,
+                    error_class="quota_exhausted",
+                    quotaProvider={
+                        "id": "llm",
+                        "label": "LLM 内容生成/翻译 API",
+                        "credential": "LLM_API_KEY_1..N",
+                        "endpoint": "api.example.test",
+                    },
+                    pausedJobs=12,
+                )
             )
-        self.assertIn("API 额度或账户余额不足", message)
-        self.assertIn("不会自动重试付费阶段", message)
-        self.assertIn("重试同一 Job ID", message)
+        self.assertIn("LLM 内容生成/翻译 API（api.example.test）", message)
+        self.assertIn("LLM_API_KEY_1..N", message)
+        self.assertIn("已暂停 12 个", message)
+        self.assertIn("不再逐任务发送额度告警", message)
+        self.assertIn("重试本条 Job ID", message)
 
     def test_success_message_calls_out_cloudflare_domain_handoff(self) -> None:
         item = {

@@ -89,7 +89,7 @@ sudo systemctl enable --now gamewiki-notifier.timer gamewiki-supervisor.timer ga
 
 创建专用 `game-wiki-operator` Agent 和 workspace，把 `deploy/openclaw/AGENTS.md`、`SOUL.md`、`TOOLS.md` 放入该 workspace。Agent 只能提交、查询、取消和按 runbook 重试任务；不能读取 secrets、修改 Factory 源码或在聊天进程运行长任务。
 
-配置通知渠道时，将私有 argv JSON 写入 `GAMEWIKI_NOTIFICATION_COMMAND_JSON`，且恰有一个 `{message}` 占位符。Notifier 返回成功后才确认 outbox。API 额度/余额不足会立即进入 `needs_attention`，消息明确要求充值或更换 key，Supervisor 不会自动重试付费阶段。
+配置通知渠道时，将私有 argv JSON 写入 `GAMEWIKI_NOTIFICATION_COMMAND_JSON`，且恰有一个 `{message}` 占位符。Notifier 返回成功后才确认 outbox。API 额度/余额不足会为具体供应商打开额度熔断：首个 Job 进入 `needs_attention` 并明确 API、端点和非敏感凭据组，其余任务进入无独立告警的 `quota_wait`。Supervisor 不会绕过熔断；凭据恢复后重试首条 Job 会统一续跑暂停任务。
 
 ## 健康检查与冒烟验收
 
