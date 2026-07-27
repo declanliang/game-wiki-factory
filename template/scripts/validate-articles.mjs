@@ -131,10 +131,13 @@ for (const locale of localeDirs) {
       else seen.set(key, rel);
     }
     const cjk = ["ja", "ko", "zh"].includes(locale);
-    const titleLimit = cjk ? 36 : locale === "en" ? 60 : 65;
-    const descriptionLimit = cjk ? 90 : locale === "en" ? 160 : 165;
+    const titleLimit = cjk ? 36 : 60;
+    const descriptionLimit = cjk ? 90 : 160;
     if (title.length > titleLimit) warn(`${rel}：title 有 ${title.length} 个字符，超过 ${locale} 建议上限 ${titleLimit}`);
     if (description.length > descriptionLimit) warn(`${rel}：description 有 ${description.length} 个字符，超过 ${locale} 建议上限 ${descriptionLimit}`);
+    if (/(?:&|\b(?:and|or|with|for|to|vs\.?|und|oder|mit|für|y|o|con|para|et|ou|avec|pour))\s*$/i.test(title)) {
+      fail(`${rel}：title 以未完成的连接词结尾，应在发布前压缩为完整短语`);
+    }
 
     const categoryMatch = metaBody.match(/category:\s*(["'`])(.+?)\1/);
     if (categoryMatch) {
