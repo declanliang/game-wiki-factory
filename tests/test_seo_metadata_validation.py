@@ -66,6 +66,8 @@ class SeoMetadataValidationTests(unittest.TestCase):
         raw = f"TITLE: Timebomb Duels Tips\nDESCRIPTION: {description}\nBODY:\n{BODY}"
         content, error = process_english(raw, "guide", "2026-07-19")
         self.assertIsNotNone(content, error)
+        metadata_description = content.split("description: ", 1)[1].splitlines()[0]
+        self.assertNotRegex(metadata_description, r"\b(?:the|this|and)[.]?[\"']?,?$")
 
     def test_compacted_english_title_does_not_end_with_ampersand(self) -> None:
         title = "Animal Hospital Anomaly Roblox Beginner Tips: Survive & Escape Every Shift"

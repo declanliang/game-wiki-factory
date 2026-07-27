@@ -258,7 +258,7 @@ def _compact_serp_field(
     candidate = candidate.rstrip(" ,.;:!?-–—&")
     if not prefer_sentence:
         candidate = re.sub(
-            r"\s+(?:and|or|with|for|to|und|oder|mit|für|y|o|con|para|et|ou|avec|pour)$",
+            r"\s+(?:and|or|with|for|to|the|a|an|in|on|at|of|from|into|this|that|your|our|und|oder|mit|für|y|o|con|para|et|ou|avec|pour)$",
             "",
             candidate,
             flags=re.I,

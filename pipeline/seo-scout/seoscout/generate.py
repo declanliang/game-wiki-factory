@@ -158,12 +158,12 @@ def _compact_serp_text(value: str, limit: int) -> str:
     shortened = value[:limit].rsplit(None, 1)[0].rstrip(" ,;:-–—&")
     if not shortened:
         shortened = value[:limit]
-    shortened = re.sub(
-        r"\s+(?:and|or|with|for|to|vs\.?)$",
-        "",
-        shortened,
+    dangling = re.compile(
+        r"\s+(?:and|or|with|for|to|vs\.?|the|a|an|in|on|at|of|from|into|this|that|your|our)$",
         flags=re.I,
-    ).rstrip(" ,;:-–—&")
+    )
+    while dangling.search(shortened):
+        shortened = dangling.sub("", shortened).rstrip(" ,;:-–—&")
     if value[-1:] in ".!?" and shortened[-1:] not in ".!?":
         shortened = shortened[:limit - 1].rstrip(" ,;:-") + "."
     return shortened
