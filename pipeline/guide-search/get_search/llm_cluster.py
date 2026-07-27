@@ -800,13 +800,41 @@ def apply_cluster_decisions(
     by_keyword = {canonical(item.keyword): item for item in candidates}
     decisions: dict[str, dict[str, Any]] = {}
     audit_errors: list[str] = []
+
+    def decision_signature(value: dict[str, Any]) -> tuple[str, str, str]:
+        return (
+            canonical(str(value.get("action") or "drop")),
+            canonical(str(value.get("category") or "")).replace(" ", "-"),
+            canonical(str(value.get("merge_into") or "")),
+        )
+
     for raw in decisions_data.get("decisions") or []:
         key = canonical(str(raw.get("keyword") or ""))
         if key not in by_keyword:
             audit_errors.append(f"LLM returned unknown keyword: {raw.get('keyword')}")
             continue
         if key in decisions:
-            audit_errors.append(f"LLM returned duplicate decision: {key}")
+            previous = decisions[key]
+            if decision_signature(previous) == decision_signature(raw):
+                # Models occasionally repeat an otherwise identical decision
+                # inside one structured response. Keep the more confident copy
+                # without invalidating every other candidate in the run.
+                previous_confidence = float(previous.get("confidence") or 0)
+                current_confidence = float(raw.get("confidence") or 0)
+                if current_confidence > previous_confidence:
+                    decisions[key] = raw
+            else:
+                # Conflicting duplicate instructions are unsafe to resolve in
+                # favor of publication. Conservatively drop only this keyword
+                # and preserve the reason in rejected.json.
+                decisions[key] = {
+                    "keyword": key,
+                    "action": "drop",
+                    "category": None,
+                    "merge_into": None,
+                    "confidence": 1,
+                    "reason": "conflicting duplicate decisions returned by LLM",
+                }
             continue
         decisions[key] = raw
 
