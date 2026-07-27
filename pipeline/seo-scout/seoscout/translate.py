@@ -175,12 +175,12 @@ def _unique_title(title: str, stem: str, common_prefix: list[str], lang_code: st
 
 
 def deduplicate_translated_titles(articles_root: Path, target_langs: list[str]) -> int:
-    """Deterministically disambiguate model-collapsed localized titles.
+    """Deterministically disambiguate model-collapsed article titles.
 
-    Different focused pages sometimes receive the same generic Japanese or
-    Korean title even when their bodies and English sources are distinct. Keep
-    the translation checkpoint and append the unique source-topic slug instead
-    of retranslating a complete article.
+    Different focused pages sometimes receive the same generic title even when
+    their bodies and source keywords are distinct. This can happen in English
+    generation as well as translation. Keep the checkpoint and append the
+    unique source-topic slug instead of regenerating a complete article.
     """
     changed = 0
     for lang_code in target_langs:
@@ -212,7 +212,7 @@ def deduplicate_translated_titles(articles_root: Path, target_langs: list[str]) 
                 )
                 path.write_text(content, encoding='utf-8')
                 changed += 1
-                print(f"  🏷️  [{lang_code.upper()}] disambiguated title: {path.name}")
+                print(f"  [TITLE] [{lang_code.upper()}] disambiguated title: {path.name}")
     return changed
 
 
@@ -618,7 +618,7 @@ async def run_translate(
 
     articles_root = Path(Config.DATA_DIR) / "articles"
     if not all_tasks:
-        deduplicate_translated_titles(articles_root, target_langs)
+        deduplicate_translated_titles(articles_root, ["en", *target_langs])
         print("  ℹ️  All articles already translated")
         return
 
@@ -740,7 +740,7 @@ async def run_translate(
             if i + batch_size < len(all_tasks):
                 await asyncio.sleep(batch_delay)
 
-    deduplicated = deduplicate_translated_titles(articles_root, target_langs)
+    deduplicated = deduplicate_translated_titles(articles_root, ["en", *target_langs])
 
     # Summary
     print("\n" + "=" * 70)
