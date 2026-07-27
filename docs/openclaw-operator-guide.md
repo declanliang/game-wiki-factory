@@ -59,8 +59,7 @@ Prompt：
 OpenClaw 不接收 Cloudflare Pages 广告任务，也不要让用户把原始代码粘贴进聊天正文。
 
 ```text
-Factory 默认的 Cloudflare Pages 流程不要提交 `taskType: ads` 后台任务。广告需要在目标游戏仓库用 `npm run ads:import` 校验，
-再由运营者把 `AD_*_B64` 手工写入 Pages Production Secret 并重新部署；不得打印或提交 code 字段。
+Factory 和 OpenClaw 不接收 `taskType: ads` 或任何原始广告代码。广告由独立 Agent 按 `docs/adsterra-environment-contract.md` 转换并写入托管平台环境变量；不得打印或提交原始代码。
 ```
 
 手工广告配置不重跑内容。缺少广告变量时站点不展示广告、不保留空白；配置后必须验证七个 `/api/ads/<format>` 路由的代码哈希。
@@ -83,9 +82,9 @@ Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status
 1. job 为 `succeeded`，manifest 必需阶段完成；
 2. GitHub repo 为 Private；
 3. `publish.json` 中 `stages.hosting.provider=cloudflare-pages` 且 `status=complete` 或 `awaiting_domain_configuration`；后者只能表述为“Pages 已部署，等待域名绑定”；
-4. Factory 默认流程不存在后台广告任务；广告由运营者另行部署和验收。
+4. Factory 和 OpenClaw 不包含广告任务；收到广告请求时转交独立广告 Agent。
 
-完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Pages project/deployment URL、hosting 状态、是否只剩域名绑定/DNS，以及广告状态。只有 `complete` 才能声称对应 origin 已线上验证。
+完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Pages project/deployment URL、hosting 状态，以及是否只剩域名绑定/DNS。只有 `complete` 才能声称对应 origin 已线上验证。
 
 `needs_attention` 固定汇报：第一个失败阶段、根因、日志路径、是否需要用户动作、是否会重复 API 成本。网络/429/5xx 由 Worker 有界重试；不要创建第二个同游戏任务。用户修复密钥、余额、DNS 或权限后，重试原 job，复用 checkpoint。
 
@@ -140,7 +139,7 @@ OpenClaw cron 建议每2分钟执行一次 `/usr/local/bin/gamewiki notifier --o
 
 - **Worker 自动处理**：429、常见 5xx、SSL/网络超时等已分类的瞬时错误；使用有界重试和 checkpoint。
 - **Agent 可以处理**：查询、读日志、按现有 runbook 重试/取消，以及权威官网 URL 明确消除歧义后的输入修正。Agent 不得扩大 API 重试次数。
-- **必须升级给 Codex/基础设施维护者**：任何源代码、测试、数据库、任务状态机、Basic Info、关键词、内容/QA、GitHub/Cloudflare 发布、广告匹配或成本控制逻辑问题。
+- **必须升级给 Codex/基础设施维护者**：任何源代码、测试、数据库、任务状态机、Basic Info、关键词、内容/QA、GitHub/Cloudflare 发布或成本控制逻辑问题。
 
 Agent 发现疑似代码 bug 时只能报告证据并保持任务为 `needs_attention`。禁止直接修改服务器工作树、提交 Git、拉取代码或重启服务。正式修复必须在 Factory 本地完成回归测试、提交 GitHub，再在无运行任务的维护窗口部署。
 
@@ -152,4 +151,4 @@ Agent 发现疑似代码 bug 时只能报告证据并保持任务为 `needs_atte
 - 不因文章数量少就造 fallback。先读 `content-opportunity-report.json`：公开资料少可以接受；明显跨游戏内容必须删除。
 - Cloudflare Pages 显示部署成功、Git push 成功或本地 build 成功都不是最终成功；线上自动验证是发布事务的最后一步。
 - 同名目标目录或 repo 已存在时停止并升级，不得自动删除、覆盖或把它解释为旧站升级。
-- 广告标题是严格协议：`Native Banner`、`Banner 468x60`、`Banner 300x250`、`Banner 160x300`、`Banner 160x600`、`Banner 320x50`、`Banner 728x90`，不可凭 alias 猜测位置。
+- 不解释或执行广告标题/代码映射；统一转交独立广告 Agent。

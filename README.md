@@ -132,7 +132,7 @@ Games/<slug>/.gamewiki/manifest.json
 
 Guide Search 还会生成 `.gamewiki/planning/guide-search/content-opportunity-report.json`，记录数据源返回量、研究机会数、入选页面、实体覆盖和拒绝原因。看到文章少时，先用它判断是公开资料确实少，还是机会在证据/编辑门被合并或拒绝。
 
-OpenClaw 的标准 JSON、指令和完成汇报契约见 [docs/openclaw-operator-guide.md](docs/openclaw-operator-guide.md)。日常只提交游戏资料或广告 JSON，不要让 Agent 在聊天进程内运行长流水线。
+OpenClaw 的标准 JSON、指令和完成汇报契约见 [docs/openclaw-operator-guide.md](docs/openclaw-operator-guide.md)。日常只提交游戏资料，不要让 Agent 在聊天进程内运行长流水线。
 
 ## 命令行兼容方式
 
@@ -228,18 +228,11 @@ npm run verify:deploy
 
 后台站点任务会自动部署 Cloudflare Pages。若提供的 `siteUrl` 尚未绑定，运营者只需在现有 Pages 项目绑定该域名并配置 DNS；`NEXT_PUBLIC_SITE_URL` 和站点部署已经完成。域名可访问后执行同一 Job 的线上验收，或在项目根运行 `npm run verify:deploy`。`awaiting_domain_configuration` 不代表正式域名已上线。
 
-## 可选 Adsterra 广告
+## 可选广告模板契约
 
-每个网站使用自己申请的 Adsterra ad units。在目标游戏仓库把平台返回的原始 JSON 保存为不会提交的 `ad.txt`，然后本地校验和转换：
+广告不是 Factory 主流程的一部分。Factory 不接收原始广告代码、不转换广告配置，也不修改 Vercel/Cloudflare 广告环境变量。模板只读取七个可选的 server-only `AD_*_B64` 变量：存在且可解码时通过同源沙箱 iframe 展示；未配置时不渲染 iframe、占位或空白。
 
-```powershell
-Set-Location ..\<game-slug>
-npm run ads:import
-```
-
-Factory 默认的 Cloudflare Pages 流程暂不接受后台 `taskType: ads`：Cloudflare 的环境变量和部署仍由运营者在 Dashboard 手工完成。先用 `npm run ads:import` 校验并转换配置，再把对应 `AD_*_B64` Secret 逐项写入 Pages Production 环境；部署后逐个验证 `/api/ads/<format>`。不得把广告原始代码写入 Git 或日志。
-
-广告可以晚于网站生产单独配置，不会重跑内容。变量全部留空时，不会渲染广告 iframe、占位或空白。Adsterra 素材实际填充可能仍受平台同步延迟影响。
+独立广告 Agent 的输入校验、Base64 转换、变量名映射和部署后验证规则见 [Adsterra 环境变量转换契约](docs/adsterra-environment-contract.md)。
 
 失败后的同一任务重试自动复用 checkpoint，不会重复已经完成的付费阶段。不要为同一个失败任务创建替代 Job。
 
@@ -266,7 +259,6 @@ game-wiki-factory/
 ├─ orchestrate_wiki.py     主流水线
 ├─ project_contract.py     跨阶段内容契约
 ├─ publisher.py            Private GitHub 发布与托管平台回执
-├─ adsterra.py             广告 JSON 校验（Cloudflare 环境变量需手工配置）
 ├─ jobs/example.json       游戏配置示例
 ├─ pipeline/
 │  ├─ basic-info/

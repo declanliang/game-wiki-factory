@@ -120,6 +120,6 @@ npx tsc --noEmit
 npx tsc --noEmit -p functions/tsconfig.json   # 单独 typecheck Cloudflare Pages Function
 ```
 
-Factory 默认流程会拒绝后台 `taskType: ads`。广告需在单站完成 `npm run ads:import` 校验后，由运营者把 `AD_*_B64` 手工写入 Pages Production Secret；这是当前明确的人工边界，不要复用旧 Vercel 自动化。
+Factory 不包含广告任务、转换器或环境变量写入逻辑。独立广告 Agent 按 Factory 的 `docs/adsterra-environment-contract.md` 把 `AD_*_B64` 写入 Pages Production；不要复用旧 Vercel 自动化。
 
 `wrangler pages deploy out --project-name <项目名>` 可以在本地直接把 `out/` 上传部署（Direct Upload 方式），不依赖 GitHub 集成，适合快速验证，但线上长期使用建议走 Dashboard 的 Git 集成（push 自动触发构建部署），不建议把 `wrangler deploy` 做成自动化脚本长期跑——避免绕过人工确认这一步。

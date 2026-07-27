@@ -137,6 +137,6 @@ npm run verify:deploy
 
 未来输入不再处理历史旧站或覆盖已有 repo。若同名目标目录已经存在且不是当前 Job 的 checkpoint，停止并核对身份，不得自动删除或替换。
 
-## Adsterra 配置
+## 广告职责边界
 
-每个网站单独申请 Adsterra app/ad units。广告配置全部可选：缺少某一格式时，该格式及其外层间距均不渲染。Factory 默认的 Cloudflare Pages 流程拒绝后台 `taskType: ads`，因为 Pages 环境变量尚未自动化。运营者在单站使用 `ad.txt` + `npm run ads:import` 完成校验和转换，再把生成的 `AD_*_B64` 作为 Pages Production Secret 手工录入；更新后必须重新部署并验证 `/api/ads/<format>`。
+Factory、后台 Worker 和 OpenClaw 只处理站点生产与 Cloudflare Pages 发布，不接收、解析或部署广告代码。广告由独立 Agent 按 [Adsterra 环境变量转换契约](adsterra-environment-contract.md)操作。模板保留可选运行时展示能力；全部变量缺失时零渲染。

@@ -17,10 +17,10 @@
 - 正常续跑先验证 checkpoint，再跳过已完成工作。只有显式 refresh/overwrite 才重复付费调用。
 - 每次外部命令都必须写独立日志，失败必须写 `manifest.json` 和 traceback。
 - 生成的 GitHub 仓库必须且只能是 Private；不得提供 Public 发布参数。
-- 今后所有游戏都作为新项目从头生产；新提交不得使用 `operation: rebuild`、`fullBuild` 或旧 repo 覆盖参数。默认托管平台只能是 Cloudflare Pages；历史 Vercel 站点保持不变。广告配置必须先严格匹配游戏身份、Pages 域名、七个固定标题和代码尺寸，再写入任何环境变量。
+- 今后所有游戏都作为新项目从头生产；新提交不得使用 `operation: rebuild`、`fullBuild` 或旧 repo 覆盖参数。默认托管平台只能是 Cloudflare Pages；历史 Vercel 站点保持不变。Factory 不接收或部署广告配置；模板广告变量契约只供独立广告 Agent 使用。
 - 用户可在站点 JSON 中提供 `manualKeywords`。手工词是补充发现源，必须继续通过风险过滤、证据门、Basic Info profile 和最终编辑门，不能直接创造越界分类。
 - 后台站点任务默认完成 Private GitHub、Cloudflare Pages Direct Upload、Production `NEXT_PUBLIC_SITE_URL` 和部署。未提供正式域名时使用 `pages.dev` 并自动线上验收；提供但尚未绑定时以 `hosting.status=awaiting_domain_configuration` 交给运营者绑定域名，不能表述为“正式域名已上线”。
-- Cloudflare Pages 显示部署成功不是上线验收完成。部署后必须验证 `/` 301 到 `/en`，并执行线上首页、metadata、canonical、sitemap、robots 和全部 loc/hreflang 直接 200 验证；广告配置还必须逐路由验证本次代码哈希。
+- Cloudflare Pages 显示部署成功不是上线验收完成。部署后必须验证 `/` 301 到 `/en`，并执行线上首页、metadata、canonical、sitemap、robots 和全部 loc/hreflang 直接 200 验证。
 
 ## 修改后最低验收
 

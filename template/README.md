@@ -81,19 +81,9 @@ npm run build
 
 ## Adsterra 广告
 
-广告是可选功能。每个网站使用自己在 Adsterra 申请的 7 个 ad unit；未填写的格式不会渲染 iframe、占位容器或空白间距。
+广告是可选的模板运行时能力，不属于 Factory。独立广告 Agent 把已验证的完整 snippet 转成七个 server-only `AD_*_B64` 环境变量；变量名和转换规则见 Factory 的 `docs/adsterra-environment-contract.md`。
 
-本地最省事的方式是把 Adsterra 原始代码按 `Native Banner`、`Banner 468x60`、`Banner 300x250`、`Banner 160x300`、`Banner 160x600`、`Banner 320x50`、`Banner 728x90` 七个标题保存到项目根目录 `ad.txt`，然后执行：
-
-```powershell
-npm run ads:import
-```
-
-脚本会校验尺寸并自动写入 `.env.local`，不需要手工转换 Base64。`ad.txt` 和 `.env.local` 均不会上传 GitHub。上线时把对应的 `AD_*_B64` 值逐项写入 Cloudflare Pages Production Secret；Base64 变量只是多行代码的可靠传输格式，不参与广告网络请求。
-
-Factory 默认的 Cloudflare Pages 流程不接受后台 `taskType: ads`，因为 Pages 环境变量尚未自动化。广告必须在目标站点本地校验，再由运营者手工配置 Pages Secret 并重新部署。
-
-广告代码由 `functions/api/ads/[format].ts` 在同源隔离 iframe 内提供，位置包括顶部 Sticky、Hero 后 Native、首页/分类卡片流、文章正文、宽屏侧栏和全站 Footer。修改 Cloudflare Pages 环境变量后必须重新部署，Adsterra 新建或刚批准的 ad unit 还可能存在平台同步延迟。
+页面先调用 `/api/ads/availability` 获取运行时可用性，再按需挂载 `/api/ads/<format>` 同源沙箱 iframe。未配置或 Base64 无效时不会渲染 iframe、占位容器或空白间距。修改 Cloudflare Pages Production 变量后必须重新部署。
 
 ## Cloudflare Pages 部署
 

@@ -116,7 +116,7 @@ class PublisherValidationTests(unittest.TestCase):
             self.assertTrue(_remove_vercel_oidc_env(project))
             self.assertFalse(env_file.exists())
 
-            env_file.write_text("VERCEL_OIDC_TOKEN=secret\nAD_NATIVE_BANNER=keep\n", encoding="utf-8")
+            env_file.write_text("VERCEL_OIDC_TOKEN=secret\nUNRELATED_SETTING=keep\n", encoding="utf-8")
             self.assertFalse(_remove_vercel_oidc_env(project))
             self.assertTrue(env_file.exists())
 

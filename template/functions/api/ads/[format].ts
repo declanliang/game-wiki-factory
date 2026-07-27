@@ -19,10 +19,6 @@ function decodeSnippet(encoded: string | undefined): string | undefined {
   }
 }
 
-function rawSnippet(value: string | undefined): string | undefined {
-  return value?.trim() || undefined;
-}
-
 type Env = Record<string, string | undefined>;
 
 // Matches the env var names documented in .env.example exactly — do not derive
@@ -41,9 +37,7 @@ const ENV_KEY: Record<AdFormat, string> = {
 function getAdSnippet(format: AdFormat, env: Env): string | undefined {
   const key = ENV_KEY[format];
   const b64 = env[`AD_${key}_B64`];
-  const plain = env[`AD_${key}`];
-  const pub = env[`NEXT_PUBLIC_AD_${key}`];
-  return decodeSnippet(b64) ?? rawSnippet(plain) ?? rawSnippet(pub);
+  return decodeSnippet(b64);
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {

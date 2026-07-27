@@ -216,13 +216,8 @@ def defer_notification(notification_id: int, error: str) -> None:
 
 def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     task_type = str(config.get("taskType") or "site").strip().casefold()
-    if task_type == "ads":
-        raise ValueError(
-            "taskType ads is unavailable in the Cloudflare Pages workflow; "
-            "configure AD_* environment variables manually in Cloudflare Pages"
-        )
     if task_type != "site":
-        raise ValueError("config.taskType must be site or ads")
+        raise ValueError("config.taskType must be site")
     allowed = {
         "schemaVersion", "taskType", "operation", "game", "platform", "officialUrl",
         "siteUrl", "publish", "refresh", "manualKeywords",
@@ -356,13 +351,13 @@ def claim(worker: str, lease_seconds: int = 90) -> sqlite3.Row | None:
         db.close()
 
 
-def _heartbeat(job_id: str, slug: str, worker: str, stop: threading.Event, lease_seconds: int, task_type: str = "site") -> None:
+def _heartbeat(job_id: str, slug: str, worker: str, stop: threading.Event, lease_seconds: int) -> None:
     while not stop.wait(max(10, lease_seconds // 3)):
         expires = (datetime.now(timezone.utc) + timedelta(seconds=lease_seconds)).replace(microsecond=0).isoformat()
         projects_root = Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)).expanduser().resolve()
         manifest_path = projects_root / slug / ".gamewiki" / "manifest.json"
-        stage = "ads" if task_type == "ads" else None
-        if task_type == "site" and manifest_path.is_file():
+        stage = None
+        if manifest_path.is_file():
             try:
                 manifest = read_json(manifest_path)
                 stages = manifest.get("stages") or {}
@@ -441,11 +436,6 @@ def _execution_config(config: dict[str, Any], attempt_number: int) -> dict[str, 
     return result
 
 
-def _ad_execution_config(config: dict[str, Any]) -> dict[str, Any]:
-    """Return the private worker input; raw code never reaches console output."""
-    return config
-
-
 def _new_workspace_conflict(slug: str, attempt_number: int) -> Path | None:
     """Reject a newly submitted site job if its workspace is not empty."""
     if attempt_number != 1:
@@ -480,16 +470,6 @@ def _completion_result(config: dict[str, Any], slug: str) -> dict[str, Any]:
     """Persist a non-secret acceptance summary before workspace cleanup."""
     projects_root = Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)).expanduser().resolve()
     project = (projects_root / slug).resolve()
-    task_type = str(config.get("taskType") or "site")
-    if task_type == "ads":
-        receipt = read_json(project / ".gamewiki" / "ads.json")
-        return {
-            "taskType": "ads",
-            "domainName": receipt.get("domainName"),
-            "vercelProject": receipt.get("vercelProject"),
-            "verification": receipt.get("verification"),
-            "placementCount": len(receipt.get("placements") or []),
-        }
     receipt = read_json(project / ".gamewiki" / "publish.json") if config.get("publish") else {}
     stages = receipt.get("stages") or {}
     plan_path = project / "intake" / "site-plan.json"
@@ -563,21 +543,14 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
     configs.mkdir(parents=True, exist_ok=True)
     log_path = logs / f"attempt-{attempt}.log"
     config_path = configs / f"attempt-{attempt}.json"
-    task_type = str(config.get("taskType") or "site")
-    workspace_conflict = (
-        _new_workspace_conflict(job["slug"], attempt) if task_type == "site" else None
-    )
-    write_json(
-        config_path,
-        _ad_execution_config(config) if task_type == "ads" else _execution_config(config, attempt),
-    )
+    workspace_conflict = _new_workspace_conflict(job["slug"], attempt)
+    write_json(config_path, _execution_config(config, attempt))
     env = build_subprocess_env(ROOT)
     stop = threading.Event()
-    heartbeat = threading.Thread(target=_heartbeat, args=(job_id, job["slug"], worker, stop, lease_seconds, task_type), daemon=True)
+    heartbeat = threading.Thread(target=_heartbeat, args=(job_id, job["slug"], worker, stop, lease_seconds), daemon=True)
     heartbeat.start()
     with connect() as db:
-        initial_stage = "ads" if task_type == "ads" else "pipeline"
-        db.execute("UPDATE jobs SET log_path=?,current_stage=?,updated_at=? WHERE id=?", (str(log_path), initial_stage, _now(), job_id))
+        db.execute("UPDATE jobs SET log_path=?,current_stage=?,updated_at=? WHERE id=?", (str(log_path), "pipeline", _now(), job_id))
         db.execute(
             "INSERT INTO attempts(job_id,number,worker,status,started_at,log_path) VALUES(?,?,?,?,?,?)",
             (job_id, attempt, worker, "running", _now(), str(log_path)),
@@ -594,13 +567,9 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                     f"existing workspace: {workspace_conflict}\n"
                 )
             else:
-                command = (
-                    [sys.executable, str(ROOT / "gamewiki.py"), "ads", "import", "--config", str(config_path)]
-                    if task_type == "ads"
-                    else [sys.executable, str(ROOT / "gamewiki.py"), "--config", str(config_path)]
-                )
+                command = [sys.executable, str(ROOT / "gamewiki.py"), "--config", str(config_path)]
                 code = _run_process(command, log, env, job_id)
-            if code == 0 and task_type == "site" and config.get("publish"):
+            if code == 0 and config.get("publish"):
                 with connect() as db:
                     db.execute("UPDATE jobs SET current_stage='publish',updated_at=? WHERE id=?", (_now(), job_id))
                 code = _run_process(_publish_command(config, job["slug"]), log, env, job_id)
@@ -610,7 +579,7 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                 except (OSError, ValueError, KeyError) as exc:
                     log.write(f"\n[failed] could not persist acceptance result: {exc}\n")
                     code = 1
-            if code == 0 and task_type == "site":
+            if code == 0:
                 try:
                     pruned = _prune_success_build_artifacts(config, job["slug"])
                     if pruned:

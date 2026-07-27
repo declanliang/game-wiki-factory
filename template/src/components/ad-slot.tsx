@@ -1,12 +1,25 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { AD_SIZES, type AdAvailability, type AdFormat } from "@/lib/ad-types";
 
 const AdContext = createContext<AdAvailability | null>(null);
 
 export function AdProvider({ availability, children }: { availability: AdAvailability; children: React.ReactNode }) {
-  return <AdContext.Provider value={availability}>{children}</AdContext.Provider>;
+  const [runtimeAvailability, setRuntimeAvailability] = useState(availability);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/ads/availability", { cache: "no-store", signal: controller.signal })
+      .then((response) => response.ok ? response.json() : null)
+      .then((value) => {
+        if (value && typeof value === "object") {
+          setRuntimeAvailability(value as AdAvailability);
+        }
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+  return <AdContext.Provider value={runtimeAvailability}>{children}</AdContext.Provider>;
 }
 
 export function useAdEnabled(format: AdFormat) {

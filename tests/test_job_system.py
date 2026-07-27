@@ -55,8 +55,8 @@ class JobSystemTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "legacy rebuild jobs are no longer accepted"):
             normalize_config({"game": "Old Site", "operation": "rebuild"})
 
-    def test_cloudflare_branch_rejects_vercel_ads_jobs(self) -> None:
-        with self.assertRaisesRegex(ValueError, "unavailable in the Cloudflare Pages workflow"):
+    def test_background_jobs_only_accept_site_tasks(self) -> None:
+        with self.assertRaisesRegex(ValueError, "taskType must be site"):
             normalize_config({"taskType": "ads", "game": "Ads Game"})
 
     def test_manual_keywords_are_normalized_and_preserved_on_retry(self) -> None:
