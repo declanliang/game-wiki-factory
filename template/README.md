@@ -87,7 +87,7 @@ npm run build
 
 ## Cloudflare Pages 部署
 
-在 Cloudflare Dashboard 连接 Private GitHub 仓库，Root directory 留空，Build command 设为 `npm run build`，Build output directory 设为 `out`。Production 环境必须设置最终公开域名对应的 `NEXT_PUBLIC_SITE_URL`。部署后运行 `npm run verify:deploy`；根路径应 301 到 `/en`，而 sitemap 中的所有 loc/hreflang 必须直接返回 200。详细步骤见 `doc/Cloudflare-Pages部署指南.md`。
+Factory 会通过 Pages API 创建连接 Private GitHub `main` 的项目，Root directory 留空，Build command 为 `npm run build`，Build output directory 为 `out`。Production 环境必须设置最终公开域名对应的 `NEXT_PUBLIC_SITE_URL`。部署后运行 `npm run verify:deploy`；根路径应 301 到 `/en`，而 sitemap 中的所有 loc/hreflang 必须直接返回 200。详细步骤见 `doc/Cloudflare-Pages部署指南.md`。
 
 ## 设计边界
 

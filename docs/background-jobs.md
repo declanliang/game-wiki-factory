@@ -4,7 +4,7 @@
 
 ## 目标与边界
 
-Factory 只接收新站任务。每个游戏从空 workspace 执行信息采集、关键词、页面规划、文章、翻译、模板、构建和 QA，并创建自己的 Private GitHub repo 与 Cloudflare Pages Direct Upload 项目。GitHub 发布前必须完成本地生产验收。
+Factory 只接收新站任务。每个游戏从空 workspace 执行信息采集、关键词、页面规划、文章、翻译、模板、构建和 QA，并创建自己的 Private GitHub repo 与 Git-integrated Cloudflare Pages 项目。GitHub 发布前必须完成本地生产验收。
 
 OpenClaw、命令行和未来管理界面只提交或控制任务；真正的长任务由独立 Worker 进程执行。关闭终端或 Agent 对话不得改变数据库中的任务状态，服务器重启后 Worker 可重新领取中断任务。
 
@@ -182,7 +182,7 @@ JINA_API_KEY_2=
 2. 同一 job 不会被两个 Worker 同时执行。
 3. 发布失败不会重跑已完成内容阶段。
 4. 临时错误有界重试，永久错误进入 `needs_attention`。
-5. 每个站点创建新的 Private repo 和 Pages Direct Upload 项目，自动设置 `NEXT_PUBLIC_SITE_URL` 并部署。
+5. 每个站点创建新的 Private repo 和连接其 `main` 的 Git-integrated Pages 项目，自动设置 `NEXT_PUBLIC_SITE_URL` 并触发首次部署；后续 `main` push 由 Cloudflare 自动构建。
 6. 未提供广告变量时零广告渲染；发布器不修改 Cloudflare Pages 环境变量。
 7. 后台 schema 只包含站点生产字段；不得重新引入广告任务或旧 Vercel 广告自动化。
 8. 站点 Job 成功时必须有 Private GitHub，且 `hosting.status` 为 `complete` 或 `awaiting_domain_configuration`。后者由运营者绑定自定义域名/DNS后另行执行 `verify:deploy`；验证日志固定保存为项目 `.gamewiki/deploy-verification.log`。

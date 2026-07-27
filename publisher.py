@@ -101,12 +101,120 @@ def _cloudflare_request(
     return envelope.get("result")
 
 
+def _cloudflare_create_git_deployment(
+    account_id: str,
+    token: str,
+    project_name: str,
+    branch: str = "main",
+) -> dict:
+    boundary = f"gamewiki-{int(time.time() * 1000)}"
+    body = (
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="branch"\r\n\r\n'
+        f"{branch}\r\n"
+        f"--{boundary}--\r\n"
+    ).encode("utf-8")
+    request = urllib.request.Request(
+        "https://api.cloudflare.com/client/v4/accounts/"
+        f"{urllib.parse.quote(account_id)}/pages/projects/"
+        f"{urllib.parse.quote(project_name)}/deployments",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            envelope = json.loads(response.read().decode("utf-8") or "{}")
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")[:1000]
+        raise RuntimeError(
+            f"HTTP {exc.code} while triggering Cloudflare Pages Git deployment: {detail}"
+        ) from exc
+    if not envelope.get("success", False):
+        errors = envelope.get("errors") or []
+        summary = "; ".join(
+            str(item.get("message") or item.get("code") or "unknown error")
+            for item in errors[:3]
+        )
+        raise RuntimeError(
+            f"Cloudflare Pages Git deployment request failed: {summary or 'unknown error'}"
+        )
+    deployment = envelope.get("result")
+    if not isinstance(deployment, dict):
+        raise RuntimeError("Cloudflare Pages Git deployment response was not an object")
+    return deployment
+
+
+def _cloudflare_git_project_payload(
+    project_name: str,
+    full_repo: str,
+) -> dict:
+    owner, repo_name = full_repo.split("/", 1)
+    return {
+        "name": project_name,
+        "production_branch": "main",
+        "source": {
+            "type": "github",
+            "config": {
+                "owner": owner,
+                "repo_name": repo_name,
+                "production_branch": "main",
+                "production_deployments_enabled": True,
+                "preview_deployment_setting": "none",
+                "pr_comments_enabled": False,
+            },
+        },
+        "build_config": {
+            "build_command": "npm run build",
+            "destination_dir": "out",
+            "root_dir": "",
+        },
+    }
+
+
+def _validate_cloudflare_git_project(project: dict, full_repo: str) -> None:
+    owner, repo_name = full_repo.split("/", 1)
+    source = project.get("source")
+    if not isinstance(source, dict):
+        raise RuntimeError(
+            f"Cloudflare Pages project {project.get('name')!r} is a Direct Upload project; "
+            "existing projects are never converted or replaced automatically"
+        )
+    config = source.get("config") or {}
+    actual = (
+        str(source.get("type") or "").casefold(),
+        str(config.get("owner") or "").casefold(),
+        str(config.get("repo_name") or "").casefold(),
+        str(config.get("production_branch") or project.get("production_branch") or "").casefold(),
+    )
+    expected = ("github", owner.casefold(), repo_name.casefold(), "main")
+    if actual != expected:
+        raise RuntimeError(
+            f"Cloudflare Pages project {project.get('name')!r} is connected to a different "
+            "Git source or production branch"
+        )
+    build = project.get("build_config") or {}
+    if (
+        str(build.get("build_command") or "") != "npm run build"
+        or str(build.get("destination_dir") or "").strip("/") != "out"
+        or str(build.get("root_dir") or "") not in {"", "/"}
+    ):
+        raise RuntimeError(
+            f"Cloudflare Pages project {project.get('name')!r} has an incompatible build configuration"
+        )
+
+
 def _ensure_cloudflare_project(
     account_id: str,
     token: str,
     project_name: str,
-) -> dict:
+    full_repo: str,
+) -> tuple[dict, bool]:
     encoded_name = urllib.parse.quote(project_name)
+    created = False
     try:
         project = _cloudflare_request(
             "GET", account_id, token, f"pages/projects/{encoded_name}"
@@ -119,37 +227,63 @@ def _ensure_cloudflare_project(
             account_id,
             token,
             "pages/projects",
-            {"name": project_name, "production_branch": "main"},
+            _cloudflare_git_project_payload(project_name, full_repo),
         )
+        created = True
     if not isinstance(project, dict):
         raise RuntimeError("Cloudflare Pages project response was not an object")
-    if project.get("source"):
-        raise RuntimeError(
-            f"Cloudflare Pages project {project_name!r} uses Git integration and cannot be "
-            "reused by the Factory Direct Upload transaction"
+    _validate_cloudflare_git_project(project, full_repo)
+    return project, created
+
+
+def _cloudflare_git_authorization_error(exc: RuntimeError) -> RuntimeError:
+    folded = str(exc).casefold()
+    if any(marker in folded for marker in (
+        "repository not found",
+        "repo not found",
+        "not authorized",
+        "not authorised",
+        "github installation",
+        "github app",
+        "could not access",
+    )):
+        return RuntimeError(
+            "Cloudflare Pages could not access the new Private GitHub repository. "
+            "Grant the Cloudflare Workers & Pages GitHub App access to the repository "
+            "(prefer All repositories for unattended future jobs), then retry the same Job."
         )
-    return project
+    return exc
 
 
 def _resolve_cloudflare_project(
     account_id: str,
     token: str,
     project_name: str,
-) -> tuple[str, dict]:
-    """Resolve a Direct Upload project, with a deterministic name fallback.
+    full_repo: str,
+) -> tuple[str, dict, bool]:
+    """Resolve a Git-integrated project, with a deterministic name fallback.
 
     Cloudflare can return error 8000000/HTTP 500 for an otherwise valid Pages
     name that it cannot allocate. A suffixed name is safe because the Factory
     records the actual Pages project and the canonical URL remains independent.
     """
     try:
-        return project_name, _ensure_cloudflare_project(account_id, token, project_name)
+        project, created = _ensure_cloudflare_project(
+            account_id, token, project_name, full_repo
+        )
+        return project_name, project, created
     except RuntimeError as exc:
         message = str(exc)
         if "HTTP 500" not in message or '"code": 8000000' not in message:
-            raise
+            raise _cloudflare_git_authorization_error(exc) from exc
         fallback_name = f"{project_name}-wiki"
-        return fallback_name, _ensure_cloudflare_project(account_id, token, fallback_name)
+        try:
+            project, created = _ensure_cloudflare_project(
+                account_id, token, fallback_name, full_repo
+            )
+        except RuntimeError as fallback_exc:
+            raise _cloudflare_git_authorization_error(fallback_exc) from fallback_exc
+        return fallback_name, project, created
 
 
 def _set_cloudflare_site_url(
@@ -157,7 +291,27 @@ def _set_cloudflare_site_url(
     token: str,
     project_name: str,
     origin: str,
-) -> None:
+    cloudflare_project: dict,
+    *,
+    created: bool,
+) -> bool:
+    production = (
+        (cloudflare_project.get("deployment_configs") or {}).get("production") or {}
+    )
+    env_vars = production.get("env_vars") or {}
+    current = env_vars.get("NEXT_PUBLIC_SITE_URL") or {}
+    if (
+        str(current.get("type") or "") == "plain_text"
+        and str(current.get("value") or "").rstrip("/") == origin.rstrip("/")
+    ):
+        return False
+    unrelated = sorted(key for key in env_vars if key != "NEXT_PUBLIC_SITE_URL")
+    if unrelated and not created:
+        raise RuntimeError(
+            "Refusing to replace Cloudflare Pages Production env_vars while unrelated "
+            f"variables exist: {', '.join(unrelated)}. Update them with the dedicated "
+            "environment-variable Agent so encrypted values are preserved."
+        )
     _cloudflare_request(
         "PATCH",
         account_id,
@@ -176,127 +330,153 @@ def _set_cloudflare_site_url(
             }
         },
     )
+    return True
 
 
-def _run_logged(
-    command: list[str],
-    cwd: Path,
-    env: dict[str, str],
-    log_path: Path,
-) -> str:
-    result = subprocess.run(
-        command,
-        cwd=cwd,
-        env=env,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        capture_output=True,
-    )
-    output = (result.stdout or "") + (result.stderr or "")
+def _append_cloudflare_log(log_path: Path, message: str) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log:
-        log.write(f"\n[{_now()}]\n[run] {' '.join(command)}\n[cwd] {cwd}\n")
-        log.write(output)
-        if output and not output.endswith("\n"):
-            log.write("\n")
-        log.write(f"[exitCode] {result.returncode}\n")
-    if result.returncode:
-        raise RuntimeError((result.stderr or result.stdout or "command failed").strip())
-    return (result.stdout or "").strip()
+        log.write(f"[{_now()}] {message.rstrip()}\n")
 
 
-def _find_cloudflare_deployment(
+def _cloudflare_deployment_failure_tail(
     account_id: str,
     token: str,
     project_name: str,
+) -> str:
+    try:
+        history = _cloudflare_request(
+            "GET",
+            account_id,
+            token,
+            f"pages/projects/{urllib.parse.quote(project_name)}/deployments",
+        )
+    except RuntimeError:
+        return ""
+    if not isinstance(history, list):
+        return ""
+    failures: list[str] = []
+    for deployment in history[:3]:
+        stage = deployment.get("latest_stage") or {}
+        if str(stage.get("status") or "").casefold() in {"failure", "canceled"}:
+            failures.append(
+                f"{deployment.get('id') or '<unknown>'}: "
+                f"{stage.get('name') or 'unknown'}={stage.get('status') or 'unknown'}"
+            )
+    return "; ".join(failures)
+
+
+def _wait_cloudflare_deployment(
+    account_id: str,
+    token: str,
+    project_name: str,
+    deployment_id: str,
     commit_sha: str,
     *,
-    attempts: int = 30,
+    attempts: int = 120,
+    log_path: Path | None = None,
 ) -> dict:
     encoded_name = urllib.parse.quote(project_name)
-    matched: dict | None = None
+    encoded_deployment = urllib.parse.quote(deployment_id)
+    deployment: dict | None = None
+    last_stage = ""
     for attempt in range(attempts):
-        deployments = _cloudflare_request(
-            "GET", account_id, token, f"pages/projects/{encoded_name}/deployments"
+        candidate = _cloudflare_request(
+            "GET",
+            account_id,
+            token,
+            f"pages/projects/{encoded_name}/deployments/{encoded_deployment}",
         )
-        if isinstance(deployments, list):
-            for candidate in deployments:
-                metadata = ((candidate.get("deployment_trigger") or {}).get("metadata") or {})
-                if metadata.get("commit_hash") == commit_sha:
-                    matched = candidate
-                    break
-        status = str(((matched or {}).get("latest_stage") or {}).get("status") or "").casefold()
-        if status in {"success", "failure"}:
+        if not isinstance(candidate, dict):
+            raise RuntimeError("Cloudflare Pages deployment response was not an object")
+        deployment = candidate
+        stage = deployment.get("latest_stage") or {}
+        stage_summary = f"{stage.get('name') or 'unknown'}={stage.get('status') or 'unknown'}"
+        if stage_summary != last_stage and log_path is not None:
+            _append_cloudflare_log(log_path, f"deployment {deployment_id}: {stage_summary}")
+            last_stage = stage_summary
+        status = str(stage.get("status") or "").casefold()
+        if status in {"success", "failure", "canceled"}:
             break
         if attempt + 1 < attempts:
             time.sleep(3)
-    if not matched:
+    if not deployment:
         raise RuntimeError(
-            f"Cloudflare Pages deployment for commit {commit_sha} was not returned by the API"
+            f"Cloudflare Pages deployment {deployment_id} was not returned by the API"
         )
-    status = str((matched.get("latest_stage") or {}).get("status") or "").casefold()
+    status = str((deployment.get("latest_stage") or {}).get("status") or "").casefold()
     if status != "success":
-        raise RuntimeError(
-            f"Cloudflare Pages deployment {matched.get('id') or '<unknown>'} ended with status {status or 'unknown'}"
+        detail = _cloudflare_deployment_failure_tail(
+            account_id, token, project_name
         )
-    return matched
+        raise RuntimeError(
+            f"Cloudflare Pages deployment {deployment_id} ended with status "
+            f"{status or 'timeout'}{(': ' + detail) if detail else ''}"
+        )
+    metadata = ((deployment.get("deployment_trigger") or {}).get("metadata") or {})
+    deployed_sha = str(metadata.get("commit_hash") or "").casefold()
+    expected_sha = commit_sha.casefold()
+    if not deployed_sha or not (
+        deployed_sha.startswith(expected_sha) or expected_sha.startswith(deployed_sha)
+    ):
+        raise RuntimeError(
+            f"Cloudflare Pages deployed commit {deployed_sha or '<missing>'}, "
+            f"expected {expected_sha}"
+        )
+    return deployment
 
 
 def _deploy_cloudflare_pages(
     project: Path,
     project_name: str,
+    full_repo: str,
     site_url: str,
     commit_sha: str,
     env: dict[str, str],
 ) -> dict:
     account_id, token = _cloudflare_credentials(env)
-    project_name, cloudflare_project = _resolve_cloudflare_project(
-        account_id, token, project_name
+    project_name, cloudflare_project, created = _resolve_cloudflare_project(
+        account_id, token, project_name, full_repo
     )
     subdomain = str(cloudflare_project.get("subdomain") or f"{project_name}.pages.dev").strip()
     pages_origin = _normalize_origin(subdomain)
     canonical_origin = _normalize_origin(site_url) if site_url.strip() else pages_origin
-    _set_cloudflare_site_url(account_id, token, project_name, canonical_origin)
-
-    command_env = dict(env)
-    command_env.update({
-        "CLOUDFLARE_ACCOUNT_ID": account_id,
-        "CLOUDFLARE_API_TOKEN": token,
-        "NEXT_PUBLIC_SITE_URL": canonical_origin,
-        "CF_PAGES": "1",
-    })
-    npm = shutil.which("npm.cmd") or shutil.which("npm")
-    npx = shutil.which("npx.cmd") or shutil.which("npx")
-    if not npm or not npx:
-        raise RuntimeError("npm and npx are required for Cloudflare Pages publishing")
     log_path = project / ".gamewiki" / "logs" / "cloudflare-pages-publish.log"
-    _run_logged([npm, "run", "build"], project, command_env, log_path)
-    output = _run_logged(
-        [
-            npx,
-            "wrangler",
-            "pages",
-            "deploy",
-            "out",
-            "--project-name",
-            project_name,
-            "--branch",
-            "main",
-            "--commit-hash",
-            commit_sha,
-            "--commit-message",
-            "Generate game wiki site",
-        ],
-        project,
-        command_env,
+    _append_cloudflare_log(
         log_path,
+        f"resolved Git-integrated project {project_name} for {full_repo}; created={created}",
     )
-    deployment = _find_cloudflare_deployment(
-        account_id, token, project_name, commit_sha
+    changed = _set_cloudflare_site_url(
+        account_id,
+        token,
+        project_name,
+        canonical_origin,
+        cloudflare_project,
+        created=created,
     )
-    output_urls = [item.rstrip(".,)") for item in re.findall(r"https://[^\s\"']+", output)]
-    deployment_url = str(deployment.get("url") or (output_urls[-1] if output_urls else "")).rstrip("/")
+    _append_cloudflare_log(
+        log_path,
+        f"Production NEXT_PUBLIC_SITE_URL {'updated' if changed else 'already matched'}",
+    )
+    deployment = _cloudflare_create_git_deployment(
+        account_id, token, project_name, "main"
+    )
+    if not isinstance(deployment, dict) or not deployment.get("id"):
+        raise RuntimeError("Cloudflare Pages did not return an initial deployment ID")
+    deployment_id = str(deployment["id"])
+    _append_cloudflare_log(
+        log_path,
+        f"triggered Git deployment {deployment_id} from main",
+    )
+    deployment = _wait_cloudflare_deployment(
+        account_id,
+        token,
+        project_name,
+        deployment_id,
+        commit_sha,
+        log_path=log_path,
+    )
+    deployment_url = str(deployment.get("url") or "").rstrip("/")
     return {
         "provider": "cloudflare-pages",
         "status": "deployed",
@@ -308,7 +488,17 @@ def _deploy_cloudflare_pages(
         "pagesOrigin": pages_origin,
         "siteUrl": canonical_origin,
         "environmentVariables": ["NEXT_PUBLIC_SITE_URL"],
-        "deploymentMode": "direct-upload",
+        "deploymentMode": "git-integration",
+        "source": {
+            "type": "github",
+            "repo": full_repo,
+            "productionBranch": "main",
+        },
+        "buildConfig": {
+            "command": "npm run build",
+            "destination": "out",
+            "root": "",
+        },
         "log": str(log_path),
         "updatedAt": _now(),
     }
@@ -661,6 +851,7 @@ def publish(argv: list[str]) -> int:
         hosting = _deploy_cloudflare_pages(
             project,
             project_name,
+            full_repo,
             args.site_url or "",
             receipt["stages"]["github"]["commit"],
             env,

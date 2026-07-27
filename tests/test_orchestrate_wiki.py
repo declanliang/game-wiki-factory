@@ -56,6 +56,7 @@ class OrchestratorTests(unittest.TestCase):
             (template / "src" / "app").mkdir(parents=True)
             (site / "src" / "app").mkdir(parents=True)
             (template / "package.json").write_text("{}", encoding="utf-8")
+            (template / ".node-version").write_text("22\n", encoding="utf-8")
             obsolete = site / "src" / "app" / "page.tsx"
             obsolete.write_text('redirect("/en")', encoding="utf-8")
 
@@ -63,6 +64,10 @@ class OrchestratorTests(unittest.TestCase):
 
             self.assertFalse(obsolete.exists())
             self.assertTrue((site / "package.json").is_file())
+            self.assertEqual(
+                (site / ".node-version").read_text(encoding="utf-8"),
+                "22\n",
+            )
 
     def test_replace_directory_is_noop_when_source_is_destination(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
