@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import shutil
 import secrets
@@ -17,6 +18,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from factory_cli import PermitState, _config_command, _handler, normalize_manual_keywords
 from http.server import ThreadingHTTPServer
@@ -118,12 +120,29 @@ def connect() -> sqlite3.Connection:
         );
         CREATE INDEX IF NOT EXISTS idx_notifications_pending
           ON notifications(status, available_at, id);
+        CREATE TABLE IF NOT EXISTS quota_circuits (
+          provider TEXT PRIMARY KEY,
+          label TEXT NOT NULL,
+          credential TEXT NOT NULL,
+          endpoint TEXT,
+          status TEXT NOT NULL,
+          primary_job_id TEXT NOT NULL,
+          opened_at TEXT NOT NULL,
+          closed_at TEXT,
+          updated_at TEXT NOT NULL
+        );
         """
     )
     columns = {row["name"] for row in db.execute("PRAGMA table_info(jobs)").fetchall()}
     if "result_json" not in columns:
         try:
             db.execute("ALTER TABLE jobs ADD COLUMN result_json TEXT")
+        except sqlite3.OperationalError as exc:
+            if "duplicate column" not in str(exc).casefold():
+                raise
+    if "quota_provider" not in columns:
+        try:
+            db.execute("ALTER TABLE jobs ADD COLUMN quota_provider TEXT")
         except sqlite3.OperationalError as exc:
             if "duplicate column" not in str(exc).casefold():
                 raise
@@ -258,12 +277,30 @@ def _submit_normalized(config: dict[str, Any], source: str, *, max_attempts: int
     job_id = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{slug}-{uuid.uuid4().hex[:6]}"
     now = _now()
     with connect() as db:
+        circuit = db.execute(
+            """SELECT provider FROM quota_circuits
+               WHERE status='open' ORDER BY opened_at LIMIT 1"""
+        ).fetchone()
+        status = "quota_wait" if circuit else "queued"
+        quota_provider = circuit["provider"] if circuit else None
         db.execute(
-            """INSERT INTO jobs(id,game,slug,config_json,status,max_attempts,available_at,created_at,updated_at)
-               VALUES(?,?,?,?,?,?,?,?,?)""",
-            (job_id, display_name, slug, json.dumps(config, ensure_ascii=False), "queued", max_attempts, now, now, now),
+            """INSERT INTO jobs(
+                 id,game,slug,config_json,status,max_attempts,available_at,
+                 quota_provider,created_at,updated_at
+               ) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            (
+                job_id, display_name, slug, json.dumps(config, ensure_ascii=False),
+                status, max_attempts, now, quota_provider, now, now,
+            ),
         )
-        _event(db, job_id, "job.submitted", configPath=source)
+        _event(
+            db,
+            job_id,
+            "job.submitted",
+            configPath=source,
+            quotaProvider=quota_provider,
+            status=status,
+        )
     return job_id
 
 
@@ -389,6 +426,158 @@ QUOTA_PATTERNS = (
     "balance exhausted", "insufficient credits", "credits exhausted",
     "credit balance", "余额不足", "额度不足",
 )
+
+QUOTA_PROVIDERS = (
+    # Explicit workload markers must precede shared endpoint markers.  The LLM
+    # pool may use toapis.com while still being configured through
+    # LLM_API_KEY_1..N rather than TOAPIS_KEY.
+    ("llm", "LLM 内容生成/翻译 API", "LLM_API_KEY_1..N",
+     ("all configured llm api keys", "llm key slot", "llm api")),
+    ("dataforseo", "DataForSEO API", "DATAFORSEO_LOGIN / DATAFORSEO_PASSWORD",
+     ("dataforseo",)),
+    ("toapis", "ToAPIs API", "TOAPIS_KEY / TOAPIS_API_KEY",
+     ("toapis", "toapis.com")),
+    ("serper", "Serper 搜索 API", "SERPER_API_KEY_1..N",
+     ("serper", "google.serper.dev")),
+    ("jina", "Jina Reader API", "JINA_API_KEY_1..N",
+     ("jina", "r.jina.ai")),
+    ("cloudflare", "Cloudflare API", "CLOUDFLARE_API_TOKEN",
+     ("cloudflare api", "api.cloudflare.com")),
+    ("github", "GitHub API", "GH_TOKEN / GITHUB_TOKEN",
+     ("github api", "api.github.com")),
+)
+
+
+def identify_quota_provider(text: str) -> dict[str, str]:
+    """Return a safe provider identifier without exposing credential values."""
+    lowered = text.casefold()
+    endpoint_match = re.search(
+        r"(?:provider|api base|base_url)\s*[=:]\s*(https?://)?([a-z0-9.-]+)",
+        lowered,
+    )
+    endpoint = endpoint_match.group(2) if endpoint_match else ""
+    for provider, label, credential, markers in QUOTA_PROVIDERS:
+        if any(marker in lowered for marker in markers):
+            result = {"id": provider, "label": label, "credential": credential}
+            if endpoint:
+                result["endpoint"] = endpoint
+            return result
+    if endpoint:
+        host = urlparse(f"https://{endpoint}").hostname or endpoint
+        return {
+            "id": f"api:{host}",
+            "label": f"API（{host}）",
+            "credential": "对应 API Key",
+            "endpoint": host,
+        }
+    return {
+        "id": "unknown-api",
+        "label": "未识别的 API",
+        "credential": "对应 API Key（请查看日志中的供应商标记）",
+    }
+
+
+def _open_quota_circuit(
+    db: sqlite3.Connection,
+    job_id: str,
+    provider: dict[str, str],
+) -> tuple[bool, int]:
+    """Open one provider incident and pause work without duplicate alerts."""
+    now = _now()
+    db.execute(
+        """INSERT INTO quota_circuits(
+             provider,label,credential,endpoint,status,primary_job_id,opened_at,updated_at
+           ) VALUES(?,?,?,?, 'open',?,?,?)
+           ON CONFLICT(provider) DO UPDATE SET
+             label=excluded.label,
+             credential=excluded.credential,
+             endpoint=excluded.endpoint,
+             status='open',
+             primary_job_id=excluded.primary_job_id,
+             opened_at=excluded.opened_at,
+             closed_at=NULL,
+             updated_at=excluded.updated_at
+           WHERE quota_circuits.status<>'open'""",
+        (
+            provider["id"],
+            provider["label"],
+            provider["credential"],
+            provider.get("endpoint"),
+            job_id,
+            now,
+            now,
+        ),
+    )
+    incident = db.execute(
+        "SELECT primary_job_id FROM quota_circuits WHERE provider=? AND status='open'",
+        (provider["id"],),
+    ).fetchone()
+    is_primary = bool(incident and incident["primary_job_id"] == job_id)
+    paused = db.execute(
+        """UPDATE jobs SET status='quota_wait',quota_provider=?,updated_at=?
+           WHERE status IN ('queued','retry_wait') AND cancel_requested=0 AND id<>?""",
+        (provider["id"], now, job_id),
+    ).rowcount
+    return is_primary, paused
+
+
+def _resume_quota_circuit(db: sqlite3.Connection, provider: str) -> int:
+    """Close one incident and resume every checkpoint-preserving paused job."""
+    now = _now()
+    db.execute(
+        """UPDATE quota_circuits SET status='closed',closed_at=?,updated_at=?
+           WHERE provider=? AND status='open'""",
+        (now, now, provider),
+    )
+    next_circuit = db.execute(
+        """SELECT provider FROM quota_circuits
+           WHERE status='open' ORDER BY opened_at LIMIT 1"""
+    ).fetchone()
+    if next_circuit:
+        db.execute(
+            """UPDATE jobs SET status='quota_wait',quota_provider=?,updated_at=?
+               WHERE quota_provider=? AND status IN ('quota_wait','needs_attention','failed')""",
+            (next_circuit["provider"], now, provider),
+        )
+        return 0
+    return db.execute(
+        """UPDATE jobs SET status='queued',available_at=?,cancel_requested=0,
+                  last_error=NULL,finished_at=NULL,result_json=NULL,
+                  quota_provider=NULL,updated_at=?
+           WHERE quota_provider=? AND status IN ('quota_wait','needs_attention','failed')""",
+        (now, now, provider),
+    ).rowcount
+
+
+def retry_job(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+    """Retry one job and, when applicable, release its provider circuit."""
+    provider = row["quota_provider"]
+    resumed = _resume_quota_circuit(db, provider) if provider else 0
+    remaining_circuit = db.execute(
+        """SELECT provider FROM quota_circuits
+           WHERE status='open' ORDER BY opened_at LIMIT 1"""
+    ).fetchone()
+    next_provider = remaining_circuit["provider"] if remaining_circuit else None
+    status = "quota_wait" if next_provider else "queued"
+    db.execute(
+        """UPDATE jobs SET status=?,available_at=?,cancel_requested=0,
+                  last_error=NULL,finished_at=NULL,result_json=NULL,
+                  quota_provider=?,updated_at=? WHERE id=?""",
+        (status, _now(), next_provider, _now(), row["id"]),
+    )
+    _event(
+        db,
+        row["id"],
+        "job.retried",
+        quotaProvider=provider,
+        resumedJobs=resumed,
+    )
+    return {
+        "retried": row["id"],
+        "status": status,
+        "quotaProvider": provider,
+        "resumedJobs": resumed,
+    }
 
 
 def classify_failure(text: str) -> str:
@@ -595,6 +784,9 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
     tail = log_path.read_text(encoding="utf-8", errors="replace")[-12000:]
     with connect() as db:
         cancelled = db.execute("SELECT cancel_requested,max_attempts FROM jobs WHERE id=?", (job_id,)).fetchone()
+        quota_provider: dict[str, str] | None = None
+        quota_primary = False
+        quota_paused = 0
         if cancelled and cancelled["cancel_requested"]:
             status, error_class, available = "cancelled", "cancelled", _now()
         elif code == 0:
@@ -604,7 +796,14 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
             retry_limit = int(cancelled["max_attempts"])
             if checkpoint_safe_content_retry(tail):
                 retry_limit += 3
-            if error_class == "retryable" and attempt < retry_limit:
+            if error_class == "quota_exhausted":
+                quota_provider = identify_quota_provider(tail)
+                quota_primary, quota_paused = _open_quota_circuit(
+                    db, job_id, quota_provider
+                )
+                status = "needs_attention" if quota_primary else "quota_wait"
+                available = _now()
+            elif error_class == "retryable" and attempt < retry_limit:
                 delays = (30, 120, 600)
                 delay = delays[min(attempt - 1, len(delays) - 1)]
                 status = "retry_wait"
@@ -616,6 +815,7 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
         db.execute(
             """UPDATE jobs SET status=?,available_at=?,lease_owner=NULL,lease_expires_at=NULL,
                last_error=?,finished_at=?,updated_at=?,result_json=?,
+               quota_provider=?,
                current_stage=CASE WHEN ?='succeeded' THEN 'complete' ELSE current_stage END
                WHERE id=?""",
             (
@@ -625,6 +825,7 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                 _now() if status in TERMINAL | {"needs_attention"} else None,
                 _now(),
                 json.dumps(completion_result, ensure_ascii=False) if completion_result is not None else None,
+                quota_provider["id"] if quota_provider else None,
                 status,
                 job_id,
             ),
@@ -638,11 +839,14 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
             db,
             job_id,
             "attempt.finished",
-            notify=status in {"succeeded", "failed", "needs_attention", "cancelled"},
+            notify=status in {"succeeded", "failed", "needs_attention", "cancelled"}
+            and (error_class != "quota_exhausted" or quota_primary),
             attempt=attempt,
             status=status,
             exitCode=code,
             errorClass=error_class,
+            quotaProvider=quota_provider,
+            pausedJobs=quota_paused,
         )
 
 
@@ -805,10 +1009,11 @@ def jobs_cli(argv: list[str]) -> int:
                 return 1
             print("\n".join(path.read_text(encoding="utf-8", errors="replace").splitlines()[-args.tail:]))
         elif args.command == "retry":
-            db.execute("UPDATE jobs SET status='queued',available_at=?,cancel_requested=0,last_error=NULL,finished_at=NULL,result_json=NULL,updated_at=? WHERE id=?", (_now(), _now(), args.job_id))
-            _event(db, args.job_id, "job.retried")
+            result = retry_job(db, row)
+            if result["quotaProvider"]:
+                print(json.dumps(result, ensure_ascii=False))
         elif args.command == "cancel":
-            db.execute("UPDATE jobs SET cancel_requested=1,status=CASE WHEN status IN ('queued','retry_wait','needs_attention') THEN 'cancelled' ELSE status END,updated_at=? WHERE id=?", (_now(), args.job_id))
+            db.execute("UPDATE jobs SET cancel_requested=1,status=CASE WHEN status IN ('queued','retry_wait','quota_wait','needs_attention') THEN 'cancelled' ELSE status END,updated_at=? WHERE id=?", (_now(), args.job_id))
             cancelled = db.execute("SELECT status FROM jobs WHERE id=?", (args.job_id,)).fetchone()
             _event(
                 db,

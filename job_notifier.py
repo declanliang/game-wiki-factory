@@ -48,8 +48,24 @@ def notification_message(item: dict[str, Any]) -> str:
     elif status in {"needs_attention", "failed"}:
         error_class = str((item.get("detail") or {}).get("errorClass") or "")
         if error_class == "quota_exhausted":
-            lines.append("原因：API 额度或账户余额不足。任务已立即停止，且不会自动重试付费阶段。")
-            lines.append("处理：请立即充值或更换对应 API Key；完成后重试同一 Job ID 以复用 checkpoint。")
+            detail = item.get("detail") or {}
+            provider = detail.get("quotaProvider") or {}
+            label = provider.get("label") or "未识别的 API"
+            endpoint = provider.get("endpoint")
+            credential = provider.get("credential") or "对应 API Key"
+            api_name = f"{label}（{endpoint}）" if endpoint else label
+            paused = int(detail.get("pausedJobs") or 0)
+            lines.append(f"API：{api_name}")
+            lines.append(f"凭据组：{credential}")
+            lines.append("原因：该 API 额度或账户余额不足，已触发全局额度熔断。")
+            lines.append(
+                f"队列：已暂停 {paused} 个尚未开始或等待重试的任务；"
+                "同一熔断下不再逐任务发送额度告警。"
+            )
+            lines.append(
+                "处理：充值或更换上述凭据后，重试本条 Job ID；"
+                "系统会复用 checkpoint，并自动恢复该熔断暂停的任务。"
+            )
         else:
             lines.append("处理：已停止自动推进，请把此 Job ID 交给 Codex/基础设施维护者。")
         if item.get("log_path"):

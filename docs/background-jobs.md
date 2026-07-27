@@ -39,8 +39,9 @@ gamewiki.py jobs submit/status/logs/retry/cancel
 - `running`：已获得 lease，后台进程运行中。
 - `retry_wait`：可重试错误，等待 `available_at`。
 - `needs_attention`：身份歧义、配置、余额、权限、schema/代码等不能安全自动处理的问题。
+- `quota_wait`：某个共享 API 已触发额度熔断；任务保留原 Job ID 和 checkpoint，等待运营者恢复凭据后统一续跑。
 
-API quota/credit/balance 耗尽会记录为 `quota_exhausted` 原因并立即进入 `needs_attention`：不消费普通重试次数、不由 Supervisor 恢复，Notifier 首条消息会明确要求充值或更换 key。恢复后只重试同一 Job ID，以复用已经落盘的 checkpoint。
+API quota/credit/balance 耗尽会记录为 `quota_exhausted`，并按供应商打开全局额度熔断。首条通知必须明确 API 名称、非敏感凭据组（例如 `LLM_API_KEY_1..N`）和安全端点域名；队列中尚未开始或等待重试的任务统一进入 `quota_wait`，同一熔断下不再逐任务告警。已经并发运行的任务若随后遇到相同额度错误，也归入该熔断而不生成第二条通知。充值或更换对应凭据后，只重试首条通知中的原 Job ID；CLI 会关闭该供应商熔断并统一恢复暂停任务，所有任务继续复用已经落盘的 checkpoint。
 
 ## 事件驱动自动恢复
 
@@ -75,7 +76,7 @@ Supervisor 在磁盘达到暂停阈值时不会恢复任务。
 - `failed`：已超过自动重试上限。
 - `cancelled`：操作员取消；Worker 在安全边界终止。
 
-Worker 启动时会回收过期 lease。网络、429、5xx、连接重置等瞬时错误按 30 秒、120 秒、600 秒退避；身份歧义、认证/余额、配置、内容契约和构建代码错误进入 `needs_attention`，避免无意义重复付费。
+Worker 启动时会回收过期 lease。网络、429、5xx、连接重置等瞬时错误按 30 秒、120 秒、600 秒退避；身份歧义、认证、配置、内容契约和构建代码错误进入 `needs_attention`。余额/额度不足由供应商级熔断接管，其他任务进入 `quota_wait`，避免无意义重复付费和重复告警。
 
 终态 `succeeded`、`failed`、`needs_attention`、`cancelled` 会原子写入 notification outbox。读取不等于送达，只有渠道成功发送后才能 acknowledge，因此轮询和 Agent 重启不会造成消息永久丢失：
 

@@ -68,7 +68,7 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 今后所有游戏都按新项目从空 workspace 开始生产，不再接受旧站 `rebuild` 输入。失败恢复只重试原 Job 并复用它自己的 checkpoint。完整状态机、服务器和 OpenClaw 说明见 [docs/background-jobs.md](docs/background-jobs.md)。
 
-成功、最终失败、取消和 `needs_attention` 会进入持久化通知 outbox；渠道成功送达后再用 `jobs notifications --ack ...` 确认。Agent 只负责队列控制和 runbook 内的常规恢复，任何核心代码或生产逻辑问题必须升级给 Codex/基础设施维护者，禁止直接热修服务器工作树。
+成功、最终失败、取消和 `needs_attention` 会进入持久化通知 outbox；渠道成功送达后再用 `jobs notifications --ack ...` 确认。共享 API 余额不足时，Factory 会在首条告警中标明供应商、端点和凭据组，并把其余任务放入 `quota_wait`，不再逐任务告警；充值后重试首条 Job 即可统一续跑。Agent 只负责队列控制和 runbook 内的常规恢复，任何核心代码或生产逻辑问题必须升级给 Codex/基础设施维护者，禁止直接热修服务器工作树。
 
 服务器可通过 `GAMEWIKI_NOTIFICATION_COMMAND_JSON` 配置渠道发送命令，并定时执行 `gamewiki.py notifier --once`。Dispatcher 只在发送命令返回成功后确认消息；发送失败会保留并指数退避，不需要让聊天 Agent 常驻或反复消耗 LLM。
 

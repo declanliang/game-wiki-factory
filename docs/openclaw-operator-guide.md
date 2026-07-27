@@ -86,7 +86,7 @@ Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status
 
 完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Pages project/deployment URL、hosting 状态，以及是否只剩域名绑定/DNS。只有 `complete` 才能声称对应 origin 已线上验证。
 
-`needs_attention` 固定汇报：第一个失败阶段、根因、日志路径、是否需要用户动作、是否会重复 API 成本。网络/429/5xx 由 Worker 有界重试；不要创建第二个同游戏任务。用户修复密钥、余额、DNS 或权限后，重试原 job，复用 checkpoint。
+`needs_attention` 固定汇报：第一个失败阶段、根因、日志路径、是否需要用户动作、是否会重复 API 成本。额度告警还必须逐字保留 Factory 返回的 API 名称、凭据组、端点和熔断暂停数量，不能笼统改写成“某个 API”。同一供应商熔断只通知一次，`quota_wait` 任务不单独上报。用户充值或更换对应凭据后，重试首条告警的原 Job；Factory 会关闭熔断、统一恢复暂停任务并复用 checkpoint。网络/429/5xx 由 Worker 有界重试；不要创建第二个同游戏任务。
 
 ## 状态变化通知
 
