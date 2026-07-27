@@ -138,6 +138,9 @@ for (const locale of localeDirs) {
     if (/(?:&|\b(?:and|or|with|for|to|vs\.?|und|oder|mit|für|y|o|con|para|et|ou|avec|pour))\s*$/i.test(title)) {
       fail(`${rel}：title 以未完成的连接词结尾，应在发布前压缩为完整短语`);
     }
+    if (/(?:&|\b(?:and|or|with|for|to|the|a|an|in|on|at|of|from|into|this|that|your|our))\s*[.!?]?\s*$/i.test(description)) {
+      fail(`${rel}：description 以未完成的虚词结尾，应在发布前压缩为完整句子`);
+    }
 
     const categoryMatch = metaBody.match(/category:\s*(["'`])(.+?)\1/);
     if (categoryMatch) {

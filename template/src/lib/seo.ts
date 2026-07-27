@@ -6,7 +6,7 @@ import type en from "@/locales/en.json";
 type Messages = typeof en;
 
 const DANGLING_CONNECTOR_RE =
-  /\s+(?:&|and|or|with|for|to|vs\.?|und|oder|mit|für|y|o|con|para|et|ou|avec|pour)$/i;
+  /\s+(?:&|and|or|with|for|to|vs\.?|the|a|an|in|on|at|of|from|into|this|that|your|our|und|oder|mit|für|y|o|con|para|et|ou|avec|pour)$/i;
 
 function metadataLimit(locale: string, kind: "title" | "description"): number {
   const cjk = locale === "ja" || locale === "ko" || locale === "zh";
@@ -14,19 +14,21 @@ function metadataLimit(locale: string, kind: "title" | "description"): number {
   return cjk ? 90 : 160;
 }
 
-function compactMetadataText(value: string, limit: number, locale: string): string {
+function compactMetadataText(value: string, limit: number, locale: string, sentence = false): string {
   const normalized = value.replace(/\s+/g, " ").trim();
-  if (normalized.length <= limit) return normalized;
   const cjk = locale === "ja" || locale === "ko" || locale === "zh";
-  let candidate = normalized.slice(0, limit);
-  if (!cjk && candidate.includes(" ")) {
+  let candidate = normalized.length > limit ? normalized.slice(0, limit) : normalized;
+  if (normalized.length > limit && !cjk && candidate.includes(" ")) {
     candidate = candidate.replace(/\s+\S*$/, "");
   }
-  candidate = candidate
-    .replace(DANGLING_CONNECTOR_RE, "")
-    .replace(/[\s,;:–—&-]+$/u, "")
-    .trim();
-  return candidate || normalized.slice(0, limit).trim();
+  let cleaned = (sentence ? candidate.replace(/[.!?]+$/u, "") : candidate).trim();
+  while (DANGLING_CONNECTOR_RE.test(cleaned)) {
+    cleaned = cleaned.replace(DANGLING_CONNECTOR_RE, "").trim();
+  }
+  cleaned = cleaned.replace(/[\s,;:–—&-]+$/u, "").trim();
+  if (!cleaned) return normalized.slice(0, limit).trim();
+  if (sentence && (cleaned !== normalized || /[.!?]$/u.test(normalized))) return `${cleaned}.`;
+  return cleaned;
 }
 
 /** Last-mile guard for metadata produced by upstream content stages. */
@@ -35,7 +37,7 @@ export function normalizeMetadataTitle(value: string, locale: string): string {
 }
 
 export function normalizeMetadataDescription(value: string, locale: string): string {
-  return compactMetadataText(value, metadataLimit(locale, "description"), locale);
+  return compactMetadataText(value, metadataLimit(locale, "description"), locale, true);
 }
 
 export function buildCategoryMetadataTitle(
