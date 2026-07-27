@@ -837,6 +837,20 @@ def main(argv: list[str] | None = None) -> int:
                 run_log_path=run_log_path,
             )
             basic_output = basic_root / slug
+            if not basic_output.is_dir():
+                # Steam's evidence-backed canonical title can be longer than the
+                # submitted project name, so Basic Info may publish under a
+                # different slug. Resolve the single validated output produced
+                # in this per-project state directory instead of assuming the
+                # request slug is also the canonical title slug.
+                candidates = [
+                    candidate for candidate in basic_root.iterdir()
+                    if candidate.is_dir()
+                    and candidate.name != ".cache"
+                    and (candidate / "template-intake" / "site-identity.json").is_file()
+                ]
+                if len(candidates) == 1:
+                    basic_output = candidates[0]
             record("basic", "generated", output=str(basic_output))
 
         basic_intake, identity, languages = validate_basic_output(basic_output)

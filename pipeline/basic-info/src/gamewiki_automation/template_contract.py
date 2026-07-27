@@ -4,6 +4,7 @@ import argparse
 import json
 import re
 import shutil
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -241,7 +242,9 @@ def validate_localized_site_content(
                 "TEMPLATE_LOCALE_IMMUTABLE_MISMATCH", f"{prefix}.{path}",
                 "href/category identifiers must exactly match site-content.json.",
             ))
-        if name and name in english_value and name not in localized_value:
+        normalized_name = unicodedata.normalize("NFKC", name)
+        normalized_localized_value = unicodedata.normalize("NFKC", localized_value)
+        if name and name in english_value and normalized_name not in normalized_localized_value:
             errors.append(_error(
                 "TEMPLATE_LOCALE_GAME_NAME", f"{prefix}.{path}",
                 "The canonical game name must not be translated or removed.",
