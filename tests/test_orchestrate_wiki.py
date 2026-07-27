@@ -48,6 +48,30 @@ class OrchestratorTests(unittest.TestCase):
                 orchestrator.should_stamp_factory_release(project, True, "v1_0722")
             )
 
+    def test_new_job_resume_keeps_manifest_release_before_intake_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            (project / ".gamewiki").mkdir()
+            (project / ".gamewiki" / "manifest.json").write_text(
+                json.dumps({"factoryRelease": "v1_0722"}),
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                orchestrator.should_stamp_factory_release(project, True, "v1_0722")
+            )
+
+    def test_legacy_manifest_without_release_remains_uncertified(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            (project / ".gamewiki").mkdir()
+            (project / ".gamewiki" / "manifest.json").write_text(
+                json.dumps({"status": "failed"}),
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                orchestrator.should_stamp_factory_release(project, True, "v1_0722")
+            )
+
     def test_template_sync_removes_obsolete_root_redirect(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

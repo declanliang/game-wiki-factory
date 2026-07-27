@@ -95,18 +95,33 @@ def should_stamp_factory_release(
     *,
     force: bool = False,
 ) -> bool:
-    """Certify only new/full rebuilds or an already-certified resume."""
+    """Certify only new/forced runs or a resume with persisted certification.
+
+    A new project records its release intent in the manifest before any paid
+    stages run.  If that first attempt fails before intake is materialized, the
+    next attempt must honor the manifest record; requiring only the final
+    intake stamp would incorrectly turn a checkpoint-safe new job into an
+    uncertified legacy resume.
+    """
     if force:
         return True
     if not is_resume:
         return True
-    stamp = project_dir / "intake" / "factory-release.json"
-    if not stamp.is_file():
-        return False
-    try:
-        return str(read_json(stamp).get("release") or "").strip() == release
-    except PipelineError:
-        return False
+    candidates = (
+        project_dir / "intake" / "factory-release.json",
+        project_dir / ".gamewiki" / "manifest.json",
+    )
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        try:
+            field = "factoryRelease" if candidate.name == "manifest.json" else "release"
+            stamped = str(read_json(candidate).get(field) or "").strip()
+            if stamped == release:
+                return True
+        except PipelineError:
+            continue
+    return False
 
 
 def parse_dotenv(path: Path) -> dict[str, str]:
