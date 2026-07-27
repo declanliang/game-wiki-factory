@@ -11,7 +11,7 @@ Copy-Item jobs\example.json jobs\my-game.json
 python gamewiki.py --config jobs\my-game.json
 ```
 
-配置文件必须明确 `game`、`platform` 和已知的 `officialUrl`；Steam 使用 Store App URL，Roblox 使用 Experience URL。`publish: true` 会完成本地生产验收、Private GitHub 和 Cloudflare Pages Direct Upload。真实 `jobs/*.json`、配置快照和日志都被 Git 忽略。
+配置文件必须明确 `game`、`platform` 和已知的 `officialUrl`；Steam 使用 Store App URL，Roblox 使用 Experience URL。`publish: true` 会完成本地生产验收、Private GitHub 和 Git-integrated Cloudflare Pages。真实 `jobs/*.json`、配置快照和日志都被 Git 忽略。
 
 直接参数模式仍可用于调试：
 
@@ -54,9 +54,11 @@ python gamewiki.py publish <slug>
 
 每个新游戏创建自己的 Private GitHub repo。GitHub integration 未授权读取 Private repo 时，完成授权后重复同一命令。Actions 中运行 `Generate and publish game wikis`，`games_json` 输入合法 JSON 数组，例如 `["Game A", "Game B"]`。
 
-后台默认不跳过 Cloudflare。发布器创建或复用同名 Direct Upload 项目，设置 Production `NEXT_PUBLIC_SITE_URL`，用该 origin 重新构建，上传 `out` 与 Pages Functions，并按本次 Git commit 轮询部署结果。未给 `siteUrl` 时使用 `pages.dev` 并自动运行线上验收，回执为 `hosting.status=complete`。
+后台默认不跳过 Cloudflare。发布器在 Private GitHub `main` 推送成功后，创建或复用同名且 source 严格匹配的 Git-integrated Pages 项目，设置 Production `NEXT_PUBLIC_SITE_URL`，触发 Cloudflare 从 `main` 执行 `npm run build`、发布 `out` 与 Pages Functions，并按 deployment ID 和本次 Git commit 轮询。未给 `siteUrl` 时使用 `pages.dev` 并自动运行线上验收，回执为 `hosting.status=complete`。
 
-给出正式域名但域名尚未指向项目时，部署仍成功，回执为 `hosting.status=awaiting_domain_configuration`。运营者只需在该 Pages 项目绑定自定义域名并配置 DNS；不要新建另一个 Git-integrated 项目。域名生效后在游戏根运行 `npm run verify:deploy`，检查根路径 301 到 `/en`、metadata/canonical、sitemap、robots 和全部 loc/hreflang 直接 200。完整输出保存在 `.gamewiki/deploy-verification.log`。
+给出正式域名但域名尚未指向项目时，部署仍成功，回执为 `hosting.status=awaiting_domain_configuration`。运营者只需在该 Pages 项目绑定自定义域名并配置 DNS；不要新建另一个项目。域名生效后在游戏根运行 `npm run verify:deploy`，检查根路径 301 到 `/en`、metadata/canonical、sitemap、robots 和全部 loc/hreflang 直接 200。完整输出保存在 `.gamewiki/deploy-verification.log`。
+
+Cloudflare Workers & Pages GitHub App 必须能读取 Factory 新建的 Private repo。无人值守账号建议授权 `All repositories`；若只授权选定仓库，新 repo 会以明确的 GitHub App authorization 错误停止，修正授权后重试原 Job。发布器不会把 Git 授权失败降级为 Direct Upload，也不会自动转换或删除已有 Direct Upload 项目。
 
 ## 排查顺序
 

@@ -71,34 +71,33 @@ Next.js 的这两个元数据文件默认按需动态生成，静态导出要求
 - **图片不再走 Next.js 图片优化服务**（`images.unoptimized: true`），因为那个服务本身需要一个运行中的 server。原图需要自己保证是合理尺寸/格式（webp 等），否则会比之前多传一些字节。如果流量对图片体积敏感，后续可以考虑用 Cloudflare Images 或构建时脚本预压缩。
 - **英文 URL 从裸路径变成 `/en/...` 前缀**，是这套改动里唯一真正改变对外行为的地方；老站点迁移时已用 `_redirects` 做 301 兜底，仍建议观察 Search Console 收录情况。全新站点没有这个负担。
 
-## 部署步骤（Cloudflare Dashboard，手动操作）
+## Factory 自动部署步骤
 
-> 约定：Cloudflare Pages 项目的创建、Git 集成授权（GitHub App 安装）、环境变量填写、自定义域名绑定，这几步都必须在 Dashboard 里手动完成——Cloudflare 的 API Token 走不通 GitHub OAuth 集成这一步，所以不用 API/CLI 自动化创建 Git 集成型项目。
+Cloudflare Workers & Pages GitHub App 需要预先安装在目标 GitHub 账号，并能读取 Factory 未来创建的 Private repo。无人值守账号建议授权 `All repositories`；若只授权选定仓库，新 repo 需要先加入授权范围。
 
-1. **Cloudflare Dashboard → Workers & Pages → Create → Pages → Connect to Git**，选对应仓库，部署分支选该站点用于 Cloudflare Pages 的分支（如果同一个站点还在用 Vercel，注意不要选到 Vercel 用的 `output: "standalone"` 分支）。
-2. **构建配置**：
-   - Build command: `npm run build`
-   - Build output directory: `out`
-   - Root directory: 留空
-3. **环境变量**（Settings → Environment variables）：
-   - `NEXT_PUBLIC_SITE_URL`
-   - `NEXT_PUBLIC_GOOGLE_ANALYTICS_ID` / `NEXT_PUBLIC_MICROSOFT_CLARITY_ID` / `NEXT_PUBLIC_GOOGLE_ADSENSE_ID`（如果用）
-   - `AD_*_B64`（或 `AD_*`）系列——广告 snippet，建议标记为 Secret 类型，因为 `functions/api/ads/[format].ts` 会读取它们
-   - 如果站点之前部署在 Vercel，以上变量可以从 Vercel 项目逐条复制过来
-4. **首次部署完成后**，用 Cloudflare 分配的 `*.pages.dev` 临时域名验证：
+Factory 在本地生产验收完成后：
+
+1. 创建并验证 Private GitHub repo，把完整站点推送到 `main`。
+2. 通过 Pages API 创建 Git-integrated 项目，source 指向该 repo 的 `main`。
+3. 显式设置 Build command `npm run build`、Build output directory `out`、Root directory 为空。
+4. 设置 Production `NEXT_PUBLIC_SITE_URL`。未提供正式域名时使用 Pages 返回的实际 `pages.dev` origin。
+5. 调用部署 API从 `main` 触发首次 Cloudflare 服务端构建；后续 `main` push 自动构建。
+6. 按 deployment ID 轮询，并验证部署 commit 与刚推送的 Git commit 一致。
+7. 用 Cloudflare 分配的 `*.pages.dev` 或已经可达的正式域名验证：
    - 确认 `/` 返回 301 且 `Location` 为 `/en`
    - 抽查几个页面：首页、任意一个非默认语言页面、任意一个内容分类页面
    - 确认样式/脚本正常加载（打开一次浏览器 DevTools Network 面板，看有没有 301/404 的 `_next/static/*` 请求——如果有，大概率是 `_redirects` 规则又把资源路径误伤了）
    - 测试广告接口：`/api/ads/<format>` 等，确认返回正确 HTML 且响应头带 `Cache-Control: private, no-store`
    - 检查 `/sitemap.xml`、`/robots.txt`
-5. **确认没问题后再接自定义域名**——这一步涉及 DNS，约定由人工在 Cloudflare 里操作，AI 不直接改 DNS 记录。
-6. 如果是从 Vercel 迁移，旧的 Vercel 项目先不要立刻下线，观察 Cloudflare Pages 跑稳（收录、广告展示都正常）一段时间后再决定。
+8. **确认没问题后再接自定义域名**——这一步涉及 DNS，约定由人工在 Cloudflare 里操作，AI 不直接改 DNS 记录。
+
+新任务不会静默回退到 Direct Upload。同名项目若是 Direct Upload、连接到其他 Git repo 或 build config 不匹配，Factory 会阻断并要求人工核对，不会自动删除、转换或接管。
 
 ## 环境变量与 Vercel 的对应关系
 
 变量名和值可以沿用 Vercel，但作用阶段要分清：
 
-- `NEXT_PUBLIC_SITE_URL`、Analytics、Clarity、AdSense 等 `NEXT_PUBLIC_*` 是构建时公开变量，必须配置在 Pages Production（需要预览时也配置 Preview）。它们会写入静态 HTML，修改后必须重新部署。
+- `NEXT_PUBLIC_SITE_URL`、Analytics、Clarity、AdSense 等 `NEXT_PUBLIC_*` 是构建时公开变量，必须配置在 Pages Production。它们会写入静态 HTML，修改后必须重新触发 Git deployment。Factory 默认关闭 Preview 自动部署，避免预览环境产生错误 canonical。
 - `AD_*_B64`（或 `AD_*`）名称和值与 Vercel 相同，但应作为 Pages Production Secret；`functions/api/ads/[format].ts` 通过 `context.env` 在运行时读取。
 - Vercel 自动注入的 `VERCEL_*` 变量不迁移，也不应成为站点配置依赖。
 
@@ -106,9 +105,11 @@ Factory 模板检测到 `CF_PAGES=1` 时，会拒绝缺失或仍指向 `example.
 
 ## API 与权限边界
 
-Cloudflare Pages REST API 支持创建/配置项目、查询和触发构建、创建/查询/删除部署；自定义 API token 至少需要 Account → Cloudflare Pages → Edit。Direct Upload 可用 API 或 `wrangler pages deploy out` 自动部署，且会上传项目根的 `functions/`。
+Cloudflare Pages REST API 支持在创建项目时带 GitHub `source`、配置 build/deployment、查询和触发部署；自定义 API token 至少需要 Account → Cloudflare Pages → Edit。普通 Pages API token 不能代替 GitHub App 安装或扩大它的 repo 访问范围，但在 App 已授权目标 repo 后，可以纯 API 创建 Git-integrated 项目。
 
-Git 集成首次仍依赖 Cloudflare Workers & Pages GitHub App 的 OAuth 授权和仓库访问范围；普通 Pages API token 不能代替 GitHub App 安装。Git 集成项目建好后可以继续由 Git push 自动构建，也可以关闭自动构建后用 Wrangler 部署，但项目不能在 Git integration 与 Direct Upload 两种模式之间原地转换。
+Git-integrated 与 Direct Upload 不能原地互转。Factory 只为未来新站创建 Git-integrated 项目；历史 Direct Upload 项目保持不变。
+
+Pages 的 Production `env_vars` 更新可能是整组替换。Factory 只拥有 `NEXT_PUBLIC_SITE_URL`：值已匹配时不 PATCH；若需要改变且项目中已有其他变量，则停止并交给专门环境变量 Agent 合并，避免破坏不可读取的 `secret_text`。
 
 ## 本地验证命令
 
@@ -120,6 +121,4 @@ npx tsc --noEmit
 npx tsc --noEmit -p functions/tsconfig.json   # 单独 typecheck Cloudflare Pages Function
 ```
 
-Factory 不包含广告任务、转换器或环境变量写入逻辑。独立广告 Agent 按 Factory 的 `docs/adsterra-environment-contract.md` 把 `AD_*_B64` 写入 Pages Production；不要复用旧 Vercel 自动化。
-
-`wrangler pages deploy out --project-name <项目名>` 可以在本地直接把 `out/` 上传部署（Direct Upload 方式），不依赖 GitHub 集成，适合快速验证，但线上长期使用建议走 Dashboard 的 Git 集成（push 自动触发构建部署），不建议把 `wrangler deploy` 做成自动化脚本长期跑——避免绕过人工确认这一步。
+Factory 不包含广告任务、转换器或广告环境变量写入逻辑。独立广告 Agent 按 Factory 的 `docs/adsterra-environment-contract.md` 合并 `AD_*_B64` 到 Pages Production，再调用部署 API从 `main` 重建；不要复用旧 Vercel 自动化。

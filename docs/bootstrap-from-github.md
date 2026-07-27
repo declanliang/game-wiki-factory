@@ -102,7 +102,7 @@ sudo systemctl list-timers 'gamewiki-*'
 df -h / /srv/game-wiki-factory
 ```
 
-在服务器执行根测试，再提交一个 `publish: false` 的测试游戏冒烟任务。另用临时 Pages 项目验证 API 权限、环境变量最小更新、Direct Upload 和线上 canonical/sitemap/robots/hreflang；测试项目验证后删除。正式自定义域名绑定/DNS仍是运营步骤。
+在服务器执行根测试，再提交一个 `publish: false` 的测试游戏冒烟任务。另用临时 Private repo 和 Git-integrated Pages 项目验证 GitHub App repo 授权、API 权限、Production 环境变量、Cloudflare 服务端构建和线上 canonical/sitemap/robots/hreflang；测试资源验证后删除。正式自定义域名绑定/DNS仍是运营步骤。
 
 ## 更新、回滚与全损恢复
 

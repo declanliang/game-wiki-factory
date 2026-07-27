@@ -4,22 +4,27 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from publisher import (
+    _cloudflare_create_git_deployment,
     _cloudflare_credentials,
+    _cloudflare_git_project_payload,
     _deploy_cloudflare_pages,
     _deploy_with_vercel_cli,
     _ensure_cloudflare_project,
     _ensure_private_github_repo,
     _remove_vercel_oidc_env,
     _replace_remote_main,
+    _resolve_cloudflare_project,
     _resolve_git_author,
     _set_cloudflare_site_url,
+    _validate_cloudflare_git_project,
     _set_vercel_site_url,
     _validate_project,
     _vercel_project_payload,
     _verify_online_deployment,
+    _wait_cloudflare_deployment,
 )
 
 
@@ -42,25 +47,139 @@ class PublisherValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "requires CLOUDFLARE_ACCOUNT_ID"):
             _cloudflare_credentials({})
 
+    def _git_project(self, **overrides) -> dict:
+        project = {
+            "id": "project-id",
+            "name": "game",
+            "subdomain": "game.pages.dev",
+            "source": {
+                "type": "github",
+                "config": {
+                    "owner": "owner",
+                    "repo_name": "game",
+                    "production_branch": "main",
+                },
+            },
+            "build_config": {
+                "build_command": "npm run build",
+                "destination_dir": "out",
+                "root_dir": "",
+            },
+            "deployment_configs": {
+                "production": {
+                    "env_vars": {},
+                },
+            },
+        }
+        project.update(overrides)
+        return project
+
+    def test_cloudflare_git_project_payload_is_buildable_and_main_only(self) -> None:
+        payload = _cloudflare_git_project_payload("game", "owner/game")
+        self.assertEqual(payload["source"]["type"], "github")
+        self.assertEqual(payload["source"]["config"]["owner"], "owner")
+        self.assertEqual(payload["source"]["config"]["repo_name"], "game")
+        self.assertTrue(payload["source"]["config"]["production_deployments_enabled"])
+        self.assertEqual(payload["source"]["config"]["preview_deployment_setting"], "none")
+        self.assertEqual(payload["build_config"], {
+            "build_command": "npm run build",
+            "destination_dir": "out",
+            "root_dir": "",
+        })
+
+    @patch("publisher.urllib.request.urlopen")
+    def test_cloudflare_git_deployment_uses_multipart_branch(self, urlopen) -> None:
+        response = MagicMock()
+        response.__enter__.return_value.read.return_value = json.dumps({
+            "success": True,
+            "result": {"id": "deployment-id"},
+        }).encode("utf-8")
+        urlopen.return_value = response
+
+        deployment = _cloudflare_create_git_deployment(
+            "account",
+            "hidden-token",
+            "game",
+        )
+
+        self.assertEqual(deployment["id"], "deployment-id")
+        request = urlopen.call_args.args[0]
+        self.assertIn("multipart/form-data", request.headers["Content-type"])
+        self.assertIn(b'name="branch"', request.data)
+        self.assertIn(b"main", request.data)
+        self.assertNotIn("hidden-token", request.full_url)
+        self.assertNotIn(b"hidden-token", request.data)
+
     @patch("publisher._cloudflare_request")
-    def test_cloudflare_project_creation_is_direct_upload(self, request) -> None:
+    def test_cloudflare_project_creation_is_git_integrated(self, request) -> None:
         request.side_effect = [
             RuntimeError("HTTP 404 from project"),
-            {"id": "project-id", "name": "game", "source": None},
+            self._git_project(),
         ]
-        project = _ensure_cloudflare_project("account", "token", "game")
-        self.assertEqual(project["id"], "project-id")
-        self.assertEqual(request.call_args_list[1].args[0], "POST")
-        self.assertEqual(
-            request.call_args_list[1].args[4],
-            {"name": "game", "production_branch": "main"},
+        project, created = _ensure_cloudflare_project(
+            "account", "token", "game", "owner/game"
         )
+        self.assertEqual(project["id"], "project-id")
+        self.assertTrue(created)
+        self.assertEqual(request.call_args_list[1].args[0], "POST")
+        payload = request.call_args_list[1].args[4]
+        self.assertEqual(payload["source"]["config"]["repo_name"], "game")
+        self.assertEqual(payload["build_config"]["destination_dir"], "out")
+
+    def test_direct_upload_project_is_never_reused_or_converted(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "Direct Upload"):
+            _validate_cloudflare_git_project(
+                {"name": "game", "source": None},
+                "owner/game",
+            )
+
+    def test_git_project_must_match_repository_and_build_contract(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "different Git source"):
+            _validate_cloudflare_git_project(
+                self._git_project(source={
+                    "type": "github",
+                    "config": {
+                        "owner": "other",
+                        "repo_name": "game",
+                        "production_branch": "main",
+                    },
+                }),
+                "owner/game",
+            )
+        with self.assertRaisesRegex(RuntimeError, "incompatible build"):
+            _validate_cloudflare_git_project(
+                self._git_project(build_config={
+                    "build_command": "",
+                    "destination_dir": "",
+                    "root_dir": "",
+                }),
+                "owner/game",
+            )
+
+    @patch("publisher._ensure_cloudflare_project")
+    def test_git_authorization_failure_has_operator_action(self, ensure_project) -> None:
+        ensure_project.side_effect = RuntimeError(
+            "HTTP 400: GitHub installation is not authorized for repository"
+        )
+        with self.assertRaisesRegex(RuntimeError, "GitHub App access"):
+            _resolve_cloudflare_project(
+                "account",
+                "token",
+                "game",
+                "owner/game",
+            )
 
     @patch("publisher._cloudflare_request")
     def test_cloudflare_site_url_patch_is_scoped_to_production(self, request) -> None:
-        _set_cloudflare_site_url(
-            "account", "token", "game", "https://game.example"
+        changed = _set_cloudflare_site_url(
+            "account",
+            "token",
+            "game",
+            "https://game.example",
+            self._git_project(),
+            created=True,
         )
+        self.assertTrue(changed)
         payload = request.call_args.args[4]
         self.assertEqual(
             payload["deployment_configs"]["production"]["env_vars"]["NEXT_PUBLIC_SITE_URL"],
@@ -68,45 +187,135 @@ class PublisherValidationTests(unittest.TestCase):
         )
         self.assertNotIn("token", json.dumps(payload).casefold())
 
-    @patch("publisher._find_cloudflare_deployment")
-    @patch("publisher._run_logged")
+    @patch("publisher._cloudflare_request")
+    def test_cloudflare_site_url_does_not_rewrite_matching_environment(self, request) -> None:
+        project = self._git_project(deployment_configs={
+            "production": {
+                "env_vars": {
+                    "NEXT_PUBLIC_SITE_URL": {
+                        "type": "plain_text",
+                        "value": "https://game.example",
+                    },
+                    "AD_NATIVE_BANNER_B64": {"type": "secret_text", "value": ""},
+                },
+            },
+        })
+        changed = _set_cloudflare_site_url(
+            "account",
+            "token",
+            "game",
+            "https://game.example",
+            project,
+            created=False,
+        )
+        self.assertFalse(changed)
+        request.assert_not_called()
+
+    @patch("publisher._cloudflare_request")
+    def test_cloudflare_site_url_refuses_to_overwrite_unrelated_environment(self, request) -> None:
+        project = self._git_project(deployment_configs={
+            "production": {
+                "env_vars": {
+                    "AD_NATIVE_BANNER_B64": {"type": "secret_text", "value": ""},
+                },
+            },
+        })
+        with self.assertRaisesRegex(RuntimeError, "Refusing to replace"):
+            _set_cloudflare_site_url(
+                "account",
+                "token",
+                "game",
+                "https://game.example",
+                project,
+                created=False,
+            )
+        request.assert_not_called()
+
+    @patch("publisher._wait_cloudflare_deployment")
+    @patch("publisher._cloudflare_create_git_deployment")
     @patch("publisher._set_cloudflare_site_url")
-    @patch("publisher._ensure_cloudflare_project")
-    @patch("publisher.shutil.which")
-    def test_cloudflare_deploy_keeps_token_out_of_argv(
-        self, which, ensure_project, set_site_url, run_logged, find_deployment
+    @patch("publisher._resolve_cloudflare_project")
+    def test_cloudflare_deploy_uses_git_integration(
+        self, resolve_project, set_site_url, create_deployment, wait_deployment
     ) -> None:
-        which.side_effect = lambda name: name
-        ensure_project.return_value = {
-            "id": "project-id",
-            "name": "game",
-            "subdomain": "game.pages.dev",
-            "source": None,
-        }
-        run_logged.side_effect = ["build ok", "https://deploy.game.pages.dev"]
-        find_deployment.return_value = {
+        resolve_project.return_value = ("game", self._git_project(), True)
+        set_site_url.return_value = True
+        create_deployment.return_value = {"id": "deployment-id"}
+        wait_deployment.return_value = {
             "id": "deployment-id",
             "url": "https://deploy.game.pages.dev",
+            "deployment_trigger": {"metadata": {"commit_hash": "abc123"}},
             "latest_stage": {"status": "success"},
         }
         result = _deploy_cloudflare_pages(
             Path("C:/game"),
             "game",
+            "owner/game",
             "game.example/path",
             "abc123",
             {"cf_accountid": "account", "cf_pages_api_key": "hidden-token"},
         )
-        deploy_call = run_logged.call_args_list[1]
-        command = deploy_call.args[0]
-        command_env = deploy_call.args[2]
-        self.assertNotIn("hidden-token", command)
-        self.assertEqual(command_env["CLOUDFLARE_API_TOKEN"], "hidden-token")
-        self.assertEqual(command_env["NEXT_PUBLIC_SITE_URL"], "https://game.example")
         self.assertEqual(result["status"], "deployed")
-        self.assertEqual(result["deploymentMode"], "direct-upload")
-        set_site_url.assert_called_once_with(
-            "account", "hidden-token", "game", "https://game.example"
+        self.assertEqual(result["deploymentMode"], "git-integration")
+        self.assertEqual(result["source"]["repo"], "owner/game")
+        create_deployment.assert_called_once_with(
+            "account", "hidden-token", "game", "main"
         )
+        set_site_url.assert_called_once_with(
+            "account",
+            "hidden-token",
+            "game",
+            "https://game.example",
+            resolve_project.return_value[1],
+            created=True,
+        )
+        wait_deployment.assert_called_once()
+
+    @patch("publisher.time.sleep")
+    @patch("publisher._cloudflare_request")
+    def test_cloudflare_wait_polls_exact_deployment_and_commit(self, request, _sleep) -> None:
+        request.side_effect = [
+            {
+                "id": "deployment-id",
+                "latest_stage": {"name": "build", "status": "active"},
+                "deployment_trigger": {"metadata": {"commit_hash": "abc123"}},
+            },
+            {
+                "id": "deployment-id",
+                "latest_stage": {"name": "deploy", "status": "success"},
+                "deployment_trigger": {"metadata": {"commit_hash": "abc123"}},
+            },
+        ]
+        result = _wait_cloudflare_deployment(
+            "account",
+            "token",
+            "game",
+            "deployment-id",
+            "abc123",
+            attempts=2,
+        )
+        self.assertEqual(result["id"], "deployment-id")
+        self.assertTrue(all(
+            call.args[3].endswith("/deployments/deployment-id")
+            for call in request.call_args_list
+        ))
+
+    @patch("publisher._cloudflare_request")
+    def test_cloudflare_wait_rejects_stale_commit(self, request) -> None:
+        request.return_value = {
+            "id": "deployment-id",
+            "latest_stage": {"name": "deploy", "status": "success"},
+            "deployment_trigger": {"metadata": {"commit_hash": "other"}},
+        }
+        with self.assertRaisesRegex(RuntimeError, "expected abc123"):
+            _wait_cloudflare_deployment(
+                "account",
+                "token",
+                "game",
+                "deployment-id",
+                "abc123",
+                attempts=1,
+            )
 
     def test_only_vercel_oidc_env_is_removed_automatically(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

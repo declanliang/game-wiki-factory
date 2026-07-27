@@ -19,7 +19,7 @@
 - 生成的 GitHub 仓库必须且只能是 Private；不得提供 Public 发布参数。
 - 今后所有游戏都作为新项目从头生产；新提交不得使用 `operation: rebuild`、`fullBuild` 或旧 repo 覆盖参数。默认托管平台只能是 Cloudflare Pages；历史 Vercel 站点保持不变。Factory 不接收或部署广告配置；模板广告变量契约只供独立广告 Agent 使用。
 - 用户可在站点 JSON 中提供 `manualKeywords`。手工词是补充发现源，必须继续通过风险过滤、证据门、Basic Info profile 和最终编辑门，不能直接创造越界分类。
-- 后台站点任务默认完成 Private GitHub、Cloudflare Pages Direct Upload、Production `NEXT_PUBLIC_SITE_URL` 和部署。未提供正式域名时使用 `pages.dev` 并自动线上验收；提供但尚未绑定时以 `hosting.status=awaiting_domain_configuration` 交给运营者绑定域名，不能表述为“正式域名已上线”。
+- 后台站点任务默认完成 Private GitHub、Git-integrated Cloudflare Pages、Production `NEXT_PUBLIC_SITE_URL` 和部署。新 Pages 项目必须连接该 Private GitHub repo 的 `main`，由 Cloudflare 执行 `npm run build` 并发布 `out`；不得静默回退到 Direct Upload。未提供正式域名时使用 `pages.dev` 并自动线上验收；提供但尚未绑定时以 `hosting.status=awaiting_domain_configuration` 交给运营者绑定域名，不能表述为“正式域名已上线”。
 - Cloudflare Pages 显示部署成功不是上线验收完成。部署后必须验证 `/` 301 到 `/en`，并执行线上首页、metadata、canonical、sitemap、robots 和全部 loc/hreflang 直接 200 验证。
 
 ## 修改后最低验收
