@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _prune_success_build_artifacts, _publish_command, acknowledge_notifications, classify_failure, claim, connect, normalize_config, pending_notifications, submit, submit_batch
+from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _prune_success_build_artifacts, _publish_command, acknowledge_notifications, checkpoint_safe_content_retry, classify_failure, claim, connect, normalize_config, pending_notifications, submit, submit_batch
 
 
 class JobSystemTests(unittest.TestCase):
@@ -103,6 +103,15 @@ class JobSystemTests(unittest.TestCase):
             ),
             "retryable",
         )
+
+    def test_checkpoint_safe_content_failures_allow_bounded_extra_retries(self) -> None:
+        self.assertTrue(checkpoint_safe_content_retry(
+            "Translation failed; existing valid locale checkpoints were preserved."
+        ))
+        self.assertTrue(checkpoint_safe_content_retry(
+            "Re-run without --overwrite to retry only the missing articles."
+        ))
+        self.assertFalse(checkpoint_safe_content_retry("unknown build problem"))
 
     def test_claim_is_atomic_and_records_lease(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(os.environ, {"GAMEWIKI_DATA_DIR": temporary}):

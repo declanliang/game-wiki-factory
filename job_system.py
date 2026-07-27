@@ -407,6 +407,22 @@ def classify_failure(text: str) -> str:
     return "needs_attention"
 
 
+def checkpoint_safe_content_retry(text: str) -> bool:
+    """Allow a few extra retries when a content stage preserves paid work.
+
+    SEO Scout explicitly guarantees that these failures retry only missing
+    articles/translations without overwrite. Provider 5xx/524 responses near
+    the end of a large batch should therefore not require an operator merely
+    because the job-wide retry budget was consumed by earlier stages.
+    """
+    lowered = text.casefold()
+    return (
+        "existing valid locale checkpoints were preserved" in lowered
+        or "re-run without --overwrite to retry only the missing articles" in lowered
+        or "re-run without --overwrite to retry only the missing translations" in lowered
+    )
+
+
 def _execution_config(config: dict[str, Any], attempt_number: int) -> dict[str, Any]:
     result = {k: config[k] for k in ("game", "platform", "officialUrl", "siteUrl", "manualKeywords") if k in config}
     result["schemaVersion"] = 1
@@ -616,7 +632,10 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
             status, error_class, available = "succeeded", None, _now()
         else:
             error_class = classify_failure(tail)
-            if error_class == "retryable" and attempt < int(cancelled["max_attempts"]):
+            retry_limit = int(cancelled["max_attempts"])
+            if checkpoint_safe_content_retry(tail):
+                retry_limit += 3
+            if error_class == "retryable" and attempt < retry_limit:
                 delays = (30, 120, 600)
                 delay = delays[min(attempt - 1, len(delays) - 1)]
                 status = "retry_wait"
