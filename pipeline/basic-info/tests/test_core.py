@@ -15,7 +15,7 @@ from gamewiki_automation.roblox import IdentityError, RobloxClient, clean_roblox
 from gamewiki_automation.steam import SteamClient, steam_app_id
 from gamewiki_automation.schemas import HOMEPAGE_SCHEMA, LANGUAGE_MARKET_SCHEMA, MODULES_SCHEMA, RESEARCH_SCHEMA, TEMPLATE_SITE_CONTENT_SCHEMA, TEMPLATE_SITE_IDENTITY_SCHEMA
 from gamewiki_automation.template_contract import build_site_content, export_existing_output, validate_localized_site_content, validate_template_contract
-from gamewiki_automation.util import clean_json_text, dump_json, normalized_name, slugify
+from gamewiki_automation.util import clean_json_text, dump_json, normalized_name, public_game_name, slugify
 from gamewiki_automation.validate import _cost_summary
 
 
@@ -86,6 +86,41 @@ class FakeSteamHttp:
 
 
 class CoreTests(unittest.TestCase):
+    def test_public_game_name_removes_only_leading_bracketed_cjk_alias(self) -> None:
+        self.assertEqual(public_game_name({"canonicalName": "(学乱) Gakuran"}), "Gakuran")
+        self.assertEqual(public_game_name({"canonicalName": "【学乱】 Gakuran"}), "Gakuran")
+        self.assertEqual(public_game_name({"canonicalName": "学園アイドルマスター"}), "学園アイドルマスター")
+        self.assertEqual(public_game_name({"canonicalName": "Gakuran 学乱"}), "Gakuran 学乱")
+
+    def test_generation_facts_separates_public_and_official_platform_names(self) -> None:
+        facts = {"identity": {"canonicalName": "(学乱) Gakuran", "canonicalUrl": "https://example.com"}}
+        generated = _generation_facts(facts)
+        self.assertEqual(generated["identity"]["canonicalName"], "Gakuran")
+        self.assertEqual(generated["identity"]["officialPlatformName"], "(学乱) Gakuran")
+        self.assertEqual(facts["identity"]["canonicalName"], "(学乱) Gakuran")
+
+    def test_site_content_uses_public_name_but_preserves_official_developer(self) -> None:
+        facts = {
+            "identity": {"canonicalName": "(学乱) Gakuran", "platform": "Roblox"},
+            "developer": {"name": "(学乱) Gakuran"},
+            "game": {},
+        }
+        homepage = {
+            "metadata": {
+                "title": "(学乱) Gakuran Wiki",
+                "description": "Learn (学乱) Gakuran with practical beginner information.",
+            },
+            "home": {
+                "hero": {},
+                "aboutGame": {"paragraphs": ["(学乱) Gakuran is a Roblox game."]},
+                "finalCta": {},
+            },
+        }
+        content = build_site_content(facts, homepage)
+        self.assertEqual(content["home"]["meta"]["title"], "Gakuran Wiki")
+        self.assertEqual(content["home"]["aboutGame"]["paragraphs"], ["Gakuran is a Roblox game."])
+        self.assertEqual(content["site"]["developer"], "(学乱) Gakuran")
+
     def test_research_merge_preserves_rejected_identity_candidates(self):
         pipeline = Pipeline.__new__(Pipeline)
         pipeline.http = FakeHttp()

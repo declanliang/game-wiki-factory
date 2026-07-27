@@ -54,6 +54,12 @@ Roblox 与 Steam 共用 Basic Info 之后的全部契约：`facts.json` / `evide
 - Steam adapter 负责 App ID、开发商、发行日期、价格、评价、商店功能、系统要求和 Steam 媒体。
 - 搜索查询携带平台名用于消歧，首页 hero stats 根据平台事实做确定性映射。
 
+平台官方标题与公开站点品牌分层保存。`facts.json.identity.canonicalName`
+始终保留平台原文；当官方标题仅以括号包裹的 CJK 别名开头、后面还有明确
+拉丁名称时（例如 `(学乱) Gakuran`），Basic Info 生成的
+`site-identity.json.GAME_NAME` 使用 `Gakuran`。后续首页、site plan、SEO
+Scout 与 manifest 只消费这个公开展示名，不把两套名称拼进英文品牌。
+
 这使平台差异停留在输入适配层，而不是复制两套文章或网站流水线。当前不支持其他商店或主机平台；扩展时必须新增 adapter 并继续输出同一规范事实契约。
 
 ## 两个项目内区域

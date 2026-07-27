@@ -280,8 +280,8 @@ def _compact_overlong_metadata(raw_content: str, lang_code: str) -> str | None:
     except ValueError:
         return None
     is_cjk = lang_code in CJK_LANGUAGES
-    title_limit = 36 if is_cjk else 65
-    description_limit = 90 if is_cjk else 165
+    title_limit = 36 if is_cjk else 60
+    description_limit = 90 if is_cjk else 160
     compact_title = _compact_serp_field(title, title_limit, lang_code)
     compact_description = _compact_serp_field(
         description, description_limit, lang_code, prefer_sentence=True
@@ -462,8 +462,8 @@ def _process_llm_response(
     except ValueError as e:
         return None, str(e)
     is_cjk = lang_code in CJK_LANGUAGES
-    title_limit = 36 if is_cjk else 65
-    description_limit = 90 if is_cjk else 165
+    title_limit = 36 if is_cjk else 60
+    description_limit = 90 if is_cjk else 160
     if len(title) > title_limit:
         return None, f"Translated TITLE is too long ({len(title)} chars; maximum {title_limit} for {lang_code})"
     if len(description) > description_limit:

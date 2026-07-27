@@ -17,7 +17,7 @@ from .roblox import IdentityError, RobloxClient
 from .steam import SteamClient, steam_app_id
 from .schemas import DEFAULT_LANGUAGE_CODES, HOMEPAGE_SCHEMA, MODULES_SCHEMA, MONETIZATION_LANGUAGE_CODES, RESEARCH_SCHEMA, TEMPLATE_SITE_CONTENT_SCHEMA
 from .template_contract import build_site_content, build_site_identity, publish_template_package, validate_localized_site_content, validate_template_contract
-from .util import dump_json, load_json, safe_public_url, slugify, utc_now
+from .util import dump_json, load_json, public_game_name, safe_public_url, slugify, utc_now
 from .validate import validate_package
 
 
@@ -515,7 +515,13 @@ def _normalize_modules(value: dict[str, Any]) -> tuple[dict[str, Any], list[dict
 def _generation_facts(facts: dict[str, Any]) -> dict[str, Any]:
     """Exclude audit-only fields so they do not invalidate content-generation caches."""
     result = copy.deepcopy(facts)
-    result.get("identity", {}).pop("rejectedCandidates", None)
+    identity = result.get("identity", {})
+    identity.pop("rejectedCandidates", None)
+    official_platform_name = str(identity.get("canonicalName") or "").strip()
+    display_name = public_game_name(identity)
+    if display_name and display_name != official_platform_name:
+        identity["officialPlatformName"] = official_platform_name
+        identity["canonicalName"] = display_name
     result.pop("researchNotes", None)
     _remove_timestamps(result)
     return result
@@ -581,7 +587,7 @@ def _select_language_codes(candidates: list[dict[str, Any]]) -> list[str]:
 
 
 def _homepage_languages(facts: dict[str, Any]) -> list[dict[str, Any]]:
-    name = facts.get("identity", {}).get("canonicalName", "")
+    name = public_game_name(facts.get("identity", {}))
     candidates = {
         candidate.get("code"): candidate
         for candidate in facts.get("languageMarket", {}).get("candidates", [])

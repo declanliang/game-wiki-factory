@@ -14,7 +14,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 from PIL import Image
 
 from .schemas import DEFAULT_LANGUAGE_CODES, TEMPLATE_SITE_CONTENT_SCHEMA, TEMPLATE_SITE_IDENTITY_SCHEMA
-from .util import compact_number, dump_json, load_json
+from .util import compact_number, dump_json, load_json, public_game_name
 
 
 CONTRACT = "game-wiki-template/doc/homepage-info-schema.md"
@@ -48,7 +48,7 @@ def build_site_identity(facts: dict[str, Any]) -> dict[str, Any]:
     identity = facts.get("identity", {})
     links = facts.get("officialLinks", {})
     return {
-        "GAME_NAME": identity.get("canonicalName", ""),
+        "GAME_NAME": public_game_name(identity),
         "OFFICIAL_GAME_URL": identity.get("canonicalUrl") or links.get("steam") or links.get("roblox") or "",
         "DISCORD_URL": links.get("discord") or "",
         "YOUTUBE_CHANNEL_URL": links.get("youtube") or "",
@@ -61,7 +61,10 @@ def build_site_identity(facts: dict[str, Any]) -> dict[str, Any]:
 
 def build_site_content(facts: dict[str, Any], homepage: dict[str, Any]) -> dict[str, Any]:
     """Convert internal research output to the current two-key template intake format."""
-    name = facts["identity"]["canonicalName"]
+    name = public_game_name(facts["identity"])
+    official_name = str(facts["identity"].get("canonicalName") or "").strip()
+    if official_name and official_name != name:
+        homepage = _replace_public_name(homepage, official_name, name)
     platform = facts["identity"].get("platform") or "Game"
     game = facts.get("game", {})
     developer = facts.get("developer", {}).get("name") or ""
@@ -162,7 +165,7 @@ def validate_site_identity(identity: dict[str, Any], facts: dict[str, Any]) -> l
 
 def validate_site_content(content: dict[str, Any], facts: dict[str, Any]) -> list[dict[str, str]]:
     errors = _schema_errors(TEMPLATE_SITE_CONTENT_SCHEMA, content, "site-content")
-    name = facts.get("identity", {}).get("canonicalName", "")
+    name = public_game_name(facts.get("identity", {}))
     expected_content = build_site_content(facts, {"metadata": {}, "home": {}})
     expected_site = expected_content.get("site", {})
     for key in ["gamePlatform", "datePublished", "developer", "genre", "price", "priceCurrency"]:
@@ -179,7 +182,9 @@ def validate_site_content(content: dict[str, Any], facts: dict[str, Any]) -> lis
     # exact facts from the English-language check.
     proper_names = {
         str(facts.get("identity", {}).get("canonicalName", "")).strip(),
+        public_game_name(facts.get("identity", {})),
         str(facts.get("identity", {}).get("developer", "")).strip(),
+        str(facts.get("developer", {}).get("name", "")).strip(),
     }
     proper_names = {name for name in proper_names if name}
     for path, value in _strings(content):
@@ -232,7 +237,7 @@ def validate_localized_site_content(
     errors = _schema_errors(TEMPLATE_SITE_CONTENT_SCHEMA, localized, prefix)
     _compare_locale_tree(english, localized, prefix, errors)
 
-    name = facts.get("identity", {}).get("canonicalName", "")
+    name = public_game_name(facts.get("identity", {}))
     for path, english_value in _strings(english):
         localized_value = _value_at_path(localized, path)
         if not isinstance(localized_value, str):
@@ -535,7 +540,7 @@ def _hero_stats(facts: dict[str, Any], genres: list[str], updated_label: str) ->
 
 
 def _faq_items(facts: dict[str, Any], paragraphs: list[str], genres: list[str]) -> list[dict[str, str]]:
-    name = facts["identity"]["canonicalName"]
+    name = public_game_name(facts["identity"])
     developer = facts.get("developer", {}).get("name") or "the game developer"
     game = facts.get("game", {})
     platform = facts.get("identity", {}).get("platform") or "the official platform"
@@ -567,6 +572,20 @@ def _month_year(value: str | None) -> str:
 
 def _plain(value: str) -> str:
     return value.replace("**", "").strip()
+
+
+def _replace_public_name(value: Any, official_name: str, display_name: str) -> Any:
+    """Replace a platform-only alias in generated reader copy."""
+    if isinstance(value, str):
+        return value.replace(official_name, display_name)
+    if isinstance(value, list):
+        return [_replace_public_name(item, official_name, display_name) for item in value]
+    if isinstance(value, dict):
+        return {
+            key: _replace_public_name(child, official_name, display_name)
+            for key, child in value.items()
+        }
+    return value
 
 
 def _as_sentence(value: str) -> str:

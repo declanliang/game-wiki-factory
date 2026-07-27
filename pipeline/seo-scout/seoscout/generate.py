@@ -155,9 +155,15 @@ def _compact_serp_text(value: str, limit: int) -> str:
     """
     if len(value) <= limit:
         return value
-    shortened = value[:limit].rsplit(None, 1)[0].rstrip(" ,;:-")
+    shortened = value[:limit].rsplit(None, 1)[0].rstrip(" ,;:-–—&")
     if not shortened:
         shortened = value[:limit]
+    shortened = re.sub(
+        r"\s+(?:and|or|with|for|to|vs\.?)$",
+        "",
+        shortened,
+        flags=re.I,
+    ).rstrip(" ,;:-–—&")
     if value[-1:] in ".!?" and shortened[-1:] not in ".!?":
         shortened = shortened[:limit - 1].rstrip(" ,;:-") + "."
     return shortened

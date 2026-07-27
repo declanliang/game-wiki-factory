@@ -9,7 +9,7 @@ from typing import Any
 import requests
 from PIL import Image, ImageOps
 
-from .util import dump_json, utc_now
+from .util import dump_json, public_game_name, utc_now
 
 
 def _download_image(url: str, timeout: int = 60) -> tuple[bytes, str]:
@@ -65,9 +65,10 @@ def build_assets(facts: dict[str, Any], assets_dir: Path) -> tuple[dict[str, Any
             square.resize((64, 64), Image.Resampling.LANCZOS).save(
                 favicon_dir / "favicon.ico", format="ICO", sizes=[(16, 16), (32, 32), (48, 48), (64, 64)]
             )
+            display_name = public_game_name(facts["identity"])
             manifest = {
-                "name": facts["identity"]["canonicalName"] + " Wiki",
-                "short_name": facts["identity"]["canonicalName"],
+                "name": display_name + " Wiki",
+                "short_name": display_name,
                 "icons": [
                     {"src": "android-chrome-192x192.png", "sizes": "192x192", "type": "image/png"},
                     {"src": "android-chrome-512x512.png", "sizes": "512x512", "type": "image/png"},

@@ -16,7 +16,7 @@ import { MobileTOC } from "@/components/table-of-contents";
 import { CONTENT_TYPES } from "@/config/navigation";
 import { getSiteName, localizedSiteUrl, SITE_LOGO_URL } from "@/config/site";
 import { languageAlternates, routing, type Locale } from "@/i18n/routing";
-import { buildOpenGraph, buildTwitter } from "@/lib/seo";
+import { buildCategoryMetadataTitle, buildOpenGraph, buildTwitter, normalizeMetadataDescription, normalizeMetadataTitle } from "@/lib/seo";
 import en from "@/locales/en.json";
 
 type Messages = typeof en;
@@ -35,8 +35,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: L
     const ct = slug[0];
     const ctTitle = ct.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     const ctMessages = (messages as unknown as Record<string, Record<string, string>>)[ct];
-    const title = `${ctMessages?.overviewTitle || ctTitle} — ${siteName}`;
-    const description = ctMessages?.overviewDescription || `Browse all ${ctTitle.toLowerCase()} guides and resources for ${messages.site.name}.`;
+    const categoryTitle = ctMessages?.overviewTitle || ctTitle;
+    const categoryDescription = ctMessages?.overviewDescription || `Browse all ${ctTitle.toLowerCase()} guides and resources for ${messages.site.name}.`;
+    const title = buildCategoryMetadataTitle(categoryTitle, messages.site.name, siteName, locale);
+    const description = normalizeMetadataDescription(
+      `${categoryDescription} ${messages.site.description}`,
+      locale,
+    );
     const items = await getAllContent(ct, locale);
     return {
       title,
@@ -56,13 +61,14 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: L
   const image = item.metadata.image?.startsWith("http") ? item.metadata.image : localizedSiteUrl(item.metadata.image ?? "/images/hero.webp", routing.defaultLocale);
   // Article metadata titles already contain the game identity. Appending the
   // site name pushes a large share of SERP titles past the display limit.
-  const title = item.metadata.title;
+  const title = normalizeMetadataTitle(item.metadata.title, locale);
+  const description = normalizeMetadataDescription(item.metadata.description, locale);
   return {
     title,
-    description: item.metadata.description,
+    description,
     alternates: { canonical: localizeHref(pathname, locale), languages: languageAlternates(pathname) },
-    openGraph: buildOpenGraph({ locale, title: item.metadata.title, description: item.metadata.description, url: localizedSiteUrl(pathname, locale), images: [image], type: "article", siteName }),
-    twitter: buildTwitter({ title: item.metadata.title, description: item.metadata.description, images: [image] }),
+    openGraph: buildOpenGraph({ locale, title, description, url: localizedSiteUrl(pathname, locale), images: [image], type: "article", siteName }),
+    twitter: buildTwitter({ title, description, images: [image] }),
   };
 }
 

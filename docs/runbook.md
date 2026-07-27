@@ -58,6 +58,14 @@ python gamewiki.py publish <slug>
 
 给出正式域名但域名尚未指向项目时，部署仍成功，回执为 `hosting.status=awaiting_domain_configuration`。运营者只需在该 Pages 项目绑定自定义域名并配置 DNS；不要新建另一个项目。域名生效后在游戏根运行 `npm run verify:deploy`，检查根路径 301 到 `/en`、metadata/canonical、sitemap、robots 和全部 loc/hreflang 直接 200。完整输出保存在 `.gamewiki/deploy-verification.log`。
 
+SEO metadata 有两层确定性保护：SEO Scout 先把文章 title/description 压到
+各语言上限并拒绝以 `&`、`and` 等未完成连接词结尾的标题；模板渲染时再对
+首页、分类页、文章和法律页 metadata 做最后限长。分类页 description 会把
+分类意图与游戏描述组合，避免发布只有几十字符的通用摘要。审计多语言站点
+时不要把日文字符数直接套用拉丁语言的 110–160 字符阈值，也不要把不同
+hreflang 页面中本来拼写相同的分类词（如法语/英语 `Guides`）误判为站内
+重复页面；应同时检查 canonical、html lang 与 reciprocal hreflang。
+
 Cloudflare Workers & Pages GitHub App 必须能读取 Factory 新建的 Private repo。无人值守账号建议授权 `All repositories`；若只授权选定仓库，新 repo 会以明确的 GitHub App authorization 错误停止，修正授权后重试原 Job。发布器不会把 Git 授权失败降级为 Direct Upload，也不会自动转换或删除已有 Direct Upload 项目。
 
 ## 排查顺序

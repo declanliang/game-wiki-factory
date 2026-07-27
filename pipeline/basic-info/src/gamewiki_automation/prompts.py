@@ -74,7 +74,8 @@ EVIDENCE:
 Official icon color candidates (HSL): {json.dumps(palette)}
 
 Requirements:
-- Preserve the exact game name and URLs from FACTS.
+- Use identity.canonicalName as the public site brand everywhere. If identity.officialPlatformName is present, retain it only as platform evidence; do not combine it with the public brand in titles, headings, or prose.
+- Preserve the exact URLs from FACTS.
 - Both descriptions must be 140-160 Unicode characters. Both titles must be at most 60 characters. Keywords at most 100 characters.
 - Hero stats: exactly 5 plain strings, no zero values; at most 2 dynamic stats. Favor launch/update, visits/players, server size, approval and sourced gameplay scale.
 - Exactly 4 distinct Start cards; first is Beginner Guide.

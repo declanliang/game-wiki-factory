@@ -67,6 +67,14 @@ class SeoMetadataValidationTests(unittest.TestCase):
         content, error = process_english(raw, "guide", "2026-07-19")
         self.assertIsNotNone(content, error)
 
+    def test_compacted_english_title_does_not_end_with_ampersand(self) -> None:
+        title = "Animal Hospital Anomaly Roblox Beginner Tips: Survive & Escape Every Shift"
+        raw = f"TITLE: {title}\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{BODY}"
+        content, error = process_english(raw, "guide", "2026-07-19")
+        self.assertIsNotNone(content, error)
+        metadata_title = content.split("title: ", 1)[1].splitlines()[0]
+        self.assertNotRegex(metadata_title, r"&[\"']?,?$")
+
     def test_rejects_overlong_cjk_translation_title(self) -> None:
         title = "時限爆弾デュエルで勝つための初心者向け完全攻略と移動テクニック徹底解説ガイド"
         raw = f"TITLE: {title}\nDESCRIPTION: 実践的な移動と位置取りを学べる初心者向け攻略です。\nBODY:\n{BODY}"

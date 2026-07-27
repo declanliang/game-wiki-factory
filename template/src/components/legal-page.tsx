@@ -3,7 +3,7 @@ import { getMessages, setRequestLocale } from "next-intl/server";
 import { getSiteName, localizedSiteUrl } from "@/config/site";
 import { languageAlternates, type Locale } from "@/i18n/routing";
 import { localizeHref } from "@/lib/locale-path";
-import { buildOpenGraph, buildTwitter } from "@/lib/seo";
+import { buildOpenGraph, buildTwitter, normalizeMetadataDescription, normalizeMetadataTitle } from "@/lib/seo";
 import type en from "@/locales/en.json";
 
 type Messages = typeof en;
@@ -21,12 +21,17 @@ export async function buildLegalMetadata(locale: Locale, pageKey: LegalPageKey):
   const page = messages.legal[pageKey];
   const pathname = LEGAL_PATHS[pageKey];
   const siteName = getSiteName(messages);
+  const title = normalizeMetadataTitle(page.title, locale);
+  const description = normalizeMetadataDescription(
+    `${page.description} ${messages.site.description}`,
+    locale,
+  );
   return {
-    title: page.title,
-    description: page.description,
+    title,
+    description,
     alternates: { canonical: localizeHref(pathname, locale), languages: languageAlternates(pathname) },
-    openGraph: buildOpenGraph({ locale, title: page.title, description: page.description, url: localizedSiteUrl(pathname, locale), siteName }),
-    twitter: buildTwitter({ title: page.title, description: page.description }),
+    openGraph: buildOpenGraph({ locale, title, description, url: localizedSiteUrl(pathname, locale), siteName }),
+    twitter: buildTwitter({ title, description }),
   };
 }
 

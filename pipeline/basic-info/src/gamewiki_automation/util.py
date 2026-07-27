@@ -10,6 +10,34 @@ from typing import Any
 from urllib.parse import urlparse
 
 
+_CJK_RE = re.compile(r"[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]")
+_LATIN_RE = re.compile(r"[A-Za-z]")
+_LEADING_BRACKETED_ALIAS_RE = re.compile(
+    r"^\s*(?:"
+    r"\([^)]*[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af][^)]*\)"
+    r"|\[[^\]]*[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af][^\]]*\]"
+    r"|（[^）]*[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af][^）]*）"
+    r"|【[^】]*[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af][^】]*】"
+    r")\s*"
+)
+
+
+def public_game_name(identity: dict[str, Any]) -> str:
+    """Return the reader-facing name without altering official identity facts."""
+    canonical = str(identity.get("canonicalName") or "").strip()
+    if not canonical:
+        return ""
+    candidate = _LEADING_BRACKETED_ALIAS_RE.sub("", canonical, count=1).strip(" \t-–—:|")
+    if (
+        candidate
+        and candidate != canonical
+        and _LATIN_RE.search(candidate)
+        and not _CJK_RE.search(candidate)
+    ):
+        return candidate
+    return canonical
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 

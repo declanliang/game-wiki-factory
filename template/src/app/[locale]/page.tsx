@@ -6,7 +6,7 @@ import { NAVIGATION_CONFIG } from "@/config/navigation";
 import { getSiteName, localizedSiteUrl } from "@/config/site";
 import { localizeHref } from "@/lib/locale-path";
 import { languageAlternates, type Locale } from "@/i18n/routing";
-import { buildOpenGraph, buildTwitter } from "@/lib/seo";
+import { buildOpenGraph, buildTwitter, normalizeMetadataDescription, normalizeMetadataTitle } from "@/lib/seo";
 import en from "@/locales/en.json";
 import HomePageClient from "./HomePageClient";
 
@@ -16,7 +16,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   const messages = (await getMessages({ locale })) as Messages;
   const siteName = getSiteName(messages);
-  const { title, description } = messages.home.meta;
+  const title = normalizeMetadataTitle(messages.home.meta.title, locale);
+  const description = normalizeMetadataDescription(messages.home.meta.description, locale);
   return {
     title,
     description,

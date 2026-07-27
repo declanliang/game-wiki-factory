@@ -5,6 +5,50 @@ import type en from "@/locales/en.json";
 
 type Messages = typeof en;
 
+const DANGLING_CONNECTOR_RE =
+  /\s+(?:&|and|or|with|for|to|vs\.?|und|oder|mit|für|y|o|con|para|et|ou|avec|pour)$/i;
+
+function metadataLimit(locale: string, kind: "title" | "description"): number {
+  const cjk = locale === "ja" || locale === "ko" || locale === "zh";
+  if (kind === "title") return cjk ? 36 : 60;
+  return cjk ? 90 : 160;
+}
+
+function compactMetadataText(value: string, limit: number, locale: string): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= limit) return normalized;
+  const cjk = locale === "ja" || locale === "ko" || locale === "zh";
+  let candidate = normalized.slice(0, limit);
+  if (!cjk && candidate.includes(" ")) {
+    candidate = candidate.replace(/\s+\S*$/, "");
+  }
+  candidate = candidate
+    .replace(DANGLING_CONNECTOR_RE, "")
+    .replace(/[\s,;:–—&-]+$/u, "")
+    .trim();
+  return candidate || normalized.slice(0, limit).trim();
+}
+
+/** Last-mile guard for metadata produced by upstream content stages. */
+export function normalizeMetadataTitle(value: string, locale: string): string {
+  return compactMetadataText(value, metadataLimit(locale, "title"), locale);
+}
+
+export function normalizeMetadataDescription(value: string, locale: string): string {
+  return compactMetadataText(value, metadataLimit(locale, "description"), locale);
+}
+
+export function buildCategoryMetadataTitle(
+  categoryTitle: string,
+  gameName: string,
+  siteName: string,
+  locale: string,
+): string {
+  const full = `${categoryTitle} — ${siteName}`;
+  if (full.length <= metadataLimit(locale, "title")) return full;
+  return normalizeMetadataTitle(`${gameName} ${categoryTitle}`, locale);
+}
+
 /**
  * Next.js Metadata merging replaces `openGraph`/`twitter` wholesale when a
  * route segment defines its own — it does not deep-merge with the parent
