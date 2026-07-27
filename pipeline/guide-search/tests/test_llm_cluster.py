@@ -180,6 +180,57 @@ class LLMClusterTests(unittest.TestCase):
         self.assertEqual(len(errors), 1)
         self.assertTrue(any("unknown keyword" in error for error in errors))
 
+    def test_identical_duplicate_decision_keeps_one_without_failing_run(self) -> None:
+        candidates = [
+            self.candidate("fallout new vegas steam how to get full screen", {"autocomplete"})
+        ]
+        first = self.decision(
+            "fallout new vegas steam how to get full screen",
+            category="guide",
+            confidence=0.82,
+        )
+        second = dict(first)
+        second["confidence"] = 0.91
+        selected, rejected, errors = apply_cluster_decisions(
+            "Fallout New Vegas Steam",
+            candidates,
+            {"decisions": [first, second]},
+        )
+        self.assertEqual(
+            [item.keyword for item in selected],
+            ["fallout new vegas steam how to get full screen"],
+        )
+        self.assertEqual(rejected, [])
+        self.assertEqual(errors, [])
+
+    def test_conflicting_duplicate_decision_drops_only_that_keyword(self) -> None:
+        candidates = [
+            self.candidate("fallout new vegas steam full screen", {"autocomplete"}),
+            self.candidate("fallout new vegas steam companions", {"autocomplete"}),
+        ]
+        selected, rejected, errors = apply_cluster_decisions(
+            "Fallout New Vegas Steam",
+            candidates,
+            {
+                "decisions": [
+                    self.decision("fallout new vegas steam full screen", category="guide"),
+                    self.decision(
+                        "fallout new vegas steam full screen",
+                        action="drop",
+                        category=None,
+                    ),
+                    self.decision("fallout new vegas steam companions", category="characters"),
+                ]
+            },
+        )
+        self.assertEqual(
+            [item.keyword for item in selected],
+            ["fallout new vegas steam companions"],
+        )
+        reasons = {item["keyword"]: item["reason"] for item in rejected}
+        self.assertIn("conflicting duplicate", reasons["fallout new vegas steam full screen"])
+        self.assertEqual(errors, [])
+
     def test_context_opportunities_require_strong_evidence_and_profile_category(self) -> None:
         context = {
             "trusted_basic_info": {

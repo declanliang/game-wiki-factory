@@ -86,6 +86,7 @@ Cloudflare Workers & Pages GitHub App 必须能读取 Factory 新建的 Private 
 - Guide Search 聚类失败：复用 `.gamewiki/planning/guide-search/raw`。
 - V4 联网背景研究会生成 `llm/game-context.json.page_opportunities`；检查 `llm/rejected.json.opportunity_rejected` 可区分“没有发现”和“发现但证据/分类门槛不足”。该契约版本变化会使旧 context checkpoint 自动失效，但不会重做 Suggest/DataForSEO 原始采集。
 - Guide Search 的 ToAPIs 请求遇到 SSL EOF、429 或常见 5xx/52x：自动指数退避重试，已完成的聚类 batch checkpoint 不会重做。
+- Guide Search 的结构化响应重复同一关键词 decision：语义相同的重复项确定性保留置信度较高者；互相冲突的重复项只淘汰该关键词并写入 `llm/rejected.json`，不能让一个模型重复项使整个游戏失败。
 - 某语言缺失或截断：SEO Scout 只删除并重翻无效文件。
 - 英文生成出现 `finish_reason=length`：客户端会以 10,000-token 上限和无表格紧凑提示词重试；仍失败会返回非零并把 Articles stage 标记为 failed。不要使用 overwrite。
 - 翻译正文完整但 SERP 标题/描述略超限：流水线会本地压缩元数据后重新执行完整性校验，不重翻正文。
