@@ -131,6 +131,27 @@ def _ensure_cloudflare_project(
     return project
 
 
+def _resolve_cloudflare_project(
+    account_id: str,
+    token: str,
+    project_name: str,
+) -> tuple[str, dict]:
+    """Resolve a Direct Upload project, with a deterministic name fallback.
+
+    Cloudflare can return error 8000000/HTTP 500 for an otherwise valid Pages
+    name that it cannot allocate. A suffixed name is safe because the Factory
+    records the actual Pages project and the canonical URL remains independent.
+    """
+    try:
+        return project_name, _ensure_cloudflare_project(account_id, token, project_name)
+    except RuntimeError as exc:
+        message = str(exc)
+        if "HTTP 500" not in message or '"code": 8000000' not in message:
+            raise
+        fallback_name = f"{project_name}-wiki"
+        return fallback_name, _ensure_cloudflare_project(account_id, token, fallback_name)
+
+
 def _set_cloudflare_site_url(
     account_id: str,
     token: str,
@@ -230,7 +251,9 @@ def _deploy_cloudflare_pages(
     env: dict[str, str],
 ) -> dict:
     account_id, token = _cloudflare_credentials(env)
-    cloudflare_project = _ensure_cloudflare_project(account_id, token, project_name)
+    project_name, cloudflare_project = _resolve_cloudflare_project(
+        account_id, token, project_name
+    )
     subdomain = str(cloudflare_project.get("subdomain") or f"{project_name}.pages.dev").strip()
     pages_origin = _normalize_origin(subdomain)
     canonical_origin = _normalize_origin(site_url) if site_url.strip() else pages_origin
