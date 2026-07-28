@@ -3,7 +3,12 @@ import { getMessages, setRequestLocale } from "next-intl/server";
 import { getSiteName, localizedSiteUrl } from "@/config/site";
 import { languageAlternates, type Locale } from "@/i18n/routing";
 import { localizeHref } from "@/lib/locale-path";
-import { buildOpenGraph, buildTwitter, normalizeMetadataDescription, normalizeMetadataTitle } from "@/lib/seo";
+import {
+  buildOpenGraph,
+  buildTwitter,
+  normalizeMetadataDescription,
+  normalizeMetadataTitle,
+} from "@/lib/seo";
 import type en from "@/locales/en.json";
 
 type Messages = typeof en;
@@ -16,7 +21,10 @@ const LEGAL_PATHS: Record<LegalPageKey, string> = {
   termsOfService: "/terms-of-service",
 };
 
-export async function buildLegalMetadata(locale: Locale, pageKey: LegalPageKey): Promise<Metadata> {
+export async function buildLegalMetadata(
+  locale: Locale,
+  pageKey: LegalPageKey,
+): Promise<Metadata> {
   const messages = (await getMessages({ locale })) as Messages;
   const page = messages.legal[pageKey];
   const pathname = LEGAL_PATHS[pageKey];
@@ -29,22 +37,38 @@ export async function buildLegalMetadata(locale: Locale, pageKey: LegalPageKey):
   return {
     title,
     description,
-    alternates: { canonical: localizeHref(pathname, locale), languages: languageAlternates(pathname) },
-    openGraph: buildOpenGraph({ locale, title, description, url: localizedSiteUrl(pathname, locale), siteName }),
+    alternates: {
+      canonical: localizeHref(pathname, locale),
+      languages: languageAlternates(pathname),
+    },
+    openGraph: buildOpenGraph({
+      locale,
+      title,
+      description,
+      url: localizedSiteUrl(pathname, locale),
+      siteName,
+    }),
     twitter: buildTwitter({ title, description }),
   };
 }
 
-export async function LegalPage({ locale, pageKey }: { locale: Locale; pageKey: LegalPageKey }) {
+export async function LegalPage({
+  locale,
+  pageKey,
+}: { locale: Locale; pageKey: LegalPageKey }) {
   setRequestLocale(locale);
   const messages = (await getMessages({ locale })) as Messages;
   const page = messages.legal[pageKey];
   return (
-    <main className="mx-auto max-w-3xl px-4 py-12 sm:px-6 lg:px-8">
+    <main className="mx-auto max-w-[760px] px-5 py-12 sm:px-8">
       <article className="rounded-3xl border border-border bg-card/70 p-6 sm:p-8">
-        <h1 className="text-4xl font-extrabold tracking-tight text-foreground">{page.title}</h1>
+        <h1 className="text-4xl font-extrabold tracking-tight text-foreground">
+          {page.title}
+        </h1>
         <div className="mt-8 space-y-5 leading-8 text-muted-foreground">
-          {page.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+          {page.paragraphs.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
         </div>
       </article>
     </main>

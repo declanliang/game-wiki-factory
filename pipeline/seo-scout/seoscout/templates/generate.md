@@ -45,6 +45,11 @@ Generate a title based on the keyword field in the reference material:
 13. Do not pad missing evidence with speculation such as "likely", "might",
     "could", "we can expect", or "based on similar games". If a useful claim
     is unsupported, omit it or label the exact unknown instead.
+14. For released games, never guess exact controls, achievement counts or
+    missability, unlock conditions, numeric values, world mechanics, or item
+    effects from genre conventions. If evidence is thin, publish a narrower
+    factual overview and direct players to the current in-game or official
+    source instead of presenting an invented how-to answer.
 
 ## Article Structure
 

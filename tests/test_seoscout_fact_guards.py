@@ -44,11 +44,20 @@ class FactGuardTests(unittest.TestCase):
 
     def test_rejects_speculation_padding(self) -> None:
         body = "## Unknown systems\n" + " ".join(
-            ["This might change.", "It could appear.", "That is likely.", "It may arrive.", "It probably works.", "It possibly helps."]
+            ["This might change.", "It could appear.", "That is likely."]
         )
         valid, error = validate_markdown(article(body))
         self.assertFalse(valid)
         self.assertIn("Speculation density", error)
+
+    def test_allows_one_explicitly_unconfirmed_note(self) -> None:
+        valid, error = validate_markdown(
+            article(
+                "## Current evidence\n"
+                "The exact unlock condition is unconfirmed. Check the current in-game objective text before planning a run."
+            )
+        )
+        self.assertTrue(valid, error)
 
     def test_rejects_future_tense_for_release_date_that_has_passed(self) -> None:
         valid, error = validate_markdown(

@@ -396,7 +396,7 @@ def validate_markdown(content: str) -> tuple:
         content,
         re.I,
     )
-    if len(speculation_markers) >= 6:
+    if len(speculation_markers) >= 3:
         return False, f"Speculation density is too high ({len(speculation_markers)} markers); omit unsupported filler"
     return True, ""
 

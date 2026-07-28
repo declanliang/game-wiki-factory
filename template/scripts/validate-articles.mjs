@@ -81,6 +81,49 @@ function countMatches(body, pattern) {
 }
 
 const REQUIRED_FIELDS = ["title", "description", "category", "date"];
+const ALLOWED_FIELDS = new Set([
+  "title",
+  "description",
+  "category",
+  "date",
+  "lastModified",
+  "image",
+  "imageAlt",
+  "badge",
+  "summary",
+]);
+
+function parseMetadata(metaBody, rel) {
+  const values = new Map();
+  const lines = metaBody.split(/\r?\n/);
+  for (const [index, rawLine] of lines.entries()) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const match = line.match(/^([A-Za-z][A-Za-z0-9]*)\s*:\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*,?$/);
+    if (!match) {
+      fail(`${rel}：metadata 第 ${index + 1} 行必须是单行字符串字面量，禁止表达式、模板字符串、展开和嵌套对象`);
+      continue;
+    }
+    const [, field, literal] = match;
+    if (!ALLOWED_FIELDS.has(field)) {
+      fail(`${rel}：metadata 包含未允许字段 ${field}`);
+      continue;
+    }
+    if (values.has(field)) {
+      fail(`${rel}：metadata 字段 ${field} 重复出现`);
+      continue;
+    }
+    try {
+      const value = literal.startsWith('"')
+        ? JSON.parse(literal)
+        : literal.slice(1, -1).replace(/\\(['\\])/g, "$1");
+      values.set(field, value);
+    } catch {
+      fail(`${rel}：metadata 字段 ${field} 不是有效字符串字面量`);
+    }
+  }
+  return values;
+}
 // ~150KB of MDX prose is already unusually long for a guide article — past this point
 // it's more often a duplication/generation bug than a legitimately long article.
 const MAX_BYTES = 150_000;
@@ -120,14 +163,12 @@ for (const locale of localeDirs) {
     const metaMatch = source.match(/^export const metadata\s*=\s*\{([\s\S]*?)^\}/m);
     const metaBody = metaMatch ? metaMatch[1] : "";
 
-    const missing = REQUIRED_FIELDS.filter((field) => {
-      const m = metaBody.match(new RegExp(`${field}\\s*:\\s*(["'\`])(.*?)\\1`, "s"));
-      return !m || !m[2].trim();
-    });
+    const metadata = parseMetadata(metaBody, rel);
+    const missing = REQUIRED_FIELDS.filter((field) => !metadata.get(field)?.trim());
     if (missing.length > 0) fail(`${rel}：metadata 缺少字段（或值为空）：${missing.join(", ")}`);
 
-    const title = metaBody.match(/title\s*:\s*(["'`])(.*?)\1/s)?.[2]?.trim() || "";
-    const description = metaBody.match(/description\s*:\s*(["'`])(.*?)\1/s)?.[2]?.trim() || "";
+    const title = metadata.get("title")?.trim() || "";
+    const description = metadata.get("description")?.trim() || "";
     for (const [label, value, seen] of [["title", title, seenTitles], ["description", description, seenDescriptions]]) {
       if (!value) continue;
       const key = `${locale}:${value.toLocaleLowerCase(locale)}`;
@@ -150,10 +191,10 @@ for (const locale of localeDirs) {
       fail(`${rel}：description 以未完成的虚词结尾，应在发布前压缩为完整句子`);
     }
 
-    const categoryMatch = metaBody.match(/category:\s*(["'`])(.+?)\1/);
-    if (categoryMatch) {
+    const category = metadata.get("category")?.trim();
+    if (category) {
       const slug = fileNameToSlug(path.basename(file));
-      const key = `${locale}/${categoryMatch[2]}/${slug}`;
+      const key = `${locale}/${category}/${slug}`;
       if (seenSlugs.has(key)) {
         fail(`${rel} 和 ${seenSlugs.get(key)} 接入后会撞到同一个路径 content/${key}.mdx（文件名生成的 slug 相同）—— 两篇会互相覆盖，改其中一个文件名或 category`);
       } else {
