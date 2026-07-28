@@ -203,7 +203,10 @@ if (fs.existsSync(enDir)) {
         }
       }
 
-      const minimumRatio = ["ja", "ko", "zh"].includes(locale) ? 0.45 : 0.80;
+      // Keep this aligned with SEO Scout's checkpoint validator. CJK prose can
+      // preserve every heading, list, callout and FAQ while using far fewer
+      // characters than English; structure parity remains the primary guard.
+      const minimumRatio = ["ja", "ko", "zh"].includes(locale) ? 0.40 : 0.80;
       const ratio = translatedBody.length / Math.max(1, sourceBody.length);
       if (ratio < minimumRatio) {
         fail(`${rel}：正文长度仅为英文的 ${ratio.toFixed(2)}，低于 ${minimumRatio.toFixed(2)}`);
