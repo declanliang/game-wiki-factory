@@ -65,7 +65,18 @@ function escapeStrayLtInBody(source) {
     voidTagCount++;
     return "<br />";
   });
-  const fixedBody = mdxSafeBody.replace(/<(?![a-zA-Z/!>])/g, () => {
+  // Human-readable placeholders such as <display name> or localized
+  // <nom d'affichage> begin with a letter, so the generic stray-`<` rule
+  // below used to miss them and MDX parsed the prose as malformed JSX.
+  // Preserve only components the template actually supports.
+  const escapedUnknownTags = mdxSafeBody.replace(
+    /<(?!\/?(?:Callout|br)\b)[a-zA-Z][^>\n]*>/g,
+    (match) => {
+      count++;
+      return `&lt;${match.slice(1)}`;
+    },
+  );
+  const fixedBody = escapedUnknownTags.replace(/<(?![a-zA-Z/!>])/g, () => {
     count++;
     return "&lt;";
   });
