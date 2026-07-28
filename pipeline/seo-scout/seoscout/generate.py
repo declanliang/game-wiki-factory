@@ -24,6 +24,15 @@ class GenerationError(RuntimeError):
     """Raised when an expected article could not be generated safely."""
 
 
+def is_evidence_limited_rejection(error: str | None) -> bool:
+    """Return whether a failed repair proves the source pack is too thin.
+
+    This is deliberately narrower than general markdown validation. Formatting,
+    truncation, and API failures must still stop the paid stage for recovery.
+    """
+    return bool(error and error.startswith("Speculation density is too high"))
+
+
 LENGTH_RETRY_INSTRUCTION = """
 The previous response was truncated by a formatting repetition loop. Generate
 the complete article again from scratch in 900–1,300 words. Do not use Markdown
@@ -507,8 +516,10 @@ async def run_generate(
     skipped_exists = 0
     skipped_rejected = 0
     fingerprints_path = f"{Config.OUT_DIR}/generation_fingerprints.json"
+    rejections_path = f"{Config.OUT_DIR}/generation_rejections.json"
     qa_cache_path = f"{Config.OUT_DIR}/qa_results.json"
     fingerprints = load_json(fingerprints_path) if os.path.exists(fingerprints_path) else {}
+    rejections = load_json(rejections_path) if os.path.exists(rejections_path) else {}
     qa_cache = load_json(qa_cache_path) if os.path.exists(qa_cache_path) else {}
 
     for entry in keyword_entries:
@@ -570,6 +581,14 @@ async def run_generate(
         )
         relative_output = str(Path(output_path).relative_to(Path(articles_dir))).replace('\\', '/')
         source_fingerprint = hashlib.sha256(prompt.encode('utf-8')).hexdigest()
+        cached_generation_rejection = rejections.get(relative_output) or {}
+        if (
+            not overwrite
+            and cached_generation_rejection.get('reason') == 'insufficient_evidence'
+            and cached_generation_rejection.get('source_fingerprint') == source_fingerprint
+        ):
+            skipped_rejected += 1
+            continue
         cached_rejection = qa_cache.get(relative_output) or {}
         if (
             not overwrite
@@ -616,6 +635,7 @@ async def run_generate(
     # Save results with repair
     saved = 0
     failed = 0
+    evidence_rejected = 0
     repair_prompts = []
 
     for meta, content in results:
@@ -662,16 +682,32 @@ async def run_generate(
                 saved += 1
                 print(f"  ✅ (repaired) {meta['slug']}.mdx")
             else:
-                failed += 1
-                print(f"  ❌ {meta['slug']}.mdx — still invalid after repair: {err}")
+                if is_evidence_limited_rejection(err):
+                    evidence_rejected += 1
+                    rejections[meta['relative_output']] = {
+                        'keyword': meta['keyword'],
+                        'reason': 'insufficient_evidence',
+                        'validation_error': err,
+                        'source_fingerprint': meta['source_fingerprint'],
+                        'rejected_at': datetime.now().astimezone().isoformat(timespec='seconds'),
+                    }
+                    print(
+                        f"  ⏭️  {meta['slug']}.mdx — rejected after repair: "
+                        "source evidence could not support a factual article"
+                    )
+                else:
+                    failed += 1
+                    print(f"  ❌ {meta['slug']}.mdx — still invalid after repair: {err}")
 
     save_json(fingerprints, fingerprints_path)
+    save_json(rejections, rejections_path)
 
     # Summary
     print("\n" + "=" * 70)
     print(f"  {'✅' if failed == 0 else '⚠️ '} Generate complete")
     print("=" * 70)
     print(f"  Saved:   {saved}")
+    print(f"  Evidence rejected: {evidence_rejected}")
     print(f"  Failed:  {failed}")
     print(f"  Output:  {articles_dir}/")
     client.print_stats()

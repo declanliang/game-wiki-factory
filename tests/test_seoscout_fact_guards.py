@@ -8,7 +8,7 @@ from pathlib import Path
 SEO_SCOUT_ROOT = Path(__file__).resolve().parents[1] / "pipeline" / "seo-scout"
 sys.path.insert(0, str(SEO_SCOUT_ROOT))
 
-from seoscout.generate import validate_markdown  # noqa: E402
+from seoscout.generate import is_evidence_limited_rejection, validate_markdown  # noqa: E402
 
 
 def article(body: str) -> str:
@@ -25,6 +25,15 @@ def article(body: str) -> str:
 
 
 class FactGuardTests(unittest.TestCase):
+    def test_only_speculation_density_is_an_evidence_limited_rejection(self) -> None:
+        self.assertTrue(
+            is_evidence_limited_rejection(
+                "Speculation density is too high (4 markers); omit unsupported filler"
+            )
+        )
+        self.assertFalse(is_evidence_limited_rejection("Missing or too short BODY section"))
+        self.assertFalse(is_evidence_limited_rejection(None))
+
     def test_rejects_inferred_positive_steam_deck_rating(self) -> None:
         valid, error = validate_markdown(
             article("## Compatibility\nSteam Deck is Verified because the game has full controller support. " * 3)
