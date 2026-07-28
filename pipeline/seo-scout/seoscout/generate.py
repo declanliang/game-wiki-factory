@@ -30,7 +30,11 @@ def is_evidence_limited_rejection(error: str | None) -> bool:
     This is deliberately narrower than general markdown validation. Formatting,
     truncation, and API failures must still stop the paid stage for recovery.
     """
-    return bool(error and error.startswith("Speculation density is too high"))
+    evidence_errors = (
+        "Speculation density is too high",
+        "Unsupported positive Steam Deck rating",
+    )
+    return bool(error and error.startswith(evidence_errors))
 
 
 LENGTH_RETRY_INSTRUCTION = """

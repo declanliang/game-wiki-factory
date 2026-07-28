@@ -31,6 +31,11 @@ class FactGuardTests(unittest.TestCase):
                 "Speculation density is too high (4 markers); omit unsupported filler"
             )
         )
+        self.assertTrue(
+            is_evidence_limited_rejection(
+                "Unsupported positive Steam Deck rating — controller support does not prove Verified or Playable"
+            )
+        )
         self.assertFalse(is_evidence_limited_rejection("Missing or too short BODY section"))
         self.assertFalse(is_evidence_limited_rejection(None))
 
