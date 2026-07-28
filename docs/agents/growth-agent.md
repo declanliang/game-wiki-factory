@@ -1,39 +1,38 @@
-# 独立 OpenClaw GSC Growth Agent
+# 飞书游戏管理员中的 GSC Growth 职责
 
-`game-wiki-growth` 是站点上线后的增长 Agent，不属于 Factory 主生产流程：
+站点上线后的 Growth 职责由飞书账号 `cli_aad59e06a3fa5bee` 绑定的现有
+`agent-ff5e1a69`（游戏管理员）承担，不再维护独立 `game-wiki-growth` Agent：
 
 - `game-wiki-operator`：输入游戏信息，创建新站并交付 Cloudflare Pages。
-- `game-wiki-growth`：读取 GSC 数据，给一个已上线站点制定关键词/页面优化方案；用户批准后才修改该游戏自己的 Private repo。
+- `agent-ff5e1a69` 的 Growth 专项：读取 GSC 数据，给一个已上线站点制定关键词/页面优化方案；用户批准后才修改该游戏自己的 Private repo。
 
 它不修改 Factory、不接触广告、不修改 Cloudflare 环境变量或域名。
 
 Factory 新站默认只生成英语和西班牙语，英语立即公开，西班牙语第三个自然日公开。德语、法语、日语等后续语言由 Growth Agent 根据 GSC/GSA 的“查询语言 + 国家 + 当前排名页面”共同判断；国家流量本身不构成翻译依据。用户批准后，它只扩展现有 Private repo，不重建站点、repo、Pages 项目或域名。
 
-## 在服务器创建
+## 服务器部署
 
-OpenClaw 官方 CLI 支持为 Agent 指定独立 workspace。以 `ubuntu` 用户执行：
+将 Growth 规则作为专项附录同步到现有游戏管理员 workspace，不覆盖其原有
+CloudBase、开发和外链规则：
 
 ```bash
-mkdir -p /home/ubuntu/.openclaw/workspace-game-wiki-growth
-cp /srv/game-wiki-factory/app/deploy/openclaw-growth/{AGENTS,SOUL,TOOLS,IDENTITY,GROWTH-RUNBOOK}.md \
-  /home/ubuntu/.openclaw/workspace-game-wiki-growth/
-openclaw agents add game-wiki-growth \
-  --workspace /home/ubuntu/.openclaw/workspace-game-wiki-growth \
-  --non-interactive
-openclaw agents set-identity --agent game-wiki-growth --from-identity
-openclaw agents list
+cp /srv/game-wiki-factory/app/deploy/openclaw-growth/AGENTS.md \
+  /home/ubuntu/.openclaw/workspace/agent-ff5e1a69/GAME-WIKI-GROWTH.md
+cp /srv/game-wiki-factory/app/deploy/openclaw-growth/GROWTH-RUNBOOK.md \
+  /home/ubuntu/.openclaw/workspace/agent-ff5e1a69/GROWTH-RUNBOOK.md
+openclaw agents list --bindings
 ```
 
-不要一开始把现有聊天渠道绑定给它，以免抢占 `game-wiki-operator`。先本地验收：
+该 Agent 已绑定飞书 `cli_aad59e06a3fa5bee`。本地验收时使用现有 Agent ID：
 
 ```bash
-openclaw agent --local --agent game-wiki-growth \
-  --session-key agent:game-wiki-growth:audit-<site>-<date> \
+openclaw agent --local --agent agent-ff5e1a69 \
+  --session-key agent:agent-ff5e1a69:growth-audit-<site>-<date> \
   --message '只做只读审计：读取我提供的 GSC 导出和站点，不要修改 repo；输出 growth-plan。'
 ```
 
-根据 [OpenClaw Agent CLI](https://docs.openclaw.ai/cli/agents)，标准创建命令是
-`openclaw agents add <id> --workspace <path>`；渠道绑定应在本地验收通过后单独配置。
+不得把 `cli_aad59e06a3fa5bee` 改绑给 Factory Operator；新站生产仍由另一个飞书
+账号绑定的 `game-wiki-operator` 负责。
 
 ## 每次给 Agent 的输入
 

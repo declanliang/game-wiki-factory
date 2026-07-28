@@ -15,7 +15,7 @@
 - `contracts/`：输入、内容/SEO 和分批语言发布契约。
 - `operations/`：后台队列、服务器部署与故障处理。
 - `deployment/`：Git-integrated Cloudflare Pages 唯一发布方式。
-- `agents/`：OpenClaw Factory Agent 与独立 Growth Agent 的职责。
+- `agents/`：OpenClaw Factory Agent 与飞书游戏管理员中的 Growth 专项职责。
 - `advertising/`：独立广告 Agent 使用的 Adsterra 环境变量契约；不属于 Factory 主流程。
 - `releases/`：每个候选版本的验收边界。
 - `design/`：仍有参考价值的设计决策；它们不覆盖上面的生产契约。
