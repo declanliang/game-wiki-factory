@@ -564,6 +564,28 @@ def find_basic_output(search_roots: Iterable[Path], slug: str) -> Path | None:
     return None
 
 
+def validated_basic_outputs(root: Path) -> list[Path]:
+    """Return every complete Basic Info output below one per-job output root.
+
+    The canonical game title can legitimately produce a different slug from the
+    submitted project name (for example a Steam subtitle or Roblox's official
+    display name).  Directory presence alone is not a checkpoint: validate the
+    contract before selecting a generated result.
+    """
+    if not root.is_dir():
+        return []
+    outputs: list[Path] = []
+    for candidate in root.iterdir():
+        if not candidate.is_dir() or candidate.name == ".cache":
+            continue
+        try:
+            validate_basic_output(candidate)
+        except PipelineError:
+            continue
+        outputs.append(candidate)
+    return outputs
+
+
 def copy_template(template_dir: Path, site_dir: Path) -> None:
     if not template_dir.is_dir():
         raise PipelineError(f"Wiki template directory does not exist: {template_dir}")
@@ -810,16 +832,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         basic_root = state_dir / "basic-info"
         project_basic_output = basic_root / slug
-        project_basic_valid = False
-        if project_basic_output.is_dir() and not args.refresh_basic:
-            try:
-                validate_basic_output(project_basic_output)
-                project_basic_valid = True
-            except PipelineError:
-                project_basic_valid = False
-        if project_basic_valid:
-            basic_output = project_basic_output
+        project_basic_candidates = [] if args.refresh_basic else validated_basic_outputs(basic_root)
+        if len(project_basic_candidates) == 1:
+            basic_output = project_basic_candidates[0]
             record("basic", "reused", output=str(basic_output), checkpoint="validated")
+        elif len(project_basic_candidates) > 1:
+            raise PipelineError(
+                f"Multiple validated Basic Info outputs exist under {basic_root}; "
+                "use --basic-output to select the intended checkpoint."
+            )
         elif args.skip_basic:
             basic_output = args.basic_output.expanduser().resolve() if args.basic_output else find_basic_output(
                 [basic_dir, ROOT.parent / "auto-basic-info"], slug
@@ -852,18 +873,13 @@ def main(argv: list[str] | None = None) -> int:
                 run_log_path=run_log_path,
             )
             basic_output = basic_root / slug
-            if not basic_output.is_dir():
+            if basic_output not in validated_basic_outputs(basic_root):
                 # Steam's evidence-backed canonical title can be longer than the
                 # submitted project name, so Basic Info may publish under a
                 # different slug. Resolve the single validated output produced
                 # in this per-project state directory instead of assuming the
                 # request slug is also the canonical title slug.
-                candidates = [
-                    candidate for candidate in basic_root.iterdir()
-                    if candidate.is_dir()
-                    and candidate.name != ".cache"
-                    and (candidate / "template-intake" / "site-identity.json").is_file()
-                ]
+                candidates = validated_basic_outputs(basic_root)
                 if len(candidates) == 1:
                     basic_output = candidates[0]
             record("basic", "generated", output=str(basic_output))

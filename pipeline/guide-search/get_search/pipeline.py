@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
-from .classifier import build_keywords_json, extract_candidates, select_keywords, validate_keywords
+from .classifier import RISK_PATTERN, build_keywords_json, extract_candidates, select_keywords, validate_keywords
 from .client import DataForSEOClient
 from .collectors import (
     collect_autocomplete,
@@ -569,6 +569,21 @@ def run_pipeline(
     else:
         selected = rules_selected
         keywords = rules_keywords
+    # A model decision can occasionally echo a risky phrase from raw search
+    # evidence despite the candidate gate.  Reject that individual candidate
+    # deterministically instead of discarding the entire paid research run.
+    unsafe_selected = [item for item in selected if RISK_PATTERN.search(item.keyword)]
+    if unsafe_selected:
+        selected = [item for item in selected if not RISK_PATTERN.search(item.keyword)]
+        keywords = build_keywords_json(topic, selected)
+        llm_rejected.extend(
+            {
+                "keyword": item.keyword,
+                "reason": "risk filter rejected post-cluster keyword",
+                "action": "drop",
+            }
+            for item in unsafe_selected
+        )
     errors = validate_keywords(keywords)
     errors.extend(llm_audit_errors)
     source_counts = count_source_items(raw)

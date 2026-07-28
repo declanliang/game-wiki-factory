@@ -284,6 +284,19 @@ FORMATTED_QUESTION_RE = re.compile(
     r'^\s*\*\*[^\n]*(?:\?|？)\*\*\s*$', re.MULTILINE
 )
 BOLD_STANDALONE_RE = re.compile(r'^\s*\*\*[^\n]+\*\*\s*$', re.MULTILINE)
+DANGLING_SERP_SUFFIX_RE = re.compile(
+    r"\s+(?:and|or|with|for|to|the|a|an|in|on|at|of|from|into|this|that|your|our|"
+    r"und|oder|mit|für|y|o|con|para|et|ou|avec|pour)[.!?。！？…]*$",
+    re.IGNORECASE,
+)
+
+
+def _trim_dangling_serp_suffix(value: str) -> str:
+    """Remove a connector left behind by a model-truncated SERP field."""
+    trimmed = value.strip()
+    while DANGLING_SERP_SUFFIX_RE.search(trimmed):
+        trimmed = DANGLING_SERP_SUFFIX_RE.sub("", trimmed).rstrip(" ,.;:!?。！？…-–—&")
+    return trimmed
 
 
 def _compact_serp_field(
@@ -291,6 +304,8 @@ def _compact_serp_field(
 ) -> str:
     """Shorten over-limit translated metadata without retranslating the body."""
     value = value.strip()
+    if lang_code not in CJK_LANGUAGES:
+        value = _trim_dangling_serp_suffix(value)
     if len(value) <= limit:
         return value
     if prefer_sentence:
@@ -309,12 +324,7 @@ def _compact_serp_field(
         candidate = value[:limit]
     candidate = candidate.rstrip(" ,.;:!?-–—&")
     if not prefer_sentence:
-        candidate = re.sub(
-            r"\s+(?:and|or|with|for|to|the|a|an|in|on|at|of|from|into|this|that|your|our|und|oder|mit|für|y|o|con|para|et|ou|avec|pour)$",
-            "",
-            candidate,
-            flags=re.I,
-        ).rstrip(" ,.;:!?-–—&")
+        candidate = _trim_dangling_serp_suffix(candidate)
         return candidate
     return candidate[: max(1, limit - 1)].rstrip(" ,.;:!?-–—&") + "…"
 
@@ -345,6 +355,39 @@ def _compact_overlong_metadata(raw_content: str, lang_code: str) -> str | None:
         f"DESCRIPTION: {compact_description}\n"
         f"BODY:\n{body}"
     )
+
+
+def normalize_existing_metadata(articles_root: Path, target_langs: list[str]) -> int:
+    """Repair mechanically incomplete localized SERP fields in valid checkpoints.
+
+    This runs before a no-overwrite resume, so an old checkpoint that ended in
+    a dangling connector can proceed without regenerating its article body.
+    """
+    changed = 0
+    for lang_code in target_langs:
+        locale_root = articles_root / lang_code
+        if not locale_root.is_dir():
+            continue
+        limit = 36 if lang_code in CJK_LANGUAGES else 60
+        description_limit = 90 if lang_code in CJK_LANGUAGES else 160
+        for path in sorted(locale_root.glob("**/*.mdx")):
+            try:
+                fields = extract_source_fields(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            title = _compact_serp_field(fields["title"], limit, lang_code)
+            description = _compact_serp_field(
+                fields["description"], description_limit, lang_code, prefer_sentence=True,
+            )
+            if title == fields["title"] and description == fields["description"]:
+                continue
+            path.write_text(
+                _build_mdx(title, description, fields["category"], fields["date"], fields["body"]),
+                encoding="utf-8",
+            )
+            changed += 1
+            print(f"  [METADATA] [{lang_code.upper()}] normalized: {path.name}")
+    return changed
 
 
 def _has_repeated_chunk(content: str, min_repeats: int = 10,
@@ -673,9 +716,12 @@ async def run_translate(
         print(f"  ⏭️  Skipped {skipped} (already translated)\n")
 
     articles_root = Path(Config.DATA_DIR) / "articles"
+    metadata_normalized = normalize_existing_metadata(articles_root, ["en", *target_langs])
     if not all_tasks:
         deduplicate_translated_titles(articles_root, ["en", *target_langs])
         deduplicate_translated_descriptions(articles_root, ["en", *target_langs])
+        if metadata_normalized:
+            print(f"  Metadata normalized locally: {metadata_normalized}")
         print("  ℹ️  All articles already translated")
         return
 
@@ -797,6 +843,7 @@ async def run_translate(
             if i + batch_size < len(all_tasks):
                 await asyncio.sleep(batch_delay)
 
+    metadata_normalized += normalize_existing_metadata(articles_root, ["en", *target_langs])
     deduplicated = deduplicate_translated_titles(articles_root, ["en", *target_langs])
     descriptions_deduplicated = deduplicate_translated_descriptions(
         articles_root, ["en", *target_langs]
@@ -810,6 +857,7 @@ async def run_translate(
     print(f"  Failed:  {failed}")
     print(f"  Titles disambiguated locally: {deduplicated}")
     print(f"  Descriptions disambiguated locally: {descriptions_deduplicated}")
+    print(f"  Metadata normalized locally: {metadata_normalized}")
     for lang_code in target_langs:
         lang_dir = Path(Config.DATA_DIR) / "articles" / lang_code
         count = len(list(lang_dir.glob("**/*.mdx"))) if lang_dir.exists() else 0

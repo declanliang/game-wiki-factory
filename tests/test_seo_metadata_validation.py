@@ -14,6 +14,7 @@ from seoscout.translate import (
     _process_llm_response as process_translation,
     deduplicate_translated_descriptions,
     deduplicate_translated_titles,
+    normalize_existing_metadata,
 )
 
 
@@ -132,6 +133,23 @@ class SeoMetadataValidationTests(unittest.TestCase):
             descriptions = [content.split("description: ", 1)[1].splitlines()[0] for content in contents]
             self.assertEqual(len(set(descriptions)), 2)
             self.assertTrue(all("## Practical Steps" in content for content in contents))
+
+    def test_normalizes_existing_dangling_localized_metadata_without_touching_body(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "es" / "guide" / "game-steam-guide.mdx"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                build_translation_mdx("Guía de juego para", "Consejos para", "guide", "2026-07-21", BODY),
+                encoding="utf-8",
+            )
+            self.assertEqual(normalize_existing_metadata(root, ["es"]), 1)
+            content = path.read_text(encoding="utf-8")
+            self.assertIn('title: "Guía de juego"', content)
+            self.assertIn('description: "Consejos"', content)
+            self.assertIn("## Practical Steps", content)
 
 
 if __name__ == "__main__":

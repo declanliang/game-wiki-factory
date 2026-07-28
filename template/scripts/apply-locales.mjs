@@ -68,6 +68,7 @@ for (const locale of locales) {
   target.site.playUrl = env.OFFICIAL_GAME_URL;
   target.site.price = enMessages.site.price;
   target.site.priceCurrency = enMessages.site.priceCurrency;
+  target.site.datePublished = enMessages.site.datePublished;
   target.home.hero.title = GAME_NAME;
   target.home.hero.secondaryCtaHref = env.OFFICIAL_GAME_URL;
   target.home.hero.videoId = env.YOUTUBE_VIDEO_ID || "";
