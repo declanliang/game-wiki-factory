@@ -216,6 +216,58 @@ def deduplicate_translated_titles(articles_root: Path, target_langs: list[str]) 
     return changed
 
 
+def _unique_description(description: str, stem: str, common_prefix: list[str], lang_code: str) -> str:
+    """Add a compact, deterministic topic qualifier to a collapsed SERP description."""
+    tokens = stem.split('-')[len(common_prefix):] or stem.split('-')[-4:]
+    qualifier = ' '.join(token.capitalize() for token in tokens[-6:] if token)
+    limit = 90 if lang_code in CJK_LANGUAGES else 160
+    suffix = f" — {qualifier}."
+    base = _compact_serp_field(
+        description.rstrip(" .!?。！？…"), max(24, limit - len(suffix)), lang_code,
+        prefer_sentence=True,
+    ).rstrip(" .!?。！？…")
+    return f"{base}{suffix}"[:limit].rstrip(" ·-–—") + "."
+
+
+def deduplicate_translated_descriptions(articles_root: Path, target_langs: list[str]) -> int:
+    """Prevent localized articles with different intent from sharing one SERP description.
+
+    Translation models occasionally collapse two narrowly related pages into the
+    same description.  This is deterministic metadata-only repair: preserve the
+    body, retain the original description, and append the source-topic slug.
+    """
+    changed = 0
+    for lang_code in target_langs:
+        locale_root = articles_root / lang_code
+        if not locale_root.is_dir():
+            continue
+        records = []
+        for path in sorted(locale_root.glob('**/*.mdx')):
+            try:
+                fields = extract_source_fields(path.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                continue
+            records.append((path, fields))
+        groups: dict[str, list[tuple[Path, dict]]] = {}
+        for record in records:
+            groups.setdefault(record[1]['description'].casefold(), []).append(record)
+        for group in groups.values():
+            if len(group) < 2:
+                continue
+            common_prefix = _common_slug_prefix([path.stem for path, _fields in group])
+            for path, fields in group:
+                unique = _unique_description(
+                    fields['description'], path.stem, common_prefix, lang_code,
+                )
+                content = _build_mdx(
+                    fields['title'], unique, fields['category'], fields['date'], fields['body'],
+                )
+                path.write_text(content, encoding='utf-8')
+                changed += 1
+                print(f"  [DESCRIPTION] [{lang_code.upper()}] disambiguated description: {path.name}")
+    return changed
+
+
 MAX_ARTICLE_CHARS = 50_000
 REPEATED_WHITESPACE_RE = re.compile(r'\s{200,}')
 STARTS_WITH_METADATA_RE = re.compile(r'\Aexport const metadata\s*=\s*\{')
@@ -428,7 +480,11 @@ def validate_translation_against_source(
 
     # CJK translations use substantially fewer characters than English;
     # Latin-script translations normally stay close to the source length.
-    minimum_ratio = 0.45 if lang_code in CJK_LANGUAGES else 0.80
+    # CJK prose routinely conveys the same fully structured guide in materially
+    # fewer characters than English.  Heading/callout/list/FAQ parity and a
+    # terminal sentence still guard against truncation; 0.40 avoids rejecting
+    # complete Japanese checkpoints merely for being concise.
+    minimum_ratio = 0.40 if lang_code in CJK_LANGUAGES else 0.80
     length_ratio = len(translated_body) / max(1, len(source_body))
     if length_ratio < minimum_ratio:
         return False, (
@@ -619,6 +675,7 @@ async def run_translate(
     articles_root = Path(Config.DATA_DIR) / "articles"
     if not all_tasks:
         deduplicate_translated_titles(articles_root, ["en", *target_langs])
+        deduplicate_translated_descriptions(articles_root, ["en", *target_langs])
         print("  ℹ️  All articles already translated")
         return
 
@@ -741,6 +798,9 @@ async def run_translate(
                 await asyncio.sleep(batch_delay)
 
     deduplicated = deduplicate_translated_titles(articles_root, ["en", *target_langs])
+    descriptions_deduplicated = deduplicate_translated_descriptions(
+        articles_root, ["en", *target_langs]
+    )
 
     # Summary
     print("\n" + "=" * 70)
@@ -749,6 +809,7 @@ async def run_translate(
     print(f"  Saved:   {saved}")
     print(f"  Failed:  {failed}")
     print(f"  Titles disambiguated locally: {deduplicated}")
+    print(f"  Descriptions disambiguated locally: {descriptions_deduplicated}")
     for lang_code in target_langs:
         lang_dir = Path(Config.DATA_DIR) / "articles" / lang_code
         count = len(list(lang_dir.glob("**/*.mdx"))) if lang_dir.exists() else 0

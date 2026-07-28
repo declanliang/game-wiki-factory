@@ -12,6 +12,7 @@ from seoscout.generate import _process_llm_response as process_english, page_typ
 from seoscout.translate import (
     _build_mdx as build_translation_mdx,
     _process_llm_response as process_translation,
+    deduplicate_translated_descriptions,
     deduplicate_translated_titles,
 )
 
@@ -106,6 +107,31 @@ class SeoMetadataValidationTests(unittest.TestCase):
             self.assertEqual(len(set(titles)), 2)
             self.assertTrue(all("## Practical Steps" in content for content in contents))
             self.assertTrue(all("Use this evidence-backed tactic" in content for content in contents))
+
+    def test_disambiguates_duplicate_translated_descriptions_without_touching_body(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            paths = [
+                root / "fr" / "updates" / "game-steam-release-date.mdx",
+                root / "fr" / "guide" / "game-steam-full-release-date.mdx",
+            ]
+            for path in paths:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    build_translation_mdx(
+                        "Guide du jeu", "Découvrez la date de sortie officielle du jeu.",
+                        path.parent.name, "2026-07-21", BODY,
+                    ),
+                    encoding="utf-8",
+                )
+            changed = deduplicate_translated_descriptions(root, ["fr"])
+            self.assertEqual(changed, 2)
+            contents = [path.read_text(encoding="utf-8") for path in paths]
+            descriptions = [content.split("description: ", 1)[1].splitlines()[0] for content in contents]
+            self.assertEqual(len(set(descriptions)), 2)
+            self.assertTrue(all("## Practical Steps" in content for content in contents))
 
 
 if __name__ == "__main__":
