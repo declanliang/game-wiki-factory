@@ -16,7 +16,9 @@ from typing import Any
 
 
 SCHEMA_VERSION = 2
-FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja"]
+# Default production policy. The template can still support additional locales,
+# but new Factory jobs pay for and declare only English and Spanish.
+FIXED_LANGUAGES = ["en", "es"]
 MINIMUM_CATEGORIES = 1
 MAXIMUM_CATEGORIES = 8
 MAXIMUM_PROFILE_CANDIDATES = 16
@@ -517,7 +519,7 @@ def render_project_readme(
 
 ## 目录
 
-- `intake/`：网站最终输入的唯一事实源，包含身份、五语言首页配置、site-plan、素材和文章；应提交 Git。
+- `intake/`：网站最终输入的唯一事实源，包含身份、已生成语言首页配置、site-plan、素材和文章；应提交 Git。
 - `content/`、`src/config/site-plan.json`、`src/locales/`、`public/`：从 intake 机械生成的网站投影。
 - `.gamewiki/manifest.json`：可续跑 stage 状态和路径。
 - `.gamewiki/planning/`：game profile、Guide Search、site plan 和关键词决策。

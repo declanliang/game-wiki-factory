@@ -91,7 +91,12 @@ function walkFiles(dir, exts) {
 const scanTargets = [
   ...walkFiles(path.join(root, "src"), [".ts", ".tsx", ".json"]),
   path.join(root, "public", "manifest.json"),
-].filter((f) => fs.existsSync(f));
+].filter((file) => {
+  if (!fs.existsSync(file)) return false;
+  const localeDir = path.join(root, "src", "locales") + path.sep;
+  if (!file.startsWith(localeDir)) return true;
+  return GENERATED_LOCALES.includes(path.basename(file, ".json"));
+});
 let placeholderHits = 0;
 for (const file of scanTargets) {
   const matches = fs.readFileSync(file, "utf-8").match(/__[A-Z_]+__/g);

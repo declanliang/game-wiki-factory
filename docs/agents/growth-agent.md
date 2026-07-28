@@ -7,6 +7,8 @@
 
 它不修改 Factory、不接触广告、不修改 Cloudflare 环境变量或域名。
 
+Factory 新站默认只生成英语和西班牙语，英语立即公开，西班牙语第三个自然日公开。德语、法语、日语等后续语言由 Growth Agent 根据 GSC/GSA 的“查询语言 + 国家 + 当前排名页面”共同判断；国家流量本身不构成翻译依据。用户批准后，它只扩展现有 Private repo，不重建站点、repo、Pages 项目或域名。
+
 ## 在服务器创建
 
 OpenClaw 官方 CLI 支持为 Agent 指定独立 workspace。以 `ubuntu` 用户执行：

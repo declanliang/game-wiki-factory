@@ -24,7 +24,7 @@ class ProjectContractTests(unittest.TestCase):
             (intake / "site-identity.json").write_text(json.dumps({
                 "GAME_NAME": "Incremental Game",
                 "OFFICIAL_GAME_URL": "https://www.roblox.com/games/1/game",
-                "LANGUAGES": ["en", "es", "de", "fr", "ja"],
+                "LANGUAGES": FIXED_LANGUAGES,
             }), encoding="utf-8")
             (intake / "site-content.json").write_text(json.dumps({
                 "site": {"description": "Earn Stars, buy upgrades, and climb.", "gamePlatform": ["Roblox"]},

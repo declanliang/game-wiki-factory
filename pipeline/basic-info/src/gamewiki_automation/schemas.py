@@ -21,9 +21,10 @@ ISO_639_1_CODES = [
     "ta", "te", "tg", "th", "ti", "tk", "tl", "tn", "to", "tr", "ts", "tt", "tw", "ty",
     "ug", "uk", "ur", "uz", "ve", "vi", "vo", "wa", "wo", "xh", "yi", "yo", "za", "zh", "zu",
 ]
-# Product policy, not a per-game research result.  Every generated wiki ships the
-# same six high-value locales so downstream stages can be deterministic.
-DEFAULT_LANGUAGE_CODES = ["en", "es", "de", "fr", "ja"]
+# Product policy, not a per-game research result. New Factory sites generate
+# English and Spanish only. Other template-supported locales are post-launch
+# Growth Agent expansions backed by measured search demand and user approval.
+DEFAULT_LANGUAGE_CODES = ["en", "es"]
 MONETIZATION_LANGUAGE_CODES = list(DEFAULT_LANGUAGE_CODES)
 
 

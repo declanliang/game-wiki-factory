@@ -2,10 +2,7 @@
   "schemaVersion": 1,
   "generatedLocales": [
     "en",
-    "es",
-    "de",
-    "fr",
-    "ja"
+    "es"
   ],
   "publishedLocales": [
     "en"
@@ -14,10 +11,7 @@
     "mode": "sequential",
     "localeOrder": [
       "en",
-      "es",
-      "de",
-      "fr",
-      "ja"
+      "es"
     ],
     "intervalDays": 3,
     "timezone": "Asia/Shanghai",

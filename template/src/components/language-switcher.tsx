@@ -3,7 +3,6 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Check, Globe } from "lucide-react";
 import { routing, type Locale } from "@/i18n/routing";
-import type { GeneratedLocale } from "@/config/publication";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,13 +12,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 // Add an entry here whenever a new locale is added to `routing.ts`.
-const LOCALE_LABELS: Record<GeneratedLocale, string> = {
+const LOCALE_LABELS = {
   en: "English",
   es: "Español",
   de: "Deutsch",
   fr: "Français",
   ja: "日本語",
-};
+} satisfies Record<string, string>;
 
 /**
  * 语言切换器（下拉菜单版）：点击 Globe 图标展开所有语言列表
@@ -47,7 +46,11 @@ export function LanguageSwitcher({ locale }: { locale: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
           <Globe className="h-4 w-4" />
           <span>{LOCALE_LABELS[locale as Locale]}</span>
         </Button>
@@ -60,7 +63,9 @@ export function LanguageSwitcher({ locale }: { locale: string }) {
             className="flex items-center justify-between gap-3"
           >
             <span>{LOCALE_LABELS[loc]}</span>
-            {loc === (locale as Locale) && <Check className="h-4 w-4 text-[hsl(var(--nav-theme))]" />}
+            {loc === (locale as Locale) && (
+              <Check className="h-4 w-4 text-[hsl(var(--nav-theme))]" />
+            )}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

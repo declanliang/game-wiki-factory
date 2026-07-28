@@ -6,15 +6,22 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const expected = ["en", "es", "de", "fr", "ja"];
+const supported = ["en", "es", "de", "fr", "ja"];
 const planPath = path.join(root, "intake", "site-plan.json");
 if (!fs.existsSync(planPath)) {
   console.error("缺少 intake/site-plan.json");
   process.exit(1);
 }
 const plan = JSON.parse(fs.readFileSync(planPath, "utf-8"));
-if (JSON.stringify(plan.languages) !== JSON.stringify(expected)) {
-  console.error(`site-plan languages 必须是 ${expected.join(", ")}`);
+const expected = plan.languages;
+if (
+  !Array.isArray(expected)
+  || expected.length < 1
+  || expected[0] !== "en"
+  || new Set(expected).size !== expected.length
+  || expected.some((locale) => !supported.includes(locale))
+) {
+  console.error(`site-plan languages 必须是以 en 开头的支持语言子集：${supported.join(", ")}`);
   process.exit(1);
 }
 for (const locale of expected) {

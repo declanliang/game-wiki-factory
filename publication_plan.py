@@ -1,7 +1,8 @@
 """Shared contract for staged locale publication.
 
-All translations are generated and quality-checked together.  Only the locales
-listed in ``publishedLocales`` are emitted as public routes by the template.
+English and Spanish are generated and quality-checked together. Only English is
+initially public; Spanish is released three natural days later by a persistent
+background job. Other template-supported locales are explicit Growth projects.
 """
 
 from __future__ import annotations
@@ -10,8 +11,8 @@ from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 
-GENERATED_LOCALES = ("en", "es", "de", "fr", "ja")
-LOCALE_RELEASE_ORDER = ("en", "es", "de", "fr", "ja")
+GENERATED_LOCALES = ("en", "es")
+LOCALE_RELEASE_ORDER = ("en", "es")
 PUBLICATION_TIMEZONE = "Asia/Shanghai"
 PUBLICATION_INTERVAL_DAYS = 3
 PUBLICATION_HOUR = 10

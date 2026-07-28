@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const expectedLocales = ["en", "es", "de", "fr", "ja"];
+const supportedLocales = ["en", "es", "de", "fr", "ja"];
 let errors = 0;
 let warnings = 0;
 const fail = (message) => { console.error(`\x1b[31m✗\x1b[0m ${message}`); errors++; };
@@ -57,8 +57,14 @@ const siteTheme = readJson("intake/site-theme.json");
 const themeSource = fs.existsSync(path.join(root, "src", "config", "theme.ts"))
   ? fs.readFileSync(path.join(root, "src", "config", "theme.ts"), "utf-8")
   : "";
-if (JSON.stringify(plan.languages) !== JSON.stringify(expectedLocales)) {
-  fail(`site-plan 语言必须是 ${expectedLocales.join(", ")}`);
+const expectedLocales = plan.languages || [];
+if (
+  expectedLocales.length < 1
+  || expectedLocales[0] !== "en"
+  || new Set(expectedLocales).size !== expectedLocales.length
+  || expectedLocales.some((locale) => !supportedLocales.includes(locale))
+) {
+  fail(`site-plan 语言必须是以 en 开头的支持语言子集：${supportedLocales.join(", ")}`);
 }
 if (!themeSource.includes(`export const SITE_THEME = ${JSON.stringify(siteTheme.preset)}`)) {
   fail("src/config/theme.ts 未与 intake/site-theme.json 同步；先运行 npm run sync:theme");
@@ -67,7 +73,7 @@ if (!themeSource.includes(`export const SITE_THEME = ${JSON.stringify(siteTheme.
 }
 const publishedLocales = publicationPlan.publishedLocales || [];
 if (JSON.stringify(publicationPlan.generatedLocales) !== JSON.stringify(expectedLocales)) {
-  fail(`publication-plan 生成语言必须是 ${expectedLocales.join(", ")}`);
+  fail("publication-plan 生成语言必须与 site-plan.languages 一致");
 }
 if (
   publishedLocales.length < 1

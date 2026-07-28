@@ -5,7 +5,7 @@
 ## 先确认边界
 
 - Factory 源码：`declanliang/game-wiki-factory`，包含调研、文章、翻译、模板、发布和后台任务系统。
-- 每个已发布游戏是独立 Private GitHub repo，包含可部署源码、`intake/` 和五语言 `content/`。
+- 每个已发布游戏是独立 Private GitHub repo，包含可部署源码、`intake/` 和已生成语言的 `content/`。
 - `.gamewiki/` 原始搜索、LLM 调试响应和 checkpoint 不进 Git。服务器完全丢失后，已发布网站可从游戏 repo 恢复，但未发布任务的中间 checkpoint 只有在另行备份时才能恢复。
 - 生产密钥应存放在密码管理器或独立加密备份；GitHub 不是密钥备份。
 

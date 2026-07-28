@@ -5,7 +5,7 @@
 ## 1. 当前产品边界
 
 - Factory 只支持 Roblox 和 Steam。
-- 固定语言及顺序为 `en/es/de/fr/ja`。
+- Factory 新站固定生成语言为 `en/es`；模板仍支持 `de/fr/ja` 供 Growth Agent 后续扩展。
 - Factory 源码只在本仓库；游戏产物位于 Factory 同级的 `../<slug>/`，游戏目录本身就是 Next.js 根。
 - 付费、可恢复状态在游戏根 `.gamewiki/`；最终可部署输入在 `intake/`。
 - 后台站点任务默认完成 Private GitHub、Git-integrated Pages、`NEXT_PUBLIC_SITE_URL` 和部署。运营者只负责自定义域名绑定/DNS；正式域名尚未可达时状态为 `awaiting_domain_configuration`。
@@ -86,7 +86,7 @@ git rev-parse HEAD
 
 站点 Job 可以在以下条件下标记 `succeeded`：
 
-- 内容、五语言一致性、MDX、TypeScript 和 production build 通过；
+- 内容、已声明语言一致性、MDX、TypeScript 和 production build 通过；
 - 新 GitHub 仓库已创建且为 Private；
 - `result.hosting.provider` 为 `cloudflare-pages`，且 `result.hosting.status` 为 `complete` 或 `awaiting_domain_configuration`。
 

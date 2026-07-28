@@ -77,7 +77,7 @@ python -m gamewiki_automation "Anime Expeditions" "PursuitCore"
 - PursuitCore rejectedCandidates 包含 `84498985865861`。
 - 两个 `validation-report.json` 都不能是 `fail`。
 - 两个 `template-validation-report.json` 必须是 `pass`。
-- `site-identity.json` 只能有规范的 7 个大写 key（含 `LANGUAGES`）；语言是固定产品策略，必须严格为 `en/es/de/fr/ja`，不再执行单游戏语言市场调研。`site-content.json` 顶层只能有 `site/home`。
+- `site-identity.json` 只能有规范的 7 个大写 key（含 `LANGUAGES`）；Factory 新站语言策略必须严格为 `en/es`，不在建站阶段执行单游戏语言市场调研。`de/fr/ja` 属于上线后的 Growth Agent 扩展。`site-content.json` 顶层只能有 `site/home`。
 - Hero stats 不超过 4 个 `{value,label}` 对象，FAQ answer 必须为 1–3 句。
 - 缓存回归时所有 LLM call 的 `cached` 应为 true，本次费用应为 0。
 

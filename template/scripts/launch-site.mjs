@@ -48,7 +48,7 @@ if (locales.length > 0) {
 // Run after all structured locale content has been merged so category labels
 // and internal links are projected from the final published site plan.
 step("同步内容分类与首页内链", "npm run sync:categories");
-step("生成五语言首页精选攻略", "npm run generate:featured");
+step("生成已声明语言首页精选攻略", "npm run generate:featured");
 
 step("全站验证", `npm run verify:site${args.includes("--skip-build") ? " -- --skip-build" : ""}`);
 

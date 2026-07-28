@@ -45,7 +45,7 @@ intake/
    ├─ ja/<category>/*.mdx
 ```
 
-`site-plan.json` 是语言、分类、顺序和发布状态的唯一事实源。模板不会从 `content/en` 反推分类，也不会用正则修改 TypeScript 配置。五语言固定为 `en/es/de/fr/ja`。
+`site-plan.json` 是语言、分类、顺序和发布状态的唯一事实源。模板不会从 `content/en` 反推分类，也不会用正则修改 TypeScript 配置。模板支持 `en/es/de/fr/ja`，Factory 新站默认只声明 `en/es`。
 
 ## 生成站点
 
@@ -56,7 +56,7 @@ npm run launch:site
 
 流水线依次执行：
 
-1. 校验 intake、五语言和 published 分类。
+1. 校验 intake、已声明语言和 published 分类。
 2. 应用身份、首页文案和素材。
 3. 清空生成的 `content/`，从 intake 幂等导入文章。
 4. 将 intake site-plan 复制为 `src/config/site-plan.json`。
@@ -98,7 +98,7 @@ Factory 会通过 Pages API 创建连接 Private GitHub `main` 的项目，Root 
 - site-plan 至少包含 1 个有真实关键词证据、最多 8 个 published 分类；不为数量生成 fallback 分类，每种语言必须交付相同文章树。
 - `NEXT_PUBLIC_SITE_URL` 集中规范化：裸域名自动补 HTTPS，非法协议在构建前失败；`verify:deploy` 会检查线上 metadata、self-canonical 和 sitemap 直接 200，而不只检查首页 HTTP 200。
 - 首页按“媒体入口 + 信息枢纽”组织：Hero 直接给出主要任务入口，下面不重复身份条；正文、分类和更新区使用受控宽度；系统与专题卡片使用分类语义图标而不是无意义编号；固定深色阅读面配合每个游戏的一个审核主题强调色，不提供明暗切换。Footer 的内容导航总标题统一为 `Wiki`，避免和其中的 Guides 分类重名。
-- 分类标签和描述来自 site-plan 的五语言 `labels` / `descriptions`，模板只负责机械使用。
+- 分类标签和描述来自 site-plan 已声明语言的 `labels` / `descriptions`，模板只负责机械使用。
 - 所有语言都使用显式前缀（`/en`、`/es`、`/de`、`/fr`、`/ja`），根 URL 301 到 `/en`；JSON-LD 和 sitemap 使用同一套路径。缺少译文时构建失败，不做英语回退。
 - 具体游戏仓库必须提交 `intake/`；原始调研、cache 和日志位于被 Git 忽略的 `.gamewiki/`。
 - 广告变量全部可选；环境变量未配置时页面保持原布局，不展示广告，也不预留空白。

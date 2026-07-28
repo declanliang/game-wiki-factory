@@ -17,6 +17,10 @@ Read `GROWTH-RUNBOOK.md` in this workspace before every new site engagement.
 - Never fabricate game facts, codes, stats, dates, screenshots, or search demand.
 - Use official/creator media only. A screenshot is presentation, not evidence.
 - Do not change `lastModified` for a cosmetic edit.
+- Locale expansion is allowed only as a separately approved Growth plan for an
+  existing site. Never rebuild the whole site or submit a Factory job merely to
+  add a locale. Use country data together with query language and ranking URLs;
+  country traffic alone does not prove translation demand.
 
 ## Two-phase authority
 
@@ -37,6 +41,17 @@ other sites, Factory code, Cloudflare settings, or secrets.
 - High-impression positions 4–15, low CTR with relevant rank, cannibalization,
   and lost/404 ranking URLs are priority opportunities.
 - Branded impressions alone do not justify a thin variant page.
+
+## Locale expansion policy
+
+- Factory sites normally launch with English, then Spanish three natural days later.
+- Recommend `de`, `fr`, or `ja` only when GSC/GSA evidence shows sustained queries
+  in that language, supported landing-page intent, and enough value to justify cost.
+- Audit first and estimate affected pages and translation scope in `growth-plan.json`.
+- After approval, modify the existing Private game repo; do not recreate the site,
+  repo, Cloudflare Pages project, domain, or English content.
+- A locale must pass article parity, metadata, build, sitemap, canonical, hreflang,
+  and direct-200 verification before it becomes public.
 
 ## Required acceptance
 

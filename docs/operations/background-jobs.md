@@ -6,12 +6,12 @@
 
 Factory 只接收新站任务。每个游戏从空 workspace 执行信息采集、关键词、页面规划、文章、翻译、模板、构建和 QA，并创建自己的 Private GitHub repo 与 Git-integrated Cloudflare Pages 项目。GitHub 发布前必须完成本地生产验收。
 
-`v1_0728` 将“生成语言”和“公开语言”分离：`en/es/de/fr/ja` 仍在首个
-站点 Job 中一次生成并完成一致性 QA，但初始路由、sitemap 和 hreflang 只有
-`en`。站点成功后只排入下一个内部 `localeRelease` Job；它在第三个后续自然日
+`v1_0728` 将“生成语言”和“公开语言”分离：`en/es` 在首个站点 Job 中
+一次生成并完成一致性 QA，但初始路由、sitemap 和 hreflang 只有 `en`。
+站点成功后只排入一个内部 `localeRelease` Job；它在第三个后续自然日
 （`10:00 Asia/Shanghai`）提交 `intake/publication-plan.json`，由 Cloudflare
-Pages 的 Git 集成部署。一次只安排一个后继语言，因此服务器停机恢复不会把
-多个逾期语言同时发布。
+Pages 的 Git 集成部署西班牙语。该计划保存在 SQLite 中，不依赖原始 Job
+租约或临时 workspace。`de/fr/ja` 只由 Growth Agent 在用户批准后扩展。
 
 OpenClaw、命令行和未来管理界面只提交或控制任务；真正的长任务由独立 Worker 进程执行。关闭终端或 Agent 对话不得改变数据库中的任务状态，服务器重启后 Worker 可重新领取中断任务。
 
@@ -76,7 +76,7 @@ Supervisor 在磁盘达到暂停阈值时不会恢复任务。
 
 ## Checkpoint 保留边界
 
-每个 Private 网站仓库已跟踪最终、可部署且成本最高的产物：`intake/` 与五语言 `content/`。不要把整个 `.gamewiki/` 提交到 Git：原始搜索页、视频转录、LLM 调试响应和二进制归档会快速膨胀 Git 历史，也可能包含不适合长期复制的第三方上下文。
+每个 Private 网站仓库已跟踪最终、可部署且成本最高的产物：`intake/` 与已生成语言的 `content/`。不要把整个 `.gamewiki/` 提交到 Git：原始搜索页、视频转录、LLM 调试响应和二进制归档会快速膨胀 Git 历史，也可能包含不适合长期复制的第三方上下文。
 
 运行中的断点续跑依赖服务器 workspace；发布成功后 GitHub 是网站源码的长期存档。若未来确实需要跨服务器恢复原始调研 checkpoint，应使用带生命周期和访问控制的对象存储，并在 Factory 中记录对象哈希；不要使用 Git/LFS 充当任务缓存。
 - `succeeded`：完整流程和要求的发布完成。

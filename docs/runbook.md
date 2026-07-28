@@ -125,7 +125,7 @@ npm run launch:site
 成功必须同时满足：
 
 - intake 0 error
-- 五语言生成文章树一致；公开路由由 `publication-plan.json` 的顺序前缀决定
+- `en/es` 生成文章树一致；公开路由由 `publication-plan.json` 的顺序前缀决定；其他语言只由 Growth Agent 扩展
 - 全部 MDX 结构通过
 - TypeScript 通过
 - 配置同步通过

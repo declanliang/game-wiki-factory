@@ -47,3 +47,13 @@ Run local checks and production build, commit intentionally, push `main`, wait
 for the Git-integrated Cloudflare Pages deployment, and verify live output.
 Choose a follow-up date at least 14 days later; compare like-for-like GSC
 windows and do not declare success from same-day rank movement.
+
+## 7. Evaluate optional locales
+
+Treat country and language as separate signals. A German visitor using an
+English query is not sufficient evidence for German translation. For `de`,
+`fr`, or `ja`, record localized queries, impressions, trend, current English
+landing URLs, distinct page intents, estimated page count, and translation
+cost. Propose a locale expansion before editing. Once approved, translate only
+the existing site's required content, add the locale to its plan, verify the
+complete public locale, and push the existing repo.

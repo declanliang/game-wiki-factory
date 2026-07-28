@@ -25,7 +25,7 @@ const ok = (msg) => console.log(`\x1b[32m✓\x1b[0m ${msg}`);
 const info = (msg) => console.log(`\x1b[36mi\x1b[0m ${msg}`);
 
 const { env, identity, resolvedByConvention, videoId } = resolveIntakeConfig(root, { warn });
-const FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja"];
+const SUPPORTED_LANGUAGES = ["en", "es", "de", "fr", "ja"];
 const sitePlanPath = path.join(root, "intake", "site-plan.json");
 const publicationPlanPath = path.join(root, "intake", "publication-plan.json");
 const siteThemePath = path.join(root, "intake", "site-theme.json");
@@ -36,16 +36,17 @@ if (!fs.existsSync(sitePlanPath)) {
   try {
     sitePlan = JSON.parse(fs.readFileSync(sitePlanPath, "utf-8"));
     if (sitePlan.schemaVersion !== 2) fail("intake/site-plan.json schemaVersion 必须是 2");
-    if (JSON.stringify(sitePlan.languages) !== JSON.stringify(FIXED_LANGUAGES)) {
-      fail(`site-plan.languages 必须是固定策略 ${FIXED_LANGUAGES.join(", ")}`);
+    const declaredLanguages = sitePlan.languages;
+    if (!Array.isArray(declaredLanguages) || declaredLanguages[0] !== "en" || new Set(declaredLanguages).size !== declaredLanguages.length || declaredLanguages.some((locale) => !SUPPORTED_LANGUAGES.includes(locale))) {
+      fail(`site-plan.languages 必须是以 en 开头的支持语言子集：${SUPPORTED_LANGUAGES.join(", ")}`);
     }
     const published = (sitePlan.categories || []).filter((category) => category.status === "published");
     for (const category of published) {
-      if (!category.labels || FIXED_LANGUAGES.some((locale) => !category.labels[locale])) {
-        fail(`site-plan 分类 ${category.id || "(missing id)"} 缺少五语言 labels`);
+      if (!category.labels || declaredLanguages.some((locale) => !category.labels[locale])) {
+        fail(`site-plan 分类 ${category.id || "(missing id)"} 缺少已声明语言 labels`);
       }
-      if (!category.descriptions || FIXED_LANGUAGES.some((locale) => !category.descriptions[locale])) {
-        fail(`site-plan 分类 ${category.id || "(missing id)"} 缺少五语言 descriptions`);
+      if (!category.descriptions || declaredLanguages.some((locale) => !category.descriptions[locale])) {
+        fail(`site-plan 分类 ${category.id || "(missing id)"} 缺少已声明语言 descriptions`);
       }
     }
     if (published.length < Number(sitePlan.categoryPolicy?.minimum ?? 1)) {
@@ -82,25 +83,26 @@ if (!fs.existsSync(publicationPlanPath)) {
     const published = publicationPlan.publishedLocales;
     const policy = publicationPlan.releasePolicy || {};
     if (publicationPlan.schemaVersion !== 1) fail("publication-plan schemaVersion 必须是 1");
-    if (JSON.stringify(publicationPlan.generatedLocales) !== JSON.stringify(FIXED_LANGUAGES)) {
-      fail(`publication-plan.generatedLocales 必须是 ${FIXED_LANGUAGES.join(", ")}`);
+    const generated = publicationPlan.generatedLocales;
+    if (JSON.stringify(generated) !== JSON.stringify(sitePlan?.languages)) {
+      fail("publication-plan.generatedLocales 必须与 site-plan.languages 完全一致");
     }
     if (
       !Array.isArray(published)
       || published.length < 1
-      || JSON.stringify(published) !== JSON.stringify(FIXED_LANGUAGES.slice(0, published.length))
+      || JSON.stringify(published) !== JSON.stringify(generated.slice(0, published.length))
     ) {
-      fail("publication-plan.publishedLocales 必须按 en → es → de → fr → ja 顺序逐步增加");
+      fail(`publication-plan.publishedLocales 必须按 ${generated.join(" → ")} 顺序逐步增加`);
     }
     if (
       policy.mode !== "sequential"
-      || JSON.stringify(policy.localeOrder) !== JSON.stringify(FIXED_LANGUAGES)
+      || JSON.stringify(policy.localeOrder) !== JSON.stringify(generated)
       || policy.intervalDays !== 3
       || policy.timezone !== "Asia/Shanghai"
     ) {
       fail("publication-plan.releasePolicy 必须是每 3 个自然日、Asia/Shanghai、顺序发布");
     } else {
-      ok(`公开语言：${published.join(", ")}；其余译文已生成但暂不进入公开路由`);
+      ok(`公开语言：${published.join(", ")}；其余已生成语言暂不进入公开路由`);
     }
   } catch (error) {
     fail(`intake/publication-plan.json 不是合法 JSON：${error.message}`);

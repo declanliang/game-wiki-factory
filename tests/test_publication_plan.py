@@ -12,9 +12,9 @@ from publication_plan import (
 
 
 class PublicationPlanTests(unittest.TestCase):
-    def test_new_site_generates_all_languages_but_publishes_english_only(self) -> None:
+    def test_new_site_generates_english_and_spanish_but_publishes_english_only(self) -> None:
         plan = build_publication_plan(datetime(2026, 7, 28, 4, 30, tzinfo=timezone.utc))
-        self.assertEqual(plan["generatedLocales"], ["en", "es", "de", "fr", "ja"])
+        self.assertEqual(plan["generatedLocales"], ["en", "es"])
         self.assertEqual(plan["publishedLocales"], ["en"])
         self.assertEqual(plan["releasePolicy"]["intervalDays"], 3)
         self.assertEqual(plan["releasePolicy"]["timezone"], "Asia/Shanghai")
@@ -29,8 +29,7 @@ class PublicationPlanTests(unittest.TestCase):
 
     def test_release_order_is_fixed_and_prefix_only(self) -> None:
         self.assertEqual(next_locale(["en"]), "es")
-        self.assertEqual(next_locale(["en", "es", "de", "fr"]), "ja")
-        self.assertIsNone(next_locale(["en", "es", "de", "fr", "ja"]))
+        self.assertIsNone(next_locale(["en", "es"]))
         plan = build_publication_plan()
         plan["publishedLocales"] = ["en", "de"]
         with self.assertRaisesRegex(ValueError, "prefix"):

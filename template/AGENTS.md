@@ -5,9 +5,9 @@
 ## 不可破坏的规则
 
 - 不提交真实游戏的 intake、content、图片、locale 文案或构建输出。
-- 分类、五语言标签与分类描述只能读取 `intake/site-plan.json` / `src/config/site-plan.json`。
+- 分类、已声明语言的标签与分类描述只能读取 `intake/site-plan.json` / `src/config/site-plan.json`。
 - 不恢复“扫描 content/en 后用正则改 navigation.ts/content.ts”的旧设计。
-- 固定支持 `en/es/de/fr/ja`；非英语缺文案或文章必须失败，不能静默用英文站冒充翻译站。
+- 模板能力保留 `en/es/de/fr/ja`；Factory 新站默认只声明并生成 `en/es`，初始只公开 `en`，三天后公开 `es`。任何已声明的非英语语言缺文案或文章必须失败，不能静默用英文站冒充翻译站。`de/fr/ja` 只能由独立 Growth Agent 根据真实搜索需求和用户批准扩展。
 - 每个页面必须 self-canonical；HTML、sitemap 与 JSON-LD 必须使用相同的 locale-aware URL。
 - ingest 必须先清理生成 content，且拒绝 site-plan 未声明的语言/分类。
 - 模板脚本必须幂等；同一 intake 连续运行两次结果应一致。

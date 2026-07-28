@@ -8,7 +8,7 @@ import path from "node:path";
 const root = process.cwd();
 const source = path.join(root, "intake", "site-plan.json");
 const target = path.join(root, "src", "config", "site-plan.json");
-const FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja"];
+const SUPPORTED_LANGUAGES = ["en", "es", "de", "fr", "ja"];
 
 function fail(message) {
   console.error(`\x1b[31m✗\x1b[0m ${message}`);
@@ -24,18 +24,19 @@ try {
 }
 
 if (plan.schemaVersion !== 2 || !Array.isArray(plan.categories)) fail("site-plan schemaVersion/categories 不合法");
-if (JSON.stringify(plan.languages) !== JSON.stringify(FIXED_LANGUAGES)) {
-  fail(`site-plan languages 必须是固定策略 ${FIXED_LANGUAGES.join(", ")}`);
+const languages = plan.languages;
+if (!Array.isArray(languages) || languages[0] !== "en" || new Set(languages).size !== languages.length || languages.some((locale) => !SUPPORTED_LANGUAGES.includes(locale))) {
+  fail(`site-plan languages 必须是以 en 开头的支持语言子集：${SUPPORTED_LANGUAGES.join(", ")}`);
 }
 const ids = plan.categories.map((category) => category.id);
 if (new Set(ids).size !== ids.length) fail("site-plan categories 包含重复 id");
 for (const category of plan.categories) {
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(category.id || "")) fail(`非法分类 id：${category.id}`);
-  if (!category.labels || FIXED_LANGUAGES.some((locale) => !category.labels[locale])) {
-    fail(`分类 ${category.id} 缺少五语言 labels`);
+  if (!category.labels || languages.some((locale) => !category.labels[locale])) {
+    fail(`分类 ${category.id} 缺少已声明语言 labels`);
   }
-  if (!category.descriptions || FIXED_LANGUAGES.some((locale) => !category.descriptions[locale])) {
-    fail(`分类 ${category.id} 缺少五语言 descriptions`);
+  if (!category.descriptions || languages.some((locale) => !category.descriptions[locale])) {
+    fail(`分类 ${category.id} 缺少已声明语言 descriptions`);
   }
 }
 const published = plan.categories.filter((category) => category.status === "published");
@@ -76,7 +77,7 @@ function rewriteUnpublishedInternalLinks(value, key = "", stats = { rewritten: 0
 
 // Category labels/list-page headings and category destinations are
 // deterministic plan data. Structured game copy has already been merged.
-for (const locale of FIXED_LANGUAGES) {
+for (const locale of languages) {
   const localePath = path.join(root, "src", "locales", `${locale}.json`);
   let messages = fs.existsSync(localePath) ? JSON.parse(fs.readFileSync(localePath, "utf-8")) : {};
   messages.nav ||= {};

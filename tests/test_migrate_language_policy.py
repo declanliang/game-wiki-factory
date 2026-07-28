@@ -9,7 +9,7 @@ from migrate_language_policy import migrate
 
 
 class LanguagePolicyMigrationTests(unittest.TestCase):
-    def test_removes_retired_locale_without_touching_supported_content(self) -> None:
+    def test_reduces_project_to_current_default_locales(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary) / "site"
             (project / "intake" / "articles" / "en").mkdir(parents=True)
@@ -33,9 +33,9 @@ class LanguagePolicyMigrationTests(unittest.TestCase):
             (project / "intake" / "site-content.ko.json").write_text("{}", encoding="utf-8")
             (project / "src" / "locales" / "ko.json").write_text("{}", encoding="utf-8")
 
-            self.assertEqual(migrate(project), ["ko"])
+            self.assertEqual(migrate(project), ["de", "fr", "ja", "ko"])
             plan = json.loads((project / "intake" / "site-plan.json").read_text(encoding="utf-8"))
-            self.assertEqual(plan["languages"], ["en", "es", "de", "fr", "ja"])
+            self.assertEqual(plan["languages"], ["en", "es"])
             self.assertNotIn("ko", plan["categories"][0]["labels"])
             self.assertTrue((project / "intake" / "articles" / "en").is_dir())
             self.assertFalse((project / "intake" / "articles" / "ko").exists())
