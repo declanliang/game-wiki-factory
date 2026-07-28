@@ -25,6 +25,7 @@ from publisher import (
     _vercel_project_payload,
     _verify_online_deployment,
     _wait_cloudflare_deployment,
+    _wait_cloudflare_commit_deployment,
 )
 
 
@@ -317,6 +318,32 @@ class PublisherValidationTests(unittest.TestCase):
                 attempts=1,
             )
 
+    @patch("publisher._wait_cloudflare_deployment")
+    @patch("publisher._cloudflare_request")
+    def test_git_integration_deployment_is_discovered_by_commit(
+        self, request, wait_deployment
+    ) -> None:
+        request.return_value = [
+            {
+                "id": "deployment-id",
+                "environment": "production",
+                "deployment_trigger": {"metadata": {"commit_hash": "abc123"}},
+            }
+        ]
+        wait_deployment.return_value = {"id": "deployment-id"}
+        result = _wait_cloudflare_commit_deployment(
+            "account", "token", "game", "abc123", discovery_attempts=1
+        )
+        self.assertEqual(result["id"], "deployment-id")
+        wait_deployment.assert_called_once_with(
+            "account",
+            "token",
+            "game",
+            "deployment-id",
+            "abc123",
+            log_path=None,
+        )
+
     def test_only_vercel_oidc_env_is_removed_automatically(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary)
@@ -334,10 +361,16 @@ class PublisherValidationTests(unittest.TestCase):
         (root / "intake").mkdir()
         (root / ".gamewiki" / "manifest.json").write_text(json.dumps({"status": "complete"}), encoding="utf-8")
         (root / "package.json").write_text("{}", encoding="utf-8")
-        for name in ("site-identity.json", "site-content.json", "site-plan.json"):
+        for name in (
+            "site-identity.json",
+            "site-content.json",
+            "site-plan.json",
+            "publication-plan.json",
+            "site-theme.json",
+        ):
             (root / "intake" / name).write_text("{}", encoding="utf-8")
         (root / "intake" / "factory-release.json").write_text(
-            json.dumps({"release": "v1_0722"}), encoding="utf-8"
+            json.dumps({"release": "v1_0728"}), encoding="utf-8"
         )
         return root
 

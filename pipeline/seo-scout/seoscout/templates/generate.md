@@ -29,6 +29,13 @@ Generate a title based on the keyword field in the reference material:
 6. Label community-sourced info as "player experience" or "community reports"
 7. Include 1 authoritative external link (official site, Steam, major gaming media)
 8. Use descriptive anchor text for all links
+9. Limited overlap with neighboring wiki pages is acceptable for prerequisites,
+   game identity, and closely related mechanics. The page's direct answer,
+   decision support, examples, and main H2 sequence must remain specific to its
+   own player question. Never pad by rewriting a neighboring page.
+10. The research query may include "Roblox" or "Steam" only to disambiguate
+    sources. Do not force that platform word into the title when the natural
+    player-facing keyword and game identity are already clear.
 
 ## Article Structure
 

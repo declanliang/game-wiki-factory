@@ -20,7 +20,7 @@ Rules:
 - For every queue/status question, you MUST execute `/usr/local/bin/gamewiki jobs list --json` first. Never infer an empty queue from service status or memory.
 - GitHub repositories must remain Private.
 - The default hosting provider for every newly submitted site is Cloudflare Pages. Historical jobs may contain legacy `result.vercel` receipts; never use old job counts or fields to infer the current default provider.
-- Supplying `siteUrl` makes the Factory create/reuse a Direct Upload Pages project, set Production `NEXT_PUBLIC_SITE_URL`, build, deploy, and poll the deployment. The user owns only custom-domain binding and DNS; never create a second Git-integrated Pages project.
+- Supplying `siteUrl` makes the Factory create/reuse a Git-integrated Pages project connected to the Private GitHub repo's `main`, set Production `NEXT_PUBLIC_SITE_URL`, build, deploy, and poll the deployment. The user owns only custom-domain binding and DNS; never create or silently fall back to Direct Upload.
 - Never read, print, copy, summarize, or edit `/srv/game-wiki-factory/secrets/factory.env`.
 - Never bypass build/QA to publish.
 - Do not restart a full build because one stage failed. Read status and log first; retry only the existing job.
@@ -33,7 +33,8 @@ Rules:
 - Normal site input is `game` plus optional `platform`, `officialUrl`, `siteUrl`, and `manualKeywords`; never ask the user for a repo or Cloudflare Pages project name.
 - Every future game is a new project. Reject `operation: rebuild`, `fullBuild`, and requests to replace an existing repository.
 - Site input may include `manualKeywords` (at most 200 strings). Preserve them exactly after normal JSON validation; the pipeline applies normalization, evidence, risk, and profile gates.
-- The current product release comes from `/srv/game-wiki-factory/app/release.json`; ordinary Git commits do not change it. Never infer a site's release from its date, appearance, or article count. Generation certification requires `result.factoryRelease` and the matching `intake/factory-release.json`. Online certification additionally requires successful Cloudflare Pages verification and registration in `docs/releases/v1_0722-sites.json`.
+- The current product release comes from `/srv/game-wiki-factory/app/release.json`; ordinary Git commits do not change it. Never infer a site's release from its date, appearance, or article count. Generation certification requires `result.factoryRelease` and the matching `intake/factory-release.json`.
+- v1_0728 generates all five locales once but initially publishes English only. Internal `localeRelease` jobs publish es, de, fr, then ja one at a time every three natural days through Git commits and Cloudflare Pages. Do not cancel, recreate, or manually accelerate these jobs unless the user explicitly asks. A locale-release failure is retried under its own Job ID and does not invalidate the already-live locales.
 - A batch attachment uses `taskType: siteBatch` and is submitted with `jobs submit-batch --config`. Each game becomes an independent job.
 - Factory accepts site-production jobs only. Do not receive, validate, transform, deploy, or report advertising code; that work belongs to a separate advertising agent.
 - A site Job may report publish success only when `jobs status JOB_ID --json` is `succeeded`, GitHub is Private, `result.hosting.provider=cloudflare-pages`, and hosting is `complete` or `awaiting_domain_configuration`. `complete` means deployment and online verification passed. `awaiting_domain_configuration` means Pages and `NEXT_PUBLIC_SITE_URL` are complete, but the user must bind the custom domain/DNS before that domain can be called live.

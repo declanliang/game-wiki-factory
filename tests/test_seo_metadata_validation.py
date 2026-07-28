@@ -9,6 +9,7 @@ SEO_SCOUT_ROOT = Path(__file__).resolve().parents[1] / "pipeline" / "seo-scout"
 sys.path.insert(0, str(SEO_SCOUT_ROOT))
 
 from seoscout.generate import _process_llm_response as process_english, page_type_brief
+from seoscout.qa import _parse_verdict
 from seoscout.translate import (
     _build_mdx as build_translation_mdx,
     _process_llm_response as process_translation,
@@ -31,6 +32,31 @@ class SeoMetadataValidationTests(unittest.TestCase):
         self.assertIn("focused named-entity", brief)
         self.assertIn("Entity: Akaza", brief)
         self.assertIn("How to obtain Akaza", brief)
+
+    def test_page_type_brief_allows_context_overlap_but_keeps_distinct_answer(self) -> None:
+        brief = page_type_brief(
+            {
+                "pageType": "guide",
+                "userQuestion": "Should I play solo or co-op?",
+                "mustAnswer": ["Compare difficulty", "Compare coordination"],
+                "distinctValue": "Help the player choose a mode",
+                "overlapPolicy": "Limited shared background is allowed.",
+                "researchQuery": "Steam Heave Ho 2 solo vs coop",
+            },
+            "modes",
+        )
+        self.assertIn("Should I play solo or co-op?", brief)
+        self.assertIn("Compare difficulty; Compare coordination", brief)
+        self.assertIn("Limited shared background is allowed.", brief)
+        self.assertIn("do not mechanically copy platform words", brief)
+
+    def test_topic_qa_reports_weak_alignment_without_calling_it_off_topic(self) -> None:
+        parsed = _parse_verdict(
+            "VERDICT: ON_TOPIC\nALIGNMENT: WEAK\n"
+            "REASON: The game is correct but the main answer serves another intent."
+        )
+        self.assertEqual(parsed[0], "ON_TOPIC")
+        self.assertEqual(parsed[1], "WEAK")
 
     def test_accepts_compact_english_serp_metadata(self) -> None:
         raw = f"TITLE: Timebomb Duels Tips: Movement and Positioning\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{BODY}"

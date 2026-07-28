@@ -3,18 +3,8 @@
 @tailwind utilities;
 
 @layer base {
-  /* --nav-theme(-light) is fixed and NOT meant to be overridden per-site anymore.
-     It used to be a per-game input (`themeColor` in site-content.json) — dropped
-     after a real launch shipped an HSL triple with lightness ~18% in dark mode,
-     which is nearly invisible against a 5%-lightness background: icons and badges
-     effectively disappeared, and nobody could tell until the site was generated
-     and opened. Contrast bugs like that are exactly the class of thing this
-     pipeline is supposed to make impossible without a human staring at rendered
-     pixels. A single violet/cyan pair (real values, pulled from a live site built
-     on the same variable convention — https://www.animeastral.wiki/) is used
-     unchanged in both :root and .dark: one number that's already proven to read
-     clearly on both a near-white and a near-black background, so there's no
-     separate light/dark tuning step to get wrong per game. */
+  /* Per-game appearance is selected from a small reviewed preset list. Arbitrary
+     LLM colors remain forbidden; every preset has separate light/dark values. */
   :root {
     --background: 0 0% 98%;
     --foreground: 0 0% 12%;
@@ -58,6 +48,13 @@
     --callout-success-text: 152 76% 30%;
   }
 
+  :root[data-site-theme="arcade"] { --nav-theme: 260 60% 48%; --nav-theme-light: 190 64% 36%; }
+  :root[data-site-theme="forest"] { --nav-theme: 145 55% 32%; --nav-theme-light: 89 48% 36%; }
+  :root[data-site-theme="ocean"] { --nav-theme: 195 72% 32%; --nav-theme-light: 174 58% 34%; }
+  :root[data-site-theme="ember"] { --nav-theme: 9 60% 41%; --nav-theme-light: 35 72% 39%; }
+  :root[data-site-theme="mystic"] { --nav-theme: 282 44% 44%; --nav-theme-light: 322 48% 42%; }
+  :root[data-site-theme="industrial"] { --nav-theme: 207 15% 38%; --nav-theme-light: 38 42% 38%; }
+
   .dark {
     --background: 0 0% 5%;
     --foreground: 0 0% 88%;
@@ -97,6 +94,13 @@
     --callout-success-border: 152 40% 33%;
     --callout-success-text: 152 65% 72%;
   }
+
+  .dark[data-site-theme="arcade"] { --nav-theme: 258 90% 70%; --nav-theme-light: 188 82% 58%; }
+  .dark[data-site-theme="forest"] { --nav-theme: 145 62% 62%; --nav-theme-light: 88 60% 62%; }
+  .dark[data-site-theme="ocean"] { --nav-theme: 194 86% 67%; --nav-theme-light: 174 70% 58%; }
+  .dark[data-site-theme="ember"] { --nav-theme: 10 82% 67%; --nav-theme-light: 38 88% 62%; }
+  .dark[data-site-theme="mystic"] { --nav-theme: 282 72% 72%; --nav-theme-light: 320 70% 67%; }
+  .dark[data-site-theme="industrial"] { --nav-theme: 202 26% 68%; --nav-theme-light: 40 55% 64%; }
 }
 
 @layer base {

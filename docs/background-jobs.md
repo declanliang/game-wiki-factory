@@ -6,6 +6,13 @@
 
 Factory 只接收新站任务。每个游戏从空 workspace 执行信息采集、关键词、页面规划、文章、翻译、模板、构建和 QA，并创建自己的 Private GitHub repo 与 Git-integrated Cloudflare Pages 项目。GitHub 发布前必须完成本地生产验收。
 
+`v1_0728` 将“生成语言”和“公开语言”分离：`en/es/de/fr/ja` 仍在首个
+站点 Job 中一次生成并完成一致性 QA，但初始路由、sitemap 和 hreflang 只有
+`en`。站点成功后只排入下一个内部 `localeRelease` Job；它在第三个后续自然日
+（`10:00 Asia/Shanghai`）提交 `intake/publication-plan.json`，由 Cloudflare
+Pages 的 Git 集成部署。一次只安排一个后继语言，因此服务器停机恢复不会把
+多个逾期语言同时发布。
+
 OpenClaw、命令行和未来管理界面只提交或控制任务；真正的长任务由独立 Worker 进程执行。关闭终端或 Agent 对话不得改变数据库中的任务状态，服务器重启后 Worker 可重新领取中断任务。
 
 ## 组件

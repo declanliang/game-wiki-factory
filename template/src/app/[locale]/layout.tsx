@@ -15,6 +15,7 @@ import { routing } from "@/i18n/routing";
 import { buildOpenGraph, buildSiteGraph, buildTwitter, shouldIndex } from "@/lib/seo";
 import { getAdAvailability } from "@/lib/ad-config";
 import en from "@/locales/en.json";
+import { SITE_THEME } from "@/config/theme";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -58,7 +59,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const adAvailability = getAdAvailability();
 
   return (
-    <html lang={locale} className={`${inter.variable}`} suppressHydrationWarning>
+    <html lang={locale} data-site-theme={SITE_THEME} className={`${inter.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <NextIntlClientProvider messages={messages}>

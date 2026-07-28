@@ -23,6 +23,7 @@ from urllib.parse import urlparse
 from factory_cli import PermitState, _config_command, _handler, normalize_manual_keywords
 from http.server import ThreadingHTTPServer
 from orchestrate_wiki import build_subprocess_env, read_json, slugify, write_json
+from publication_plan import next_locale, next_release_at
 
 
 ROOT = Path(__file__).resolve().parent
@@ -304,6 +305,98 @@ def _submit_normalized(config: dict[str, Any], source: str, *, max_attempts: int
     return job_id
 
 
+def _schedule_next_locale_release(
+    db: sqlite3.Connection,
+    source_job: sqlite3.Row,
+    source_config: dict[str, Any],
+    completion_result: dict[str, Any],
+) -> str | None:
+    """Persist one next-wave job; later waves chain from actual completion."""
+    publication = completion_result.get("localePublication") or {}
+    published = list(
+        publication.get("publishedLocales")
+        or completion_result.get("publishedLocales")
+        or []
+    )
+    locale = next_locale(published)
+    if locale is None:
+        return None
+    github = completion_result.get("github") or {}
+    hosting = completion_result.get("hosting") or {}
+    repo = str(github.get("repo") or "").strip()
+    project_name = str(hosting.get("projectName") or "").strip()
+    site_url = str(hosting.get("siteUrl") or source_config.get("siteUrl") or "").strip()
+    pages_origin = str(
+        hosting.get("pagesOrigin") or source_config.get("pagesOrigin") or ""
+    ).strip()
+    if (
+        str(hosting.get("provider") or "") != "cloudflare-pages"
+        or not repo
+        or not project_name
+        or not site_url
+        or not pages_origin
+    ):
+        return None
+    root_job_id = str(source_config.get("rootJobId") or source_job["id"])
+    job_id = f"{root_job_id}-locale-{locale}"
+    available_at = next_release_at().isoformat()
+    now = _now()
+    internal_config = {
+        "schemaVersion": 1,
+        "taskType": "localeRelease",
+        "rootJobId": root_job_id,
+        "parentJobId": source_job["id"],
+        "game": str(source_config.get("originalGame") or source_job["game"]),
+        "originalGame": str(source_config.get("originalGame") or source_job["game"]),
+        "slug": source_job["slug"],
+        "locale": locale,
+        "githubRepo": repo,
+        "cloudflareProject": project_name,
+        "siteUrl": site_url,
+        "pagesOrigin": pages_origin,
+    }
+    changed = db.execute(
+        """INSERT OR IGNORE INTO jobs(
+             id,game,slug,config_json,status,current_stage,max_attempts,available_at,
+             created_at,updated_at
+           ) VALUES(?,?,?,?,?,?,?,?,?,?)""",
+        (
+            job_id,
+            f"{internal_config['originalGame']} · locale {locale}",
+            source_job["slug"],
+            json.dumps(internal_config, ensure_ascii=False),
+            "queued",
+            "localeRelease",
+            4,
+            available_at,
+            now,
+            now,
+        ),
+    ).rowcount
+    if not changed:
+        return job_id
+    _event(
+        db,
+        source_job["id"],
+        "locale_release.scheduled",
+        locale=locale,
+        releaseJobId=job_id,
+        availableAt=available_at,
+        intervalDays=3,
+        timezone="Asia/Shanghai",
+    )
+    _event(
+        db,
+        job_id,
+        "job.submitted",
+        source="internal-locale-scheduler",
+        parentJobId=source_job["id"],
+        locale=locale,
+        status="queued",
+    )
+    return job_id
+
+
 def submit(config_path: Path, *, max_attempts: int = 4) -> str:
     resolved = config_path.expanduser().resolve()
     config = normalize_config(read_json(resolved))
@@ -515,7 +608,8 @@ def _open_quota_circuit(
     is_primary = bool(incident and incident["primary_job_id"] == job_id)
     paused = db.execute(
         """UPDATE jobs SET status='quota_wait',quota_provider=?,updated_at=?
-           WHERE status IN ('queued','retry_wait') AND cancel_requested=0 AND id<>?""",
+           WHERE status IN ('queued','retry_wait') AND cancel_requested=0 AND id<>?
+             AND COALESCE(json_extract(config_json,'$.taskType'),'site')='site'""",
         (provider["id"], now, job_id),
     ).rowcount
     return is_primary, paused
@@ -665,6 +759,8 @@ def _completion_result(config: dict[str, Any], slug: str) -> dict[str, Any]:
     plan = read_json(plan_path) if plan_path.is_file() else {}
     release_path = project / "intake" / "factory-release.json"
     release = read_json(release_path) if release_path.is_file() else {}
+    publication_path = project / "intake" / "publication-plan.json"
+    publication = read_json(publication_path) if publication_path.is_file() else {}
     return {
         "taskType": "site",
         "factoryRelease": release.get("release"),
@@ -679,6 +775,11 @@ def _completion_result(config: dict[str, Any], slug: str) -> dict[str, Any]:
         "github": stages.get("github"),
         "hosting": stages.get("hosting"),
         "onlineVerification": stages.get("onlineVerification"),
+        "localePublication": {
+            "generatedLocales": publication.get("generatedLocales"),
+            "publishedLocales": publication.get("publishedLocales"),
+            "releasePolicy": publication.get("releasePolicy"),
+        },
     }
 
 
@@ -694,6 +795,18 @@ def _publish_command(config: dict[str, Any], slug: str) -> list[str]:
     if config.get("siteUrl"):
         command.extend(["--site-url", str(config["siteUrl"])])
     return command
+
+
+def _locale_release_command(config_path: Path, result_path: Path) -> list[str]:
+    return [
+        sys.executable,
+        str(ROOT / "gamewiki.py"),
+        "release-locale",
+        "--config",
+        str(config_path),
+        "--result",
+        str(result_path),
+    ]
 
 
 def _run_process(command: list[str], log, env: dict[str, str], job_id: str) -> int:
@@ -723,6 +836,7 @@ def _run_process(command: list[str], log, env: dict[str, str], job_id: str) -> i
 
 def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
     config = json.loads(job["config_json"])
+    task_type = str(config.get("taskType") or "site")
     job_id = job["id"]
     attempt = int(job["attempts"])
     runtime = data_dir()
@@ -732,14 +846,24 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
     configs.mkdir(parents=True, exist_ok=True)
     log_path = logs / f"attempt-{attempt}.log"
     config_path = configs / f"attempt-{attempt}.json"
-    workspace_conflict = _new_workspace_conflict(job["slug"], attempt)
-    write_json(config_path, _execution_config(config, attempt))
+    result_path = configs / f"attempt-{attempt}-result.json"
+    workspace_conflict = (
+        _new_workspace_conflict(job["slug"], attempt)
+        if task_type == "site"
+        else None
+    )
+    write_json(
+        config_path,
+        _execution_config(config, attempt) if task_type == "site" else config,
+    )
     env = build_subprocess_env(ROOT)
     stop = threading.Event()
-    heartbeat = threading.Thread(target=_heartbeat, args=(job_id, job["slug"], worker, stop, lease_seconds), daemon=True)
+    heartbeat_slug = job["slug"] if task_type == "site" else "__locale_release__"
+    heartbeat = threading.Thread(target=_heartbeat, args=(job_id, heartbeat_slug, worker, stop, lease_seconds), daemon=True)
     heartbeat.start()
     with connect() as db:
-        db.execute("UPDATE jobs SET log_path=?,current_stage=?,updated_at=? WHERE id=?", (str(log_path), "pipeline", _now(), job_id))
+        initial_stage = "pipeline" if task_type == "site" else f"localeRelease:{config.get('locale')}"
+        db.execute("UPDATE jobs SET log_path=?,current_stage=?,updated_at=? WHERE id=?", (str(log_path), initial_stage, _now(), job_id))
         db.execute(
             "INSERT INTO attempts(job_id,number,worker,status,started_at,log_path) VALUES(?,?,?,?,?,?)",
             (job_id, attempt, worker, "running", _now(), str(log_path)),
@@ -750,7 +874,14 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
     try:
         with log_path.open("w", encoding="utf-8") as log:
             log.write(f"job={job_id}\nattempt={attempt}\nstarted={_now()}\n")
-            if workspace_conflict is not None:
+            if task_type == "localeRelease":
+                code = _run_process(
+                    _locale_release_command(config_path, result_path),
+                    log,
+                    env,
+                    job_id,
+                )
+            elif workspace_conflict is not None:
                 log.write(
                     "[failed] new site job requires an empty workspace; "
                     f"existing workspace: {workspace_conflict}\n"
@@ -758,19 +889,27 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
             else:
                 command = [sys.executable, str(ROOT / "gamewiki.py"), "--config", str(config_path)]
                 code = _run_process(command, log, env, job_id)
-            if code == 0 and config.get("publish"):
+            if code == 0 and task_type == "site" and config.get("publish"):
                 with connect() as db:
                     db.execute("UPDATE jobs SET current_stage='publish',updated_at=? WHERE id=?", (_now(), job_id))
                 code = _run_process(_publish_command(config, job["slug"]), log, env, job_id)
             if code == 0:
                 try:
-                    completion_result = _completion_result(config, job["slug"])
+                    completion_result = (
+                        read_json(result_path)
+                        if task_type == "localeRelease"
+                        else _completion_result(config, job["slug"])
+                    )
                 except (OSError, ValueError, KeyError) as exc:
                     log.write(f"\n[failed] could not persist acceptance result: {exc}\n")
                     code = 1
             if code == 0:
                 try:
-                    pruned = _prune_success_build_artifacts(config, job["slug"])
+                    pruned = (
+                        _prune_success_build_artifacts(config, job["slug"])
+                        if task_type == "site"
+                        else []
+                    )
                     if pruned:
                         log.write(f"\nprunedBuildArtifacts={','.join(pruned)}\n")
                 except OSError as exc:
@@ -835,11 +974,26 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                WHERE job_id=? AND number=?""",
             (status, _now(), code, error_class, job_id, attempt),
         )
+        if code == 0 and completion_result is not None:
+            _schedule_next_locale_release(db, job, config, completion_result)
+        final_locale_release = (
+            task_type == "localeRelease"
+            and completion_result is not None
+            and next_locale(
+                list(completion_result.get("publishedLocales") or [])
+            ) is None
+        )
         _event(
             db,
             job_id,
             "attempt.finished",
-            notify=status in {"succeeded", "failed", "needs_attention", "cancelled"}
+            notify=(
+                status in {"failed", "needs_attention", "cancelled"}
+                or (
+                    status == "succeeded"
+                    and (task_type == "site" or final_locale_release)
+                )
+            )
             and (error_class != "quota_exhausted" or quota_primary),
             attempt=attempt,
             status=status,
@@ -893,7 +1047,12 @@ def worker_loop(concurrency: int, once: bool, poll_seconds: float = 3.0) -> int:
 
 def _job_dict(row: sqlite3.Row) -> dict[str, Any]:
     result = dict(row)
-    result.pop("config_json", None)
+    raw_config = result.pop("config_json", None)
+    if raw_config:
+        config = json.loads(raw_config)
+        result["task_type"] = str(config.get("taskType") or "site")
+        if config.get("locale"):
+            result["locale"] = config["locale"]
     raw_result = result.pop("result_json", None)
     if raw_result:
         result["result"] = json.loads(raw_result)

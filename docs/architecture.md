@@ -41,7 +41,7 @@ Games/
   → pipeline/seo-scout
       search → collect → generate → topic QA → translate
   → intake
-      identity + site content + site plan + assets + 5-language articles
+      identity + site content + site plan + publication plan + theme + assets + 5-language articles
   → template scripts
       content/locales/navigation/assets → TypeScript → Next build → HTTP/SEO verification
 ```
@@ -91,7 +91,7 @@ Scout 与 manifest 只消费这个公开展示名，不把两套名称拼进英�
 
 1. `game-profile.json` 由 Basic Info 根据可信游戏事实和平台能力生成，定义允许的分类候选和语义边界。候选词汇可宽于最终导航（最多 16 个），避免在关键词研究前过早淘汰真实类别；最终 site plan 仍最多发布 8 类。Roblox 可把 Codes 作为候选能力，但没有后续证据就不会发布。
 2. Guide Search 把搜索关键词和联网研究发现的 `page_opportunities` 合并后审计。知识机会只有在置信度至少 0.72，且拥有一个官方/创作者 URL 或两个不同支持 URL时才能进入聚类；Discord、Reddit、Trello、游戏链接、无实体依据的 Tier List 和工具页会被拒绝。
-3. `site-plan.json` 把 Guide Search 主题限制在 profile 内，记录分类顺序、五语言标签与描述、关键词、页面类型、实体/意图元数据、交付数量及状态。`strategy/tips/tactics` 合并到 `guide` 分类但保留独立关键词；planner 不生成无证据的 fallback 主题。
+3. `site-plan.json` 把 Guide Search 主题限制在 profile 内，记录分类顺序、五语言标签与描述、主关键词、研究查询、用户问题、必答点、独特价值、页面类型、实体/意图元数据、交付数量及状态。`strategy/tips/tactics` 合并到 `guide` 分类但保留独立关键词；planner 不生成无证据的 fallback 主题。有限共享背景属于允许的内容复用，错误游戏/无关内容才进入删除门。
 
 Guide Search 不再把“必须已经出现精确 Suggest 词”作为独立页面的前提。联网研究可以从多个同游戏来源发现有具体玩家意图的系统页和实体页；仍必须通过确定性证据门、Basic Info 语义边界和最终编辑门。这样可以把资料丰富的游戏拆为更多可导航页面，同时继续拒绝完全错误、异义和无支撑主题。
 
@@ -114,4 +114,4 @@ SEO Scout 只接收由 site plan 机械生成的 `seo-keywords.json`。生成阶
 
 每个游戏 GitHub 仓库强制为 Private，发布器没有 Public 模式，并在推送前后验证可见性。游戏目录的 `package.json` 位于仓库根，因此 Cloudflare Pages Root directory 留空，Build output directory 固定为 `out`。部署只运行确定性静态 Next.js build；所有 AI 工作在本地工厂完成。
 
-后台站点 Job 默认执行 Private GitHub + Git-integrated Cloudflare Pages 事务：先推送 `main`，再创建/复用严格匹配该 repo 的 Pages 项目、设置 Production `NEXT_PUBLIC_SITE_URL`，触发 Cloudflare 服务端 `npm run build` 并发布 `out` 与 Functions，最后按 deployment ID 和 Git commit 轮询。新任务不得静默回退到 Direct Upload；同名 Direct Upload 或不同 Git source 项目必须阻断。`hosting.status=complete` 表示线上验收通过；`awaiting_domain_configuration` 表示只剩运营者绑定自定义域名/DNS和最终域名验收。模板使用 `/en` 等固定语言前缀；根路径必须 301 到 `/en`，sitemap 的所有 loc/hreflang 必须 self-canonical 且直接返回 200。
+后台站点 Job 默认执行 Private GitHub + Git-integrated Cloudflare Pages 事务：先推送 `main`，再创建/复用严格匹配该 repo 的 Pages 项目、设置 Production `NEXT_PUBLIC_SITE_URL`，触发 Cloudflare 服务端 `npm run build` 并发布 `out` 与 Functions，最后按 deployment ID 和 Git commit 轮询。新任务不得静默回退到 Direct Upload；同名 Direct Upload 或不同 Git source 项目必须阻断。`hosting.status=complete` 表示线上验收通过；`awaiting_domain_configuration` 表示只剩运营者绑定自定义域名/DNS和最终域名验收。模板使用 `/en` 等固定语言前缀；根路径必须 301 到 `/en`，sitemap 的所有已公开 loc/hreflang 必须 self-canonical 且直接返回 200。0728 首次只公开 `en`，之后内部 Job 每三个自然日通过 Git 提交增加一个 locale。

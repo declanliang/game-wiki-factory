@@ -68,6 +68,12 @@ Factory 和 OpenClaw 不接收 `taskType: ads` 或任何原始广告代码。广
 
 当前稳定版本读取根目录 `release.json`。普通 Git commit 不改变产品版本。OpenClaw 不得按日期、外观或文章数量推断版本；必须检查任务结果中的 `factoryRelease` 和站点的 `intake/factory-release.json`。线上认证还必须由运营者完成 Cloudflare Pages 验收并登记到 release 站点清单。
 
+从 `v1_0728` 开始，五语言仍一次生成和检查，但第一次部署只公开英文。Worker
+会在 SQLite 中创建内部 `localeRelease` Job，依次在每三个自然日发布
+`es → de → fr → ja`。这些 Job 只修改 Private GitHub 中的发布计划并由
+Cloudflare Pages Git 集成构建，不重复调用生成/翻译 API，也不修改 Pages
+环境变量。OpenClaw 查询队列时应把它们标明为“定时语言发布”，不得误报成重复建站。
+
 ## 查询、异常和完成汇报
 
 用户查询：

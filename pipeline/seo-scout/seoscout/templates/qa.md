@@ -9,12 +9,26 @@ An article can mention real-world context briefly (e.g., "in real veterinary pra
 
 Title: $title
 
+Target keyword: $target_keyword
+Primary player question: $user_question
+Required answer points: $must_answer
+Overlap policy: $overlap_policy
+
 Article body:
 $body
 
+First decide whether the article is genuinely about this game. Then assess
+whether it directly resolves the supplied player question. Shared introductory
+facts, prerequisites, and related mechanics are allowed. Mark alignment WEAK
+only when the article is still about the correct game but its main answer,
+examples, or H2 structure mostly serve a different page intent. A WEAK article
+is retained for audit; OFF_TOPIC is reserved for wrong-game or unrelated
+subject matter.
+
 ## Output Format
 
-Output exactly two lines, nothing else:
+Output exactly three lines, nothing else:
 
 VERDICT: ON_TOPIC or OFF_TOPIC
+ALIGNMENT: ALIGNED or WEAK
 REASON: one sentence explaining your verdict

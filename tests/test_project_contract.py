@@ -123,9 +123,20 @@ class ProjectContractTests(unittest.TestCase):
         }
         plan = build_site_plan(profile, raw)
         self.assertEqual(plan["schemaVersion"], 2)
-        self.assertEqual(plan["categories"][0]["topics"][0]["pageType"], "tier_list")
+        topic = plan["categories"][0]["topics"][0]
+        self.assertEqual(topic["pageType"], "tier_list")
+        self.assertEqual(topic["primaryKeyword"], "hellhole unit tier list")
+        self.assertEqual(topic["researchQuery"], "Roblox hellhole unit tier list")
+        self.assertEqual(topic["userQuestion"], "Compare the strongest units")
+        self.assertEqual(topic["mustAnswer"], ["Compare the strongest units"])
+        self.assertEqual(topic["demandClass"], "evidence-backed")
+        self.assertIn("Limited shared background", topic["overlapPolicy"])
         bridge = build_seo_keywords(plan)
         self.assertEqual(bridge["topic_specs"]["hellhole unit tier list"]["pageType"], "tier_list")
+        self.assertEqual(
+            bridge["topic_specs"]["hellhole unit tier list"]["userQuestion"],
+            "Compare the strongest units",
+        )
 
     def test_site_plan_rejects_an_empty_evidence_set(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

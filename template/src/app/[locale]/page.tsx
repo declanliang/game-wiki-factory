@@ -89,12 +89,34 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
     messages.site.developer ? { label: aboutStats[0]?.label || "Developer", value: messages.site.developer } : null,
     messages.site.gamePlatform?.[0] ? { label: aboutStats[1]?.label || "Platform", value: messages.site.gamePlatform[0] } : null,
   ].filter((item): item is { label: string; value: string } => Boolean(item?.value));
+  const articleImages = new Map(
+    allArticles.map((article) => [
+      `/${article.contentType}/${article.slug}`,
+      article.metadata.image,
+    ]),
+  );
+  const featuredItems = messages.home.featured.items as Array<{
+    title: string;
+    description: string;
+    href: string;
+    category?: string;
+  }>;
+  const home = {
+    ...messages.home,
+    featured: {
+      ...messages.home.featured,
+      items: featuredItems.map((item) => ({
+        ...item,
+        image: articleImages.get(item.href),
+      })),
+    },
+  };
 
   return (
     <main className="mx-auto max-w-[90rem] px-5 pb-10 pt-5 sm:px-8 sm:pt-6 lg:px-12">
       {messages.home.faq.items.length > 0 && <JsonLd data={faqPage} />}
       <HomePageClient
-        home={messages.home}
+        home={home}
         quickFactsLabel={messages.shared.quickFacts}
         videoLabels={messages.shared.homeVideo}
         locale={locale}

@@ -37,7 +37,7 @@ python gamewiki.py --config jobs/<game>.json
 - 不生成 Calculator、Planner、Team Builder 等工具页。
 - 不手工补标签掩盖被截断的翻译。
 
-生成发布标准：只保留有证据的 published 分类；简单游戏允许少量页面，资料丰富的游戏要保留不同意图和实体入口；en/es/de/fr/ja；五语言文章树一致；intake、MDX、TypeScript、production build、Private GitHub 和 Pages 部署全部通过。正式域名未绑定时 `result.hosting.status=awaiting_domain_configuration`，不代表该域名已上线。
+生成发布标准：只保留有证据的 published 分类；简单游戏允许少量页面，资料丰富的游戏要保留不同意图和实体入口；en/es/de/fr/ja 一次生成且文章树一致；首次只公开 en，之后按 publication plan 每三个自然日公开一个语言；intake、MDX、TypeScript、production build、Private GitHub 和 Pages 部署全部通过。正式域名未绑定时 `result.hosting.status=awaiting_domain_configuration`，不代表该域名已上线。
 
 上线完成标准：Pages 部署后目标 origin 的根路径 301 到 `/en`，线上首页、metadata、sitemap、robots、所有 loc/hreflang 直接 200、self-canonical、OG 全部通过。自定义域名尚未绑定时，由运营者完成绑定/DNS后再执行最终域名验收。
 

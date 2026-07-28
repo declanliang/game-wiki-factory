@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _open_quota_circuit, _prune_success_build_artifacts, _publish_command, _resume_quota_circuit, acknowledge_notifications, checkpoint_safe_content_retry, classify_failure, claim, connect, identify_quota_provider, normalize_config, pending_notifications, submit, submit_batch
+from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _open_quota_circuit, _prune_success_build_artifacts, _publish_command, _resume_quota_circuit, _schedule_next_locale_release, acknowledge_notifications, checkpoint_safe_content_retry, classify_failure, claim, connect, identify_quota_provider, normalize_config, pending_notifications, submit, submit_batch
 
 
 class JobSystemTests(unittest.TestCase):
@@ -210,6 +210,77 @@ class JobSystemTests(unittest.TestCase):
             claimed = claim("retry-priority-worker")
             self.assertEqual(claimed["id"], retry_id)
             self.assertNotEqual(claimed["id"], queued_id)
+
+    def test_successful_site_schedules_only_the_next_locale_wave(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ, {"GAMEWIKI_DATA_DIR": temporary}
+        ):
+            config_path = Path(temporary) / "game.json"
+            config_path.write_text(
+                json.dumps({"game": "Wave Game", "publish": True}),
+                encoding="utf-8",
+            )
+            job_id = submit(config_path)
+            with connect() as db:
+                source = db.execute("SELECT * FROM jobs WHERE id=?", (job_id,)).fetchone()
+                release_id = _schedule_next_locale_release(
+                    db,
+                    source,
+                    json.loads(source["config_json"]),
+                    {
+                        "localePublication": {"publishedLocales": ["en"]},
+                        "github": {"repo": "owner/wave-game"},
+                        "hosting": {
+                            "provider": "cloudflare-pages",
+                            "projectName": "wave-game",
+                            "siteUrl": "https://wave.example",
+                            "pagesOrigin": "https://wave-game.pages.dev",
+                        },
+                    },
+                )
+                rows = db.execute(
+                    "SELECT id,status,available_at,config_json FROM jobs ORDER BY id"
+                ).fetchall()
+            self.assertEqual(release_id, f"{job_id}-locale-es")
+            self.assertEqual(len(rows), 2)
+            release = next(row for row in rows if row["id"] == release_id)
+            release_config = json.loads(release["config_json"])
+            self.assertEqual(release["status"], "queued")
+            self.assertEqual(release_config["taskType"], "localeRelease")
+            self.assertEqual(release_config["locale"], "es")
+            self.assertEqual(release_config["githubRepo"], "owner/wave-game")
+
+    def test_quota_circuit_does_not_pause_scheduled_locale_releases(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ, {"GAMEWIKI_DATA_DIR": temporary}
+        ):
+            config_path = Path(temporary) / "game.json"
+            config_path.write_text(json.dumps({"game": "Quota Source"}), encoding="utf-8")
+            source_id = submit(config_path)
+            with connect() as db:
+                source = db.execute("SELECT * FROM jobs WHERE id=?", (source_id,)).fetchone()
+                release_id = _schedule_next_locale_release(
+                    db,
+                    source,
+                    json.loads(source["config_json"]),
+                    {
+                        "localePublication": {"publishedLocales": ["en"]},
+                        "github": {"repo": "owner/quota-source"},
+                        "hosting": {
+                            "provider": "cloudflare-pages",
+                            "projectName": "quota-source",
+                            "siteUrl": "https://quota.example",
+                            "pagesOrigin": "https://quota-source.pages.dev",
+                        },
+                    },
+                )
+                db.execute("UPDATE jobs SET status='running' WHERE id=?", (source_id,))
+                provider = identify_quota_provider("DataForSEO insufficient balance")
+                _open_quota_circuit(db, source_id, provider)
+                release = db.execute(
+                    "SELECT status,quota_provider FROM jobs WHERE id=?", (release_id,)
+                ).fetchone()
+            self.assertEqual(dict(release), {"status": "queued", "quota_provider": None})
 
     def test_full_build_is_rejected_for_new_jobs(self) -> None:
         with self.assertRaisesRegex(ValueError, "unknown config field"):

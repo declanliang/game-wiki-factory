@@ -339,14 +339,49 @@ def build_site_plan(profile: dict[str, Any], keyword_output: dict[str, Any]) -> 
         topics = []
         for keyword in keywords:
             source = topics_by_keyword.get(keyword) or {}
+            intent = str(source.get("intent") or "").strip()
+            discovery_sources = list(source.get("discoverySources") or [])
+            platform = str(profile.get("game", {}).get("platform") or "Game").strip()
+            research_query = (
+                keyword
+                if platform.casefold() in keyword.casefold().split()
+                else f"{platform} {keyword}"
+            )
+            if any(item in {"labs", "autocomplete", "trends"} for item in discovery_sources):
+                demand_class = "query-backed"
+            elif source.get("entityName"):
+                demand_class = "entity-backed"
+            else:
+                demand_class = "evidence-backed"
             topics.append({
                 "keyword": keyword,
+                "primaryKeyword": keyword,
+                "researchQuery": research_query,
                 "pageType": str(source.get("pageType") or "guide"),
                 "entityName": source.get("entityName"),
                 "entityType": source.get("entityType"),
-                "intent": str(source.get("intent") or ""),
+                "intent": intent,
+                "userQuestion": intent or f"What should a player know about {keyword}?",
+                "mustAnswer": [
+                    intent or f"Give a direct, game-specific answer for {keyword}."
+                ],
+                "distinctValue": (
+                    intent
+                    or f"Resolve the specific player decision expressed by {keyword}."
+                ),
+                "allowedSharedContext": [
+                    "brief game identity",
+                    "relevant prerequisites",
+                    "closely related mechanics",
+                ],
+                "overlapPolicy": (
+                    "Limited shared background is allowed. The page must still deliver "
+                    "its own primary answer and must not become a wording-only copy of "
+                    "another page."
+                ),
+                "demandClass": demand_class,
                 "confidence": source.get("confidence"),
-                "discoverySources": list(source.get("discoverySources") or []),
+                "discoverySources": discovery_sources,
                 "evidenceUrls": list(source.get("evidenceUrls") or []),
             })
         if category_id not in allowed:

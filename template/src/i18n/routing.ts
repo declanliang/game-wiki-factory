@@ -1,7 +1,9 @@
 import { defineRouting } from "next-intl/routing";
+import { PUBLISHED_LOCALES } from "@/config/publication";
 
 /**
- * Single source of truth for supported locales.
+ * Generated translations and publicly routable locales are intentionally
+ * separate. publication-plan.json controls the release waves.
  *
  * To add a new language you must update THREE places that have to stay in sync:
  *   1. The `locales` array below.
@@ -9,7 +11,7 @@ import { defineRouting } from "next-intl/routing";
  *   3. The matching JSON file in `src/locales/<locale>.json`.
  */
 export const routing = defineRouting({
-  locales: ["en", "es", "de", "fr", "ja"],
+  locales: PUBLISHED_LOCALES,
   defaultLocale: "en",
   // Cloudflare Pages branch: static export has no middleware, so "as-needed"
   // (bare English URLs via a runtime rewrite) isn't possible. Every locale,

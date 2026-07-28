@@ -30,6 +30,8 @@ function step(label, cmd) {
 }
 
 step("阶段 a 校验", "npm run check:intake");
+step("同步当前公开语言", "npm run sync:publication");
+step("同步站点主题预设", "npm run sync:theme");
 step("文章结构预检（metadata 完整性/重复 slug/异常大文件）", "npm run validate:articles");
 step("站点身份 + 首页文案（机械字段 + 结构化 intake）", "npm run apply:content");
 step("素材处理（hero/favicon/manifest/主题色）", "npm run process:assets");

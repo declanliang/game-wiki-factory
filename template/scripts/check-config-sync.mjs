@@ -49,8 +49,37 @@ function missingStructure(reference, candidate, prefix = "") {
 }
 
 const plan = readJson("src/config/site-plan.json");
+const publicationPlan = readJson("intake/publication-plan.json");
+const publicationSource = fs.existsSync(path.join(root, "src", "config", "publication.ts"))
+  ? fs.readFileSync(path.join(root, "src", "config", "publication.ts"), "utf-8")
+  : "";
+const siteTheme = readJson("intake/site-theme.json");
+const themeSource = fs.existsSync(path.join(root, "src", "config", "theme.ts"))
+  ? fs.readFileSync(path.join(root, "src", "config", "theme.ts"), "utf-8")
+  : "";
 if (JSON.stringify(plan.languages) !== JSON.stringify(expectedLocales)) {
   fail(`site-plan 语言必须是 ${expectedLocales.join(", ")}`);
+}
+if (!themeSource.includes(`export const SITE_THEME = ${JSON.stringify(siteTheme.preset)}`)) {
+  fail("src/config/theme.ts 未与 intake/site-theme.json 同步；先运行 npm run sync:theme");
+} else {
+  ok(`站点主题：${siteTheme.preset}`);
+}
+const publishedLocales = publicationPlan.publishedLocales || [];
+if (JSON.stringify(publicationPlan.generatedLocales) !== JSON.stringify(expectedLocales)) {
+  fail(`publication-plan 生成语言必须是 ${expectedLocales.join(", ")}`);
+}
+if (
+  publishedLocales.length < 1
+  || JSON.stringify(publishedLocales) !== JSON.stringify(expectedLocales.slice(0, publishedLocales.length))
+) {
+  fail("publication-plan 公开语言必须是固定发布顺序的前缀");
+}
+const expectedPublicationLine = `export const PUBLISHED_LOCALES = ${JSON.stringify(publishedLocales)} as const`;
+if (!publicationSource.includes(expectedPublicationLine)) {
+  fail("src/config/publication.ts 未与 intake/publication-plan.json 同步；先运行 npm run sync:publication");
+} else {
+  ok(`当前公开路由语言：${publishedLocales.join(", ")}`);
 }
 const categories = (plan.categories || [])
   .filter((category) => category.status === "published")

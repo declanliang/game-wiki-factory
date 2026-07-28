@@ -21,7 +21,7 @@ import en from "@/locales/en.json";
 // Featured Guides, Live Tools, and Extra Sections blocks. `category` is optional and, when
 // it matches a registered NAVIGATION_CONFIG key, borrows that category's icon so games
 // don't need a separate icon vocabulary just for these cards.
-type LightItem = { title: string; description: string; href: string; category?: string };
+type LightItem = { title: string; description: string; href: string; category?: string; image?: string };
 // `description` is an optional intro line under the heading — mainly for home.extraSections,
 // where a sentence or two of real, keyword-bearing copy above the item cards is the point
 // (see doc/homepage-info-schema.md), but any LightSection can use it.
@@ -76,11 +76,19 @@ function renderBoldText(text: string) {
 function LightCard({ item, locale }: { item: LightItem; locale: string }) {
   const Icon = (item.category && iconByKey[item.category]) || BookOpen;
   return (
-    <Link href={localizeHref(item.href, locale)} className="group flex w-full max-w-[20rem] items-start gap-3 rounded-2xl border border-border bg-card/70 p-4 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]"><Icon className="h-4 w-4" /></span>
-      <span className="min-w-0">
+    <Link href={localizeHref(item.href, locale)} className="group flex w-full max-w-[22rem] flex-col overflow-hidden rounded-2xl border border-border bg-card/70 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">
+      {item.image ? (
+        <span className="relative block aspect-[16/9] overflow-hidden bg-muted">
+          <Image src={item.image} alt={item.title} fill sizes="(max-width: 640px) 100vw, 352px" className="object-cover transition duration-500 group-hover:scale-[1.03]" />
+          <span className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
+        </span>
+      ) : null}
+      <span className="flex items-start gap-3 p-4">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]"><Icon className="h-4 w-4" /></span>
+        <span className="min-w-0">
         <span className="block text-lg font-semibold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{item.title}</span>
         <span className="mt-1 block text-base leading-6 text-muted-foreground line-clamp-2">{item.description}</span>
+        </span>
       </span>
     </Link>
   );

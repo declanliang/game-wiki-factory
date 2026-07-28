@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "generatedLocales": [
+    "en",
+    "es",
+    "de",
+    "fr",
+    "ja"
+  ],
+  "publishedLocales": [
+    "en"
+  ],
+  "releasePolicy": {
+    "mode": "sequential",
+    "localeOrder": [
+      "en",
+      "es",
+      "de",
+      "fr",
+      "ja"
+    ],
+    "intervalDays": 3,
+    "timezone": "Asia/Shanghai",
+    "releaseHour": 10
+  },
+  "createdAt": "2026-07-28T00:00:00+00:00",
+  "updatedAt": "2026-07-28T00:00:00+00:00"
+}

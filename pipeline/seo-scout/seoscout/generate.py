@@ -74,6 +74,22 @@ def page_type_brief(spec: dict, category: str) -> str:
         details.append(f"Entity type: {spec['entityType']}")
     if spec.get("intent"):
         details.append(f"Player intent: {spec['intent']}")
+    if spec.get("userQuestion"):
+        details.append(f"Primary player question: {spec['userQuestion']}")
+    if spec.get("mustAnswer"):
+        details.append(
+            "Required answer points: "
+            + "; ".join(str(item) for item in spec["mustAnswer"] if str(item).strip())
+        )
+    if spec.get("distinctValue"):
+        details.append(f"Distinct value of this page: {spec['distinctValue']}")
+    if spec.get("overlapPolicy"):
+        details.append(f"Overlap policy: {spec['overlapPolicy']}")
+    if spec.get("researchQuery"):
+        details.append(
+            f"Research-only disambiguation query: {spec['researchQuery']} "
+            "(do not mechanically copy platform words into the published title)"
+        )
     return brief + ("\n" + "\n".join(details) if details else "")
 
 

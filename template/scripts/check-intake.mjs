@@ -27,6 +27,8 @@ const info = (msg) => console.log(`\x1b[36mi\x1b[0m ${msg}`);
 const { env, identity, resolvedByConvention, videoId } = resolveIntakeConfig(root, { warn });
 const FIXED_LANGUAGES = ["en", "es", "de", "fr", "ja"];
 const sitePlanPath = path.join(root, "intake", "site-plan.json");
+const publicationPlanPath = path.join(root, "intake", "publication-plan.json");
+const siteThemePath = path.join(root, "intake", "site-theme.json");
 let sitePlan = null;
 if (!fs.existsSync(sitePlanPath)) {
   fail("缺少 intake/site-plan.json —— 语言和分类必须来自上游唯一规划文件");
@@ -53,6 +55,55 @@ if (!fs.existsSync(sitePlanPath)) {
     }
   } catch (error) {
     fail(`intake/site-plan.json 不是合法 JSON：${error.message}`);
+  }
+}
+
+if (!fs.existsSync(siteThemePath)) {
+  fail("缺少 intake/site-theme.json");
+} else {
+  try {
+    const theme = JSON.parse(fs.readFileSync(siteThemePath, "utf-8"));
+    const presets = ["arcade", "forest", "ocean", "ember", "mystic", "industrial"];
+    if (theme.schemaVersion !== 1 || !presets.includes(theme.preset)) {
+      fail(`site-theme.preset 必须是固定预设：${presets.join(", ")}`);
+    } else {
+      ok(`站点主题预设：${theme.preset}`);
+    }
+  } catch (error) {
+    fail(`intake/site-theme.json 不是合法 JSON：${error.message}`);
+  }
+}
+
+if (!fs.existsSync(publicationPlanPath)) {
+  fail("缺少 intake/publication-plan.json —— 0728 版本必须区分已生成与已公开语言");
+} else {
+  try {
+    const publicationPlan = JSON.parse(fs.readFileSync(publicationPlanPath, "utf-8"));
+    const published = publicationPlan.publishedLocales;
+    const policy = publicationPlan.releasePolicy || {};
+    if (publicationPlan.schemaVersion !== 1) fail("publication-plan schemaVersion 必须是 1");
+    if (JSON.stringify(publicationPlan.generatedLocales) !== JSON.stringify(FIXED_LANGUAGES)) {
+      fail(`publication-plan.generatedLocales 必须是 ${FIXED_LANGUAGES.join(", ")}`);
+    }
+    if (
+      !Array.isArray(published)
+      || published.length < 1
+      || JSON.stringify(published) !== JSON.stringify(FIXED_LANGUAGES.slice(0, published.length))
+    ) {
+      fail("publication-plan.publishedLocales 必须按 en → es → de → fr → ja 顺序逐步增加");
+    }
+    if (
+      policy.mode !== "sequential"
+      || JSON.stringify(policy.localeOrder) !== JSON.stringify(FIXED_LANGUAGES)
+      || policy.intervalDays !== 3
+      || policy.timezone !== "Asia/Shanghai"
+    ) {
+      fail("publication-plan.releasePolicy 必须是每 3 个自然日、Asia/Shanghai、顺序发布");
+    } else {
+      ok(`公开语言：${published.join(", ")}；其余译文已生成但暂不进入公开路由`);
+    }
+  } catch (error) {
+    fail(`intake/publication-plan.json 不是合法 JSON：${error.message}`);
   }
 }
 

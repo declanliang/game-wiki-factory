@@ -413,8 +413,16 @@ def publish_template_package(
         dump_json(staging_dir / "site-content.json", content)
         for locale, localized in sorted(localized_contents.items()):
             dump_json(staging_dir / f"site-content.{locale}.json", localized)
-        hero = _hero_candidates(output_dir)[0]
+        hero_candidates = _hero_candidates(output_dir)
+        hero = hero_candidates[0]
         shutil.copy2(hero, staging_dir / f"hero{hero.suffix.lower()}")
+        gameplay_target = staging_dir / "gameplay-media"
+        gameplay_target.mkdir()
+        for index, gameplay_image in enumerate(hero_candidates[:5], 1):
+            shutil.copy2(
+                gameplay_image,
+                gameplay_target / f"gameplay-{index}{gameplay_image.suffix.lower()}",
+            )
         favicon_target = staging_dir / "favicon"
         favicon_target.mkdir()
         for name in FAVICON_FILES:

@@ -61,7 +61,11 @@ class GeneratedOutputTests(unittest.TestCase):
         locale_files = {f"site-content.{locale}.json" for locale in site_identity["LANGUAGES"] if locale != "en"}
         self.assertEqual(
             {path.name for path in intake.iterdir()},
-            {"site-identity.json", "site-content.json", hero_files[0].name, "favicon", *locale_files},
+            {"site-identity.json", "site-content.json", hero_files[0].name, "favicon", "gameplay-media", *locale_files},
+        )
+        self.assertGreaterEqual(
+            len([path for path in (intake / "gameplay-media").iterdir() if path.is_file()]),
+            1,
         )
         for locale in site_identity["LANGUAGES"]:
             if locale == "en":

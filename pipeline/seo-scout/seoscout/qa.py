@@ -36,10 +36,11 @@ from .core.utils import load_json, save_json, ensure_dir, extract_source_fields
 
 QA_SYSTEM_PROMPT = (
     "You are a precise content-relevance reviewer for a fan wiki site. "
-    "You only output the exact VERDICT/REASON format requested, no extra commentary."
+    "You only output the exact VERDICT/ALIGNMENT/REASON format requested, no extra commentary."
 )
 
 VERDICT_RE = re.compile(r'^VERDICT:\s*(ON_TOPIC|OFF_TOPIC)\s*$', re.MULTILINE | re.IGNORECASE)
+ALIGNMENT_RE = re.compile(r'^ALIGNMENT:\s*(ALIGNED|WEAK)\s*$', re.MULTILINE | re.IGNORECASE)
 REASON_RE = re.compile(r'^REASON:\s*(.+)$', re.MULTILINE | re.IGNORECASE)
 
 
@@ -78,9 +79,10 @@ def _parse_verdict(content: str):
     v_m = VERDICT_RE.search(content)
     if not v_m:
         return None
+    a_m = ALIGNMENT_RE.search(content)
     r_m = REASON_RE.search(content)
     reason = r_m.group(1).strip() if r_m else ""
-    return v_m.group(1).upper(), reason
+    return v_m.group(1).upper(), (a_m.group(1).upper() if a_m else "UNKNOWN"), reason
 
 
 def _log_removed(entry: dict):
@@ -140,6 +142,14 @@ async def run_qa(project: str, keywords_file: str, prompt_path: str = None, over
     if not game_name:
         print("  ⚠️  No game_name found in keywords file — skipping topic QA\n")
         return
+    topic_specs = kw_raw.get("topic_specs") or {}
+    spec_by_slug = {}
+    for keyword, spec in topic_specs.items():
+        slug = re.sub(r'[^a-z0-9-]', '', str(keyword).lower().replace(' ', '-'))
+        spec_by_slug[slug] = {
+            "keyword": keyword,
+            **(spec if isinstance(spec, dict) else {}),
+        }
 
     en_dir = Path(Config.DATA_DIR) / "articles" / "en"
     if not en_dir.exists():
@@ -198,10 +208,17 @@ async def run_qa(project: str, keywords_file: str, prompt_path: str = None, over
             kept_from_cache += 1
             continue
 
-        prompt = prompt_template.substitute(
+        spec = spec_by_slug.get(article_path.stem) or {}
+        prompt = prompt_template.safe_substitute(
             game_name=game_name,
             title=source['title'],
             body=source['body'],
+            target_keyword=spec.get("primaryKeyword") or spec.get("keyword") or article_path.stem,
+            user_question=spec.get("userQuestion") or spec.get("intent") or "",
+            must_answer="; ".join(str(item) for item in spec.get("mustAnswer") or []),
+            overlap_policy=spec.get("overlapPolicy") or (
+                "Limited shared game context is allowed, but the page needs a distinct primary answer."
+            ),
         )
         tasks_to_run.append({'rel': rel, 'path': article_path, 'prompt': prompt, 'source_fingerprint': source_fingerprint})
 
@@ -222,6 +239,7 @@ async def run_qa(project: str, keywords_file: str, prompt_path: str = None, over
     on_topic = 0
     off_topic = 0
     inconclusive = 0
+    weak_alignment = 0
 
     async with aiohttp.ClientSession() as session:
         for i in range(0, len(tasks_to_run), batch_size):
@@ -248,9 +266,10 @@ async def run_qa(project: str, keywords_file: str, prompt_path: str = None, over
                     inconclusive += 1
                     continue
 
-                verdict, reason = parsed
+                verdict, alignment, reason = parsed
                 cache[rel] = {
                     'verdict': verdict,
+                    'alignment': alignment,
                     'reason': reason,
                     'checked_at': datetime.now().isoformat(),
                     'source_fingerprint': t.get('source_fingerprint'),
@@ -258,7 +277,11 @@ async def run_qa(project: str, keywords_file: str, prompt_path: str = None, over
 
                 if verdict == 'ON_TOPIC':
                     on_topic += 1
-                    print(f"    ✅ {rel}")
+                    if alignment == "WEAK":
+                        weak_alignment += 1
+                        print(f"    ⚠️  {rel} — ON_TOPIC but intent alignment is weak (kept)")
+                    else:
+                        print(f"    ✅ {rel}")
                 else:
                     off_topic += 1
                     print(f"    🗑️  {rel} — {reason}")
@@ -271,6 +294,7 @@ async def run_qa(project: str, keywords_file: str, prompt_path: str = None, over
     print("  ✅ Topic QA complete")
     print("=" * 70)
     print(f"  On-topic:     {on_topic}")
+    print(f"  Weak alignment kept for audit: {weak_alignment}")
     print(f"  Off-topic:    {off_topic} (removed, incl. any existing translations)")
     if inconclusive:
         print(f"  Inconclusive: {inconclusive} (will retry next run)")

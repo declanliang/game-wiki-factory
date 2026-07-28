@@ -66,10 +66,10 @@ if (!ffmpegAvailable) warn("没有检测到 ffmpeg，hero 转 webp / 单张 logo
 
 // Read once, reused both by the initials-icon background color and by manifest.json's
 // theme_color at the end of this script (same fixed value, --nav-theme in globals.css).
-const cssPathEarly = path.join(root, "src", "app", "globals.css");
-const cssEarly = fs.readFileSync(cssPathEarly, "utf-8");
-const navThemeMatch = cssEarly.match(/--nav-theme: ([^;]+);/);
-const navThemeHex = navThemeMatch && !navThemeMatch[1].includes("__") ? hslStringToHex(navThemeMatch[1]) : "#895af6";
+const themeConfigPath = path.join(root, "src", "config", "theme.ts");
+const themeConfig = fs.readFileSync(themeConfigPath, "utf-8");
+const manifestColorMatch = themeConfig.match(/THEME_MANIFEST_COLOR\s*=\s*["'](#[0-9a-f]{6})["']/i);
+const navThemeHex = manifestColorMatch?.[1] || "#6842c2";
 
 // --- 1. Hero image -> public/images/hero.webp -----------------------------------
 if (env.HERO_IMAGE_SOURCE) {
@@ -81,6 +81,30 @@ if (env.HERO_IMAGE_SOURCE) {
     execSync(`ffmpeg -y -i "${src}" "${dest}"`, { stdio: "ignore" });
     ok(`hero 图已转换：${env.HERO_IMAGE_SOURCE} → public/images/hero.webp`);
   }
+}
+
+// --- 1b. Official gameplay gallery -> reusable article/card media ----------------
+// Basic Info supplies only platform/creator images here (Roblox gallery or Steam
+// screenshots). They are presentation aids, not evidence for an article claim.
+const gameplaySourceDir = path.join(root, "intake", "gameplay-media");
+const gameplayDestDir = path.join(root, "public", "images", "gameplay");
+fs.rmSync(gameplayDestDir, { recursive: true, force: true });
+if (fs.existsSync(gameplaySourceDir) && ffmpegAvailable) {
+  fs.mkdirSync(gameplayDestDir, { recursive: true });
+  const gameplaySources = fs.readdirSync(gameplaySourceDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => path.join(gameplaySourceDir, entry.name))
+    .slice(0, 5);
+  for (const [index, src] of gameplaySources.entries()) {
+    const dest = path.join(gameplayDestDir, `gameplay-${index + 1}.webp`);
+    execSync(
+      `ffmpeg -y -i "${src}" -vf "scale='min(1400,iw)':-2" -quality 82 "${dest}"`,
+      { stdio: "ignore" },
+    );
+  }
+  ok(`${gameplaySources.length} 张官方游戏图已处理为文章/卡片媒体`);
+} else if (fs.existsSync(gameplaySourceDir)) {
+  warn("存在 gameplay-media，但没有 ffmpeg，文章将正常发布但不展示附加截图");
 }
 
 // --- 2. Favicon: FAVICON_SET_DIR (copy) takes priority over LOGO_SOURCE (generate) ---

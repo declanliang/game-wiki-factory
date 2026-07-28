@@ -125,14 +125,14 @@ npm run launch:site
 成功必须同时满足：
 
 - intake 0 error
-- 五语言文章树一致
+- 五语言生成文章树一致；公开路由由 `publication-plan.json` 的顺序前缀决定
 - 全部 MDX 结构通过
 - TypeScript 通过
 - 配置同步通过
 - production build 通过
 - sitemap 的 loc/hreflang 目标全部直接 200（不接受 3xx）
 - OG/Twitter image 正常
-- hreflang 包含五语言和 x-default；每个 locale 页面 canonical 等于自身最终 URL
+- hreflang 只包含当前已公开语言和 x-default；每个公开 locale 页面 canonical 等于自身最终 URL，未到期语言不得进入 sitemap
 - 非英语分类描述、法律页和文章正文没有英语静默回退
 - 首页 Hero 使用真实游戏图；有至少两篇文章的高价值分类会生成本地化专题入口，且所有专题链接存在
 

@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Check, Globe } from "lucide-react";
 import { routing, type Locale } from "@/i18n/routing";
+import type { GeneratedLocale } from "@/config/publication";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 // Add an entry here whenever a new locale is added to `routing.ts`.
-const LOCALE_LABELS: Record<Locale, string> = {
+const LOCALE_LABELS: Record<GeneratedLocale, string> = {
   en: "English",
   es: "Español",
   de: "Deutsch",

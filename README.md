@@ -74,7 +74,7 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 服务器的 Supervisor 每分钟检查一次失败事件。只有文章生成/翻译明确保存了有效 checkpoint、且失败属于可继续的内容阶段时，才自动冷却并恢复同一个 Job；默认最多 6 轮。身份、密钥/余额、schema、代码、构建、GitHub/Vercel 安全问题不会自动处理，最终才通知用户和 Codex。这样批量任务不依赖 OpenClaw 对话持续在线。
 
-当前稳定生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。认证规则和已上线站点清单见 [docs/releases/v1_0722.md](docs/releases/v1_0722.md)。
+当前候选生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。0728 版本的验收规则见 [docs/releases/v1_0728.md](docs/releases/v1_0728.md)；在用户确认、推送和服务器部署前，本分支只属于本地候选。
 
 首页采用任务优先的信息架构，并支持有证据的 Codes/Update 等“当前无结果”状态页；网站本身即 Wiki，不生成 `/wiki/` 分类。设计与验收边界见 [docs/design/task-first-home-and-status-pages.md](docs/design/task-first-home-and-status-pages.md)。
 

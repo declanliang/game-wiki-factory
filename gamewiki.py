@@ -27,6 +27,9 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "publish":
         from publisher import publish
         raise SystemExit(publish(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "release-locale":
+        from locale_publication import release_locale
+        raise SystemExit(release_locale(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] in {"run-config", "run-many", "status", "logs", "resume"}:
         from factory_cli import dispatch
         raise SystemExit(dispatch(sys.argv[1], sys.argv[2:]))

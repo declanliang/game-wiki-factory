@@ -21,6 +21,8 @@ from project_contract import (
     render_project_readme,
 )
 from permit_client import shared_permit
+from publication_plan import build_publication_plan
+from site_theme import select_site_theme
 
 
 ROOT = Path(__file__).resolve().parent
@@ -1038,6 +1040,20 @@ def main(argv: list[str] | None = None) -> int:
             languages,
         )
         shutil.copy2(site_plan_path, intake_dir / "site-plan.json")
+        write_json(intake_dir / "publication-plan.json", build_publication_plan())
+        site_content_for_theme = read_json(intake_dir / "site-content.json")
+        write_json(
+            intake_dir / "site-theme.json",
+            select_site_theme(
+                canonical_name,
+                str(site_content_for_theme.get("site", {}).get("description") or ""),
+                [
+                    str(category.get("id") or "")
+                    for category in site_plan.get("categories") or []
+                    if category.get("status") == "published"
+                ],
+            ),
+        )
         if release_certified:
             write_json(
                 intake_dir / "factory-release.json",

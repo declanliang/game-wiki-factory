@@ -426,6 +426,64 @@ def _wait_cloudflare_deployment(
     return deployment
 
 
+def _wait_cloudflare_commit_deployment(
+    account_id: str,
+    token: str,
+    project_name: str,
+    commit_sha: str,
+    *,
+    discovery_attempts: int = 40,
+    log_path: Path | None = None,
+) -> dict:
+    """Wait for the Git integration webhook to create a deployment for a commit."""
+    encoded_name = urllib.parse.quote(project_name)
+    expected = commit_sha.casefold()
+    for attempt in range(discovery_attempts):
+        history = _cloudflare_request(
+            "GET",
+            account_id,
+            token,
+            f"pages/projects/{encoded_name}/deployments",
+        )
+        if isinstance(history, list):
+            for deployment in history:
+                metadata = (
+                    (deployment.get("deployment_trigger") or {}).get("metadata") or {}
+                )
+                deployed_sha = str(metadata.get("commit_hash") or "").casefold()
+                environment = str(deployment.get("environment") or "").casefold()
+                if (
+                    deployed_sha
+                    and (
+                        deployed_sha.startswith(expected)
+                        or expected.startswith(deployed_sha)
+                    )
+                    and environment in {"", "production"}
+                ):
+                    deployment_id = str(deployment.get("id") or "")
+                    if not deployment_id:
+                        continue
+                    if log_path is not None:
+                        _append_cloudflare_log(
+                            log_path,
+                            f"Git integration observed commit {commit_sha} as deployment {deployment_id}",
+                        )
+                    return _wait_cloudflare_deployment(
+                        account_id,
+                        token,
+                        project_name,
+                        deployment_id,
+                        commit_sha,
+                        log_path=log_path,
+                    )
+        if attempt + 1 < discovery_attempts:
+            time.sleep(3)
+    raise RuntimeError(
+        "Cloudflare Pages Git integration did not create a production deployment "
+        f"for commit {commit_sha} within the discovery window"
+    )
+
+
 def _deploy_cloudflare_pages(
     project: Path,
     project_name: str,
@@ -733,7 +791,15 @@ def _validate_project(project: Path) -> dict:
     manifest = read_json(project / ".gamewiki" / "manifest.json")
     if manifest.get("status") != "complete":
         raise RuntimeError("Project pipeline manifest is not complete")
-    for relative in ("package.json", "intake/site-identity.json", "intake/site-content.json", "intake/site-plan.json", "intake/factory-release.json"):
+    for relative in (
+        "package.json",
+        "intake/site-identity.json",
+        "intake/site-content.json",
+        "intake/site-plan.json",
+        "intake/publication-plan.json",
+        "intake/site-theme.json",
+        "intake/factory-release.json",
+    ):
         if not (project / relative).is_file():
             raise RuntimeError(f"Required publish file is missing: {relative}")
     expected_release = str(read_json(ROOT / "release.json").get("release") or "").strip()

@@ -35,6 +35,35 @@ function walkMdx(dir) {
   return out;
 }
 
+const gameplayImagesDir = path.join(root, "public", "images", "gameplay");
+const gameplayImages = fs.existsSync(gameplayImagesDir)
+  ? fs.readdirSync(gameplayImagesDir)
+    .filter((name) => /^gameplay-\d+\.webp$/i.test(name))
+    .sort()
+    .map((name) => `/images/gameplay/${name}`)
+  : [];
+
+function stableMediaIndex(slug, count) {
+  let hash = 2166136261;
+  for (const char of slug) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash) % count;
+}
+
+function addOfficialGameplayImage(source, slug) {
+  if (gameplayImages.length === 0 || /\bimage\s*:\s*["'`]/.test(source)) return source;
+  const image = gameplayImages[stableMediaIndex(slug, gameplayImages.length)];
+  return source.replace(
+    /^(export const metadata\s*=\s*\{[\s\S]*?)(^\}\s*$)/m,
+    (_match, block, closing) => {
+      const normalized = /,\s*$/.test(block) ? block : `${block.replace(/\s*$/, "")},\n`;
+      return `${normalized}  image: ${JSON.stringify(image)},\n${closing}`;
+    },
+  );
+}
+
 // MDX parses the body (everything after the `export const metadata = {...}` block) as
 // JSX-in-Markdown: any `<` there is read as the start of a tag unless immediately followed
 // by a letter/`/`/`!`/`>`. Prose that compares numbers ("enemies <10% health") is common in
@@ -131,7 +160,10 @@ for (const locale of localeDirs) {
     const destDir = path.join(root, "content", locale, category);
     fs.mkdirSync(destDir, { recursive: true });
     const { fixed, count, voidTagCount, autoLinkCount } = escapeStrayLtInBody(source);
-    fs.writeFileSync(path.join(destDir, `${slug}.mdx`), fixed);
+    fs.writeFileSync(
+      path.join(destDir, `${slug}.mdx`),
+      addOfficialGameplayImage(fixed, slug),
+    );
     if (count > 0) ok(`${path.relative(root, file)} — 自动转义了 ${count} 处会导致 MDX 构建失败的裸 "<"（如 "<10%"），改成 "&lt;"`);
     if (voidTagCount > 0) ok(`${path.relative(root, file)} — 自动修复了 ${voidTagCount} 个裸 <br>，改成 MDX 合法的 <br />`);
     if (autoLinkCount > 0) ok(`${path.relative(root, file)} — 自动转换了 ${autoLinkCount} 个 <https://...> 自动链接，避免 MDX 误判为 JSX`);
@@ -140,4 +172,5 @@ for (const locale of localeDirs) {
 }
 
 ok(`${ingested} 篇文章已接入 content/（${localeDirs.length} 个语言：${localeDirs.join(", ")}）`);
+if (gameplayImages.length > 0) ok(`文章已轮换使用 ${gameplayImages.length} 张官方游戏截图；自带 image metadata 的文章保持不变`);
 if (errors > 0) process.exit(1);
