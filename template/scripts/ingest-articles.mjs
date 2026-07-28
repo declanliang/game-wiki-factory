@@ -70,7 +70,7 @@ function escapeStrayLtInBody(source) {
   // below used to miss them and MDX parsed the prose as malformed JSX.
   // Preserve only components the template actually supports.
   const escapedUnknownTags = mdxSafeBody.replace(
-    /<(?!\/?(?:Callout|br)\b)[a-zA-Z][^>\n]*>/g,
+    /<(?!\/?(?:Callout|br)\b)\/?[a-zA-Z][^>\n]*>/g,
     (match) => {
       count++;
       return `&lt;${match.slice(1)}`;
