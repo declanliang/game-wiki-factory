@@ -69,7 +69,11 @@ const STRUCTURAL_PATTERNS = {
   "列表项": /^\s*[-*+]\s+\S/gm,
   "编号项": /^\s*\d+[.)]\s+\S/gm,
   "表格行": /^\s*\|.*\|\s*$/gm,
-  "格式化问题": /^\s*(?:#{3,6}\s+|\*\*)[^\n]*(?:\?|？)(?:\*\*)?\s*$/gm,
+  // Heading count/levels are already compared separately. Treat only a fully
+  // bold standalone question as a formatting marker; otherwise a normal
+  // question heading or a bold lead-in followed by prose becomes a false
+  // translation-truncation signal.
+  "格式化问题": /^\s*\*\*[^\n]*(?:\?|？)\*\*\s*$/gm,
 };
 
 function countMatches(body, pattern) {

@@ -304,8 +304,11 @@ def _compact_serp_field(
 ) -> str:
     """Shorten over-limit translated metadata without retranslating the body."""
     value = value.strip()
-    if lang_code not in CJK_LANGUAGES:
-        value = _trim_dangling_serp_suffix(value)
+    # CJK titles often retain Latin game names and comparison words. A model
+    # can therefore leave a standalone `o`, `O`, or `vs` suffix even in ja.
+    # The suffix matcher requires leading whitespace, so applying it to every
+    # locale cannot strip a native word or Japanese particle.
+    value = _trim_dangling_serp_suffix(value)
     if len(value) <= limit:
         return value
     if prefer_sentence:

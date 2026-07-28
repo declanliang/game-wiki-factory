@@ -151,6 +151,28 @@ class SeoMetadataValidationTests(unittest.TestCase):
             self.assertIn('description: "Consejos"', content)
             self.assertIn("## Practical Steps", content)
 
+    def test_normalizes_latin_connector_suffix_in_japanese_title(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "ja" / "modes" / "game-steam-solo-vs-coop.mdx"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                build_translation_mdx(
+                    "ゲーム攻略 Steam ソロプレイ vs",
+                    "協力プレイとの違いを説明します。",
+                    "modes",
+                    "2026-07-21",
+                    BODY,
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(normalize_existing_metadata(root, ["ja"]), 1)
+            content = path.read_text(encoding="utf-8")
+            self.assertIn('title: "ゲーム攻略 Steam ソロプレイ"', content)
+            self.assertIn("## Practical Steps", content)
+
 
 if __name__ == "__main__":
     unittest.main()
