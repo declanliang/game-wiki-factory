@@ -9,10 +9,33 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _open_quota_circuit, _prune_success_build_artifacts, _publish_command, _resume_quota_circuit, _schedule_next_locale_release, acknowledge_notifications, checkpoint_safe_content_retry, classify_failure, claim, connect, identify_quota_provider, normalize_config, pending_notifications, submit, submit_batch
+from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _open_quota_circuit, _prune_success_build_artifacts, _publish_command, _resume_quota_circuit, _schedule_next_locale_release, acknowledge_notifications, checkpoint_safe_content_retry, classify_failure, claim, connect, identify_quota_provider, normalize_config, pending_notifications, retry_job, submit, submit_batch
 
 
 class JobSystemTests(unittest.TestCase):
+    def test_manual_retry_is_claimed_before_untouched_batch_jobs(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ, {"GAMEWIKI_DATA_DIR": temporary}
+        ):
+            config = Path(temporary) / "game.json"
+            config.write_text(json.dumps({"game": "Untouched"}), encoding="utf-8")
+            untouched = submit(config)
+            config.write_text(json.dumps({"game": "Repaired"}), encoding="utf-8")
+            repaired = submit(config)
+            with connect() as db:
+                db.execute(
+                    "UPDATE jobs SET status='needs_attention' WHERE id=?",
+                    (repaired,),
+                )
+                result = retry_job(
+                    db,
+                    db.execute("SELECT * FROM jobs WHERE id=?", (repaired,)).fetchone(),
+                )
+            claimed = claim("repair-worker")
+            self.assertEqual(result["status"], "retry_wait")
+            self.assertEqual(claimed["id"], repaired)
+            self.assertNotEqual(claimed["id"], untouched)
+
     def test_new_job_defaults_to_automatic_cloudflare_publish(self) -> None:
         config = normalize_config({
             "game": "Pages Game",

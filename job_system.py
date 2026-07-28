@@ -652,7 +652,9 @@ def retry_job(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
            WHERE status='open' ORDER BY opened_at LIMIT 1"""
     ).fetchone()
     next_provider = remaining_circuit["provider"] if remaining_circuit else None
-    status = "quota_wait" if next_provider else "queued"
+    # A maintainer-triggered retry has already paid the diagnosis/repair cost.
+    # Put it ahead of untouched batch jobs so the fix is validated promptly.
+    status = "quota_wait" if next_provider else "retry_wait"
     db.execute(
         """UPDATE jobs SET status=?,available_at=?,cancel_requested=0,
                   last_error=NULL,finished_at=NULL,result_json=NULL,
