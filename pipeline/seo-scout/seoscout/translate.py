@@ -285,7 +285,7 @@ FORMATTED_QUESTION_RE = re.compile(
 )
 BOLD_STANDALONE_RE = re.compile(r'^\s*\*\*[^\n]+\*\*\s*$', re.MULTILINE)
 DANGLING_SERP_SUFFIX_RE = re.compile(
-    r"\s+(?:and|or|with|for|to|the|a|an|in|on|at|of|from|into|this|that|your|our|"
+    r"\s+(?:and|or|with|for|to|vs\.?|the|a|an|in|on|at|of|from|into|this|that|your|our|"
     r"und|oder|mit|für|y|o|con|para|et|ou|avec|pour)[.!?。！？…]*$",
     re.IGNORECASE,
 )

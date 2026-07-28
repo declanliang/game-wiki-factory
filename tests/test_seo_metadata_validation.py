@@ -142,7 +142,7 @@ class SeoMetadataValidationTests(unittest.TestCase):
             path = root / "es" / "guide" / "game-steam-guide.mdx"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(
-                build_translation_mdx("Guía de juego para", "Consejos para", "guide", "2026-07-21", BODY),
+                    build_translation_mdx("Guía de juego vs", "Consejos para", "guide", "2026-07-21", BODY),
                 encoding="utf-8",
             )
             self.assertEqual(normalize_existing_metadata(root, ["es"]), 1)
