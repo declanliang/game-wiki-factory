@@ -562,83 +562,6 @@ def _deploy_cloudflare_pages(
     }
 
 
-def _publish_with_vercel_cli(project: Path, project_name: str, full_repo: str, env: dict[str, str]) -> dict:
-    vercel = shutil.which("vercel.cmd") or shutil.which("vercel")
-    if not vercel:
-        raise RuntimeError("VERCEL_TOKEN is absent and no authenticated Vercel CLI was found")
-    _run([vercel, "link", "--yes", "--project", project_name], project, env)
-    # `vercel link` normally connects an existing Git remote automatically. An
-    # explicit connect is safe to skip when Vercel reports it is already linked.
-    connected = subprocess.run(
-        [vercel, "git", "connect", f"https://github.com/{full_repo}", "--non-interactive"],
-        cwd=project,
-        env=env,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        capture_output=True,
-    )
-    if connected.returncode and "already" not in (connected.stdout + connected.stderr).casefold():
-        raise RuntimeError((connected.stderr or connected.stdout).strip())
-    return {
-        "status": "awaiting_domain_configuration",
-        "projectName": project_name,
-        "requiredEnvironmentVariables": ["NEXT_PUBLIC_SITE_URL"],
-        "nextAction": "Set the final custom domain and NEXT_PUBLIC_SITE_URL in Vercel, then run npm run verify:deploy.",
-        "dashboardUrl": "https://vercel.com/dashboard",
-        "updatedAt": _now(),
-    }
-
-
-def _set_vercel_site_url(
-    project: Path,
-    project_name: str,
-    site_url: str,
-    env: dict[str, str] | None = None,
-) -> str:
-    """Set the public canonical origin only when the operator supplied it explicitly."""
-    configured = site_url.strip()
-    if not re.match(r"^https?://", configured, flags=re.I):
-        configured = f"https://{configured}"
-    parsed = urllib.parse.urlparse(configured)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise RuntimeError("--site-url must be a valid hostname or HTTP(S) URL")
-    origin = f"{parsed.scheme}://{parsed.netloc}"
-    vercel = shutil.which("vercel.cmd") or shutil.which("vercel")
-    if not vercel:
-        raise RuntimeError("Vercel CLI is required when --site-url is supplied")
-    command_env = env or dict(os.environ)
-    # Vercel CLI natively consumes VERCEL_TOKEN.  Never append it to argv:
-    # command-line arguments are visible to other users through the process list.
-    _run([vercel, "link", "--yes", "--project", project_name], project, command_env)
-    _run(
-        [vercel, "env", "add", "NEXT_PUBLIC_SITE_URL", "production", "--value", origin,
-         "--force", "--yes", "--no-sensitive"],
-        project,
-        command_env,
-    )
-    return origin
-
-
-def _deploy_with_vercel_cli(project: Path, project_name: str, env: dict[str, str]) -> str:
-    """Create a production deployment after linking and environment setup."""
-    vercel = shutil.which("vercel.cmd") or shutil.which("vercel")
-    if not vercel:
-        raise RuntimeError("Vercel CLI is required to create the production deployment")
-    _run([vercel, "link", "--yes", "--project", project_name], project, env)
-    output = _run([vercel, "--prod", "--yes"], project, env)
-    urls = [item.rstrip(".,)") for item in re.findall(r"https://[^\s\"']+", output)]
-    public_urls = [
-        item for item in urls
-        if (urllib.parse.urlparse(item).hostname or "").casefold() != "api.vercel.com"
-    ]
-    deployment_urls = [
-        item for item in public_urls
-        if (urllib.parse.urlparse(item).hostname or "").casefold().endswith(".vercel.app")
-    ]
-    return deployment_urls[-1] if deployment_urls else ""
-
-
 def _verify_online_deployment(project: Path, origin: str, env: dict[str, str]) -> dict:
     """Make remote SEO/runtime verification a publish postcondition."""
     npm = shutil.which("npm.cmd") or shutil.which("npm")
@@ -650,10 +573,9 @@ def _verify_online_deployment(project: Path, origin: str, env: dict[str, str]) -
         raise RuntimeError("online verification requires a valid HTTP(S) production origin")
     verify_env = dict(env)
     verify_env["NEXT_PUBLIC_SITE_URL"] = f"{parsed.scheme}://{parsed.netloc}"
-    # Rebuild with the final public origin.  The generation build may have used
-    # example.com intentionally, while Vercel injects its production env only in
-    # the remote build.  Reusing that local artifact would create false failures
-    # and would not prove the final-origin build itself is healthy.
+    # Rebuild with the final public origin. The generation build may have used
+    # example.com intentionally, while Cloudflare injects the production env in
+    # the remote build.
     command = [npm, "run", "verify:deploy"]
     result = subprocess.run(
         command,
@@ -743,17 +665,8 @@ def _ensure_private_github_repo(full_repo: str, project: Path, env: dict[str, st
         raise RuntimeError(f"GitHub repository visibility must be PRIVATE: {full_repo}")
 
 
-def _vercel_project_payload(project_name: str, full_repo: str) -> dict:
-    """Create only the Vercel project link; domain configuration belongs to the operator."""
-    return {
-        "name": project_name,
-        "framework": "nextjs",
-        "gitRepository": {"type": "github", "repo": full_repo},
-    }
-
-
 def _resolve_git_author(project: Path, env: dict[str, str]) -> tuple[str, str]:
-    """Return a Vercel-recognizable author without exposing the GitHub token."""
+    """Return a GitHub-recognizable author without exposing the GitHub token."""
     name = env.get("FACTORY_GIT_AUTHOR_NAME", "").strip()
     email = env.get("FACTORY_GIT_AUTHOR_EMAIL", "").strip()
     if name and email:
@@ -768,23 +681,6 @@ def _resolve_git_author(project: Path, env: dict[str, str]) -> tuple[str, str]:
 def _commit(project: Path, message: str, env: dict[str, str], author: tuple[str, str]) -> None:
     name, email = author
     _run(["git", "-c", f"user.name={name}", "-c", f"user.email={email}", "commit", "-m", message], project, env)
-
-
-def _replace_remote_main(project: Path, full_repo: str, env: dict[str, str], author: tuple[str, str]) -> str:
-    """Replace remote tracked content with one clean generated commit, preserving a backup tag."""
-    _run(["git", "fetch", "origin", "main"], project, env)
-    remote_sha = _run(["git", "rev-parse", "refs/remotes/origin/main"], project, env)
-    backup_tag = f"pre-rebuild-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
-    _run(["git", "tag", backup_tag, remote_sha], project, env)
-    _run(["git", "push", "origin", f"refs/tags/{backup_tag}"], project, env)
-    branch = f"factory-rebuild-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
-    _run(["git", "checkout", "--orphan", branch], project, env)
-    subprocess.run(["git", "rm", "--cached", "-r", "--ignore-unmatch", "."], cwd=project, env=env, capture_output=True)
-    _run(["git", "add", "--all"], project, env)
-    _commit(project, "Rebuild game wiki from latest factory", env, author)
-    _run(["git", "branch", "-M", "main"], project, env)
-    _run(["git", "push", "--force-with-lease=main:" + remote_sha, "-u", "origin", "main"], project, env)
-    return backup_tag
 
 
 def _validate_project(project: Path) -> dict:
@@ -817,25 +713,6 @@ def _validate_project(project: Path) -> dict:
     return manifest
 
 
-def _remove_vercel_oidc_env(project: Path) -> bool:
-    """Remove only the one-key temporary file created by recent Vercel CLI releases."""
-    path = project / ".env.local"
-    if not path.is_file():
-        return False
-    keys: set[str] = set()
-    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if "=" not in line:
-            return False
-        keys.add(line.split("=", 1)[0].strip())
-    if keys != {"VERCEL_OIDC_TOKEN"}:
-        return False
-    path.unlink()
-    return True
-
-
 def publish(argv: list[str]) -> int:
     runtime_env = build_subprocess_env(ROOT)
     parser = argparse.ArgumentParser(prog="gamewiki.py publish")
@@ -845,12 +722,8 @@ def publish(argv: list[str]) -> int:
     parser.add_argument("--project-dir", type=Path)
     parser.add_argument("--site-url", help="Optional final canonical domain/URL for Cloudflare Pages.")
     parser.add_argument("--skip-cloudflare", action="store_true")
-    parser.add_argument("--skip-vercel", action="store_true", help=argparse.SUPPRESS)
-    parser.add_argument("--replace-existing", action="store_true", help="Replace an existing repository tree after creating a backup tag.")
-    parser.add_argument("--vercel-project", help="Reuse a Vercel project name that differs from the GitHub repository name.")
     args = parser.parse_args(argv)
     project = (args.project_dir or (PROJECTS_ROOT / args.slug)).expanduser().resolve()
-    _remove_vercel_oidc_env(project)
     _validate_project(project)
     repo = args.repo or args.slug
     receipt_path = project / ".gamewiki" / "publish.json"
@@ -882,14 +755,10 @@ def publish(argv: list[str]) -> int:
         if "origin" not in remotes:
             _run(["git", "remote", "add", "origin", f"https://github.com/{full_repo}.git"], project)
         _run(["gh", "auth", "setup-git"], project, env)
-        if args.replace_existing:
-            backup_tag = _replace_remote_main(project, full_repo, env, author)
-            receipt["backupTag"] = backup_tag
-        else:
-            _run(["git", "add", "--all"], project)
-            if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project).returncode != 0:
-                _commit(project, "Generate game wiki site", env, author)
-            _run(["git", "push", "-u", "origin", "main"], project, env)
+        _run(["git", "add", "--all"], project)
+        if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project).returncode != 0:
+            _commit(project, "Generate game wiki site", env, author)
+        _run(["git", "push", "-u", "origin", "main"], project, env)
     _ensure_private_github_repo(full_repo, project, env)
     receipt["stages"]["github"] = {
         "status": "complete",
@@ -901,7 +770,7 @@ def publish(argv: list[str]) -> int:
     }
     write_json(receipt_path, receipt)
 
-    if args.skip_cloudflare or args.skip_vercel:
+    if args.skip_cloudflare:
         receipt["stages"]["hosting"] = {
             "provider": "cloudflare-pages",
             "status": "manual_action_required",
@@ -909,7 +778,6 @@ def publish(argv: list[str]) -> int:
             "dashboardUrl": "https://dash.cloudflare.com/",
             "updatedAt": _now(),
         }
-        receipt["stages"].pop("vercel", None)
         receipt["stages"].pop("onlineVerification", None)
         write_json(receipt_path, receipt)
     else:
@@ -929,7 +797,6 @@ def publish(argv: list[str]) -> int:
             "updatedAt": _now(),
         })
         receipt["stages"]["hosting"] = hosting
-        receipt["stages"].pop("vercel", None)
         receipt["stages"]["onlineVerification"] = {
             "status": "running",
             "origin": hosting["siteUrl"],

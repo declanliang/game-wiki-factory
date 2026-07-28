@@ -13,8 +13,13 @@ export const SITE_URL = resolveDeploymentSiteUrl(process.env);
 export const SITE_LOGO_PATH = "/android-chrome-512x512.png";
 export const SITE_OG_IMAGE_PATH = "/images/hero.webp";
 
-export const SITE_LOGO_URL = `${SITE_URL}${SITE_LOGO_PATH}`;
-export const SITE_OG_IMAGE_URL = `${SITE_URL}${SITE_OG_IMAGE_PATH}`;
+export function absoluteAssetUrl(pathname: string): string {
+  if (/^https?:\/\//i.test(pathname)) return pathname;
+  return new URL(pathname.replace(/^\/+/, ""), `${SITE_URL}/`).href;
+}
+
+export const SITE_LOGO_URL = absoluteAssetUrl(SITE_LOGO_PATH);
+export const SITE_OG_IMAGE_URL = absoluteAssetUrl(SITE_OG_IMAGE_PATH);
 
 export function localizedSiteUrl(pathname: string, locale: string): string {
   return absoluteLocalizedUrl(SITE_URL, pathname, locale);

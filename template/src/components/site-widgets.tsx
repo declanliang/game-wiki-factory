@@ -8,11 +8,11 @@ import { ChevronRight } from "lucide-react";
 
 export function Breadcrumbs({ items }: { items: { label: string; href?: string }[] }) {
   return (
-    <nav className="mb-7 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+    <nav aria-label="Breadcrumb" className="mb-7 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
       {items.map((item, index) => (
         <span key={`${item.label}-${index}`} className="flex items-center gap-2">
           {index > 0 && <ChevronRight className="h-4 w-4" />}
-          {item.href ? <Link className="hover:text-foreground" href={item.href}>{item.label}</Link> : <span className="text-foreground">{item.label}</span>}
+          {item.href ? <Link className="hover:text-foreground" href={item.href}>{item.label}</Link> : <span aria-current="page" className="text-foreground">{item.label}</span>}
         </span>
       ))}
     </nav>
@@ -20,5 +20,6 @@ export function Breadcrumbs({ items }: { items: { label: string; href?: string }
 }
 
 export function JsonLd({ data }: { data: unknown }) {
-  return <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
+  const serialized = JSON.stringify(data).replace(/</g, "\\u003c");
+  return <script type="application/ld+json" suppressHydrationWarning dangerouslySetInnerHTML={{ __html: serialized }} />;
 }

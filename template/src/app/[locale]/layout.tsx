@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { hasLocale } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { NextIntlClientProvider } from "next-intl";
 import { notFound } from "next/navigation";
-import { ThemeProvider } from "next-themes";
 import { SiteFooter, SiteHeader } from "@/components/site";
 import { JsonLd } from "@/components/site-widgets";
 import { AdProvider } from "@/components/ad-slot";
@@ -16,8 +14,6 @@ import { buildOpenGraph, buildSiteGraph, buildTwitter, shouldIndex } from "@/lib
 import { getAdAvailability } from "@/lib/ad-config";
 import en from "@/locales/en.json";
 import { SITE_THEME } from "@/config/theme";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 type Messages = typeof en;
 
@@ -59,21 +55,19 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const adAvailability = getAdAvailability();
 
   return (
-    <html lang={locale} data-site-theme={SITE_THEME} className={`${inter.variable}`} suppressHydrationWarning>
+    <html lang={locale} data-site-theme={SITE_THEME}>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          <NextIntlClientProvider messages={messages}>
-            <AdProvider availability={adAvailability}>
-              <JsonLd data={siteGraph} />
-              <TopStickyAd />
-              <SiteHeader locale={locale} />
-              {children}
-              <GlobalFooterAds />
-              <SiteFooter locale={locale} />
-              <Analytics />
-            </AdProvider>
-          </NextIntlClientProvider>
-        </ThemeProvider>
+        <NextIntlClientProvider messages={messages}>
+          <AdProvider availability={adAvailability}>
+            <JsonLd data={siteGraph} />
+            <TopStickyAd />
+            <SiteHeader locale={locale} />
+            {children}
+            <GlobalFooterAds />
+            <SiteFooter locale={locale} />
+            <Analytics />
+          </AdProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

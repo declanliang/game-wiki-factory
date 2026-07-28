@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The one-command version of doc/新游戏上站提示词流程.md Part 0-5 — runs every
+// The one-command Factory template pipeline — runs every
 // mechanical step in order and stops at the first failure. This is only possible
 // because every step it calls is itself already a deterministic script; this file
 // doesn't contain any new logic of its own, it's just the sequencing.
@@ -7,7 +7,7 @@
 // What's NOT automated here, on purpose (still needs a human or an upstream tool):
 //   - content quality/off-topic screening — delegated to seoscout, not re-checked here
 //   - writing the actual marketing copy — has to already be ready-to-use in
-//     intake/site-content.json by the time this runs (see doc/homepage-info-schema.md);
+//     intake/site-content.json by the time this runs (see Factory input contract);
 //     this script only ever copies/substitutes text, it never generates any
 //
 // Usage: npm run launch:site [-- --skip-build]

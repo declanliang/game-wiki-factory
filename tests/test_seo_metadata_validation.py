@@ -199,6 +199,27 @@ class SeoMetadataValidationTests(unittest.TestCase):
             self.assertIn('title: "ゲーム攻略 Steam ソロプレイ"', content)
             self.assertIn("## Practical Steps", content)
 
+    def test_compaction_drops_incomplete_promotional_subtitle(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            path = root / "es" / "updates" / "game-release-date.mdx"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(
+                build_translation_mdx(
+                    "Fecha de lanzamiento de Heave Ho 2 en Steam: Marca tu calendario ahora",
+                    "Descubre la fecha oficial de lanzamiento y las plataformas disponibles para jugar.",
+                    "updates",
+                    "2026-07-28",
+                    BODY,
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(normalize_existing_metadata(root, ["es"]), 1)
+            content = path.read_text(encoding="utf-8")
+            self.assertIn('title: "Fecha de lanzamiento de Heave Ho 2 en Steam"', content)
+
 
 if __name__ == "__main__":
     unittest.main()

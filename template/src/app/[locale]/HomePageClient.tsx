@@ -3,7 +3,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, BookOpen, ChevronRight, ExternalLink, Fingerprint, type LucideIcon } from "lucide-react";
+import { ArrowRight, BookOpen, ChevronRight, type LucideIcon } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,18 +18,16 @@ import type { ContentItem } from "@/lib/content";
 import en from "@/locales/en.json";
 
 // Lightweight "icon + title + one-line description + link" card item — used by the
-// Featured Guides, Live Tools, and Extra Sections blocks. `category` is optional and, when
+// Featured Guides block. `category` is optional and, when
 // it matches a registered NAVIGATION_CONFIG key, borrows that category's icon so games
 // don't need a separate icon vocabulary just for these cards.
 type LightItem = { title: string; description: string; href: string; category?: string; image?: string };
-// `description` is an optional intro line under the heading — mainly for home.extraSections,
-// where a sentence or two of real, keyword-bearing copy above the item cards is the point
-// (see doc/homepage-info-schema.md), but any LightSection can use it.
+// `description` is an optional keyword-bearing intro line under the heading.
 type LightSection = { title: string; description?: string; viewAllHref?: string; viewAllLabel?: string; items: LightItem[] };
 type GuideItem = { title: string; description: string; category?: string; href?: string };
 type GuideSection = { id: string; eyebrow: string; title: string; description: string; items: GuideItem[] };
 type VideoLabels = { eyebrow: string; title: string; description: string; play: string; watchOnYouTube: string };
-type Home = Omit<typeof en.home, "featured" | "liveTools" | "hero"> & {
+type Home = Omit<typeof en.home, "featured" | "liveTools" | "hero" | "guideSections"> & {
   hero: Omit<typeof en.home.hero, "videoId"> & { videoId?: string };
   featured: LightSection;
   liveTools?: LightSection;
@@ -40,8 +38,6 @@ type Home = Omit<typeof en.home, "featured" | "liveTools" | "hero"> & {
 };
 
 type Category = { key: string; path: string; title: string; description: string; count: number };
-type IdentityFact = { label: string; value: string };
-
 const iconByKey: Record<string, LucideIcon> = Object.fromEntries(NAVIGATION_CONFIG.map((item) => [item.key, item.icon]));
 
 // Renders a FAQ answer that may contain `[label](href)` links — the only Markdown syntax
@@ -79,7 +75,7 @@ function LightCard({ item, locale }: { item: LightItem; locale: string }) {
     <Link href={localizeHref(item.href, locale)} className="group flex w-full max-w-[22rem] flex-col overflow-hidden rounded-2xl border border-border bg-card/70 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">
       {item.image ? (
         <span className="relative block aspect-[16/9] overflow-hidden bg-muted">
-          <Image src={item.image} alt={item.title} fill sizes="(max-width: 640px) 100vw, 352px" className="object-cover transition duration-500 group-hover:scale-[1.03]" />
+          <Image src={item.image} alt="" fill sizes="(max-width: 640px) 100vw, 352px" className="object-cover transition duration-500 group-hover:scale-[1.03]" />
           <span className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
         </span>
       ) : null}
@@ -124,46 +120,50 @@ function LightSectionBlock({ section, locale, insertAd = false, taskRouter = fal
 
 function GuideSectionsBlock({ sections, locale }: { sections: GuideSection[]; locale: string }) {
   return (
-    <section aria-label="Game field guide" className="mx-auto max-w-6xl space-y-16 sm:space-y-20">
-      {sections.map((section, sectionIndex) => (
-        <article
-          key={section.id}
-          className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:gap-16"
-        >
-          <div className="lg:self-start">
-            <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.24em] text-[hsl(var(--nav-theme))]">
-              <span className="grid h-12 w-12 place-items-center rounded-2xl border border-[hsl(var(--nav-theme)/0.35)] bg-[hsl(var(--nav-theme)/0.1)] font-mono text-base text-[hsl(var(--nav-theme))]">{String(sectionIndex + 1).padStart(2, "0")}</span>
-              <span>{section.eyebrow}</span>
+    <section aria-label="Game field guide" className="mx-auto max-w-6xl space-y-14 sm:space-y-16">
+      {sections.map((section) => {
+        const SectionIcon = iconByKey[section.id] || iconByKey[section.items.find((item) => item.category)?.category || ""] || BookOpen;
+        return (
+          <article
+            key={section.id}
+            className="grid gap-7 lg:grid-cols-[0.7fr_1.3fr] lg:gap-12"
+          >
+            <div className="lg:self-start">
+              <div className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.24em] text-[hsl(var(--nav-theme))]">
+                <span className="grid h-12 w-12 place-items-center rounded-2xl border border-[hsl(var(--nav-theme)/0.35)] bg-[hsl(var(--nav-theme)/0.1)] text-[hsl(var(--nav-theme))]"><SectionIcon className="h-6 w-6" /></span>
+                <span>{section.eyebrow}</span>
+              </div>
+              <h2 className="mt-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{section.title}</h2>
+              <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">{section.description}</p>
             </div>
-            <h2 className="mt-4 text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{section.title}</h2>
-            <p className="mt-4 max-w-xl text-base leading-7 text-muted-foreground">{section.description}</p>
-          </div>
-          <ol className="grid gap-4">
-            {section.items.map((item, itemIndex) => {
-              const body = (
-                <div className="grid grid-cols-[3.5rem_1fr_auto] gap-5 rounded-2xl border border-border bg-card/70 p-5 transition group-hover:-translate-y-0.5 group-hover:border-[hsl(var(--nav-theme-light))]">
-                  <span className="grid h-14 w-14 place-items-center rounded-2xl bg-muted font-mono text-sm font-bold text-[hsl(var(--nav-theme))]">{String(itemIndex + 1).padStart(2, "0")}</span>
-                  <span>
-                    <span className="block text-lg font-semibold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{item.title}</span>
-                    <span className="mt-1 block text-sm leading-6 text-muted-foreground">{item.description}</span>
-                  </span>
-                  {item.href ? <ArrowRight className="mt-1 h-4 w-4 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-[hsl(var(--nav-theme))]" /> : null}
-                </div>
-              );
-              return item.href ? (
-                <li key={`${section.id}-${itemIndex}`}>
-                  <Link className="group block" href={localizeHref(item.href, locale)}>{body}</Link>
-                </li>
-              ) : <li key={`${section.id}-${itemIndex}`}>{body}</li>;
-            })}
-          </ol>
-        </article>
-      ))}
+            <ul className="grid gap-4">
+              {section.items.map((item, itemIndex) => {
+                const ItemIcon = (item.category && iconByKey[item.category]) || SectionIcon;
+                const body = (
+                  <div className="grid grid-cols-[3.75rem_1fr_auto] gap-5 rounded-2xl border border-border bg-card/70 p-5 transition group-hover:-translate-y-0.5 group-hover:border-[hsl(var(--nav-theme-light))]">
+                    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-muted text-[hsl(var(--nav-theme))]"><ItemIcon className="h-7 w-7" /></span>
+                    <span>
+                      <span className="block text-lg font-semibold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{item.title}</span>
+                      <span className="mt-1 block text-sm leading-6 text-muted-foreground">{item.description}</span>
+                    </span>
+                    {item.href ? <ArrowRight className="mt-1 h-4 w-4 text-muted-foreground transition group-hover:translate-x-1 group-hover:text-[hsl(var(--nav-theme))]" /> : null}
+                  </div>
+                );
+                return item.href ? (
+                  <li key={`${section.id}-${itemIndex}`}>
+                    <Link className="group block" href={localizeHref(item.href, locale)}>{body}</Link>
+                  </li>
+                ) : <li key={`${section.id}-${itemIndex}`}>{body}</li>;
+              })}
+            </ul>
+          </article>
+        );
+      })}
     </section>
   );
 }
 
-export default function HomePageClient({ home, quickFactsLabel, videoLabels, locale, recentArticles, categories, identityFacts, officialUrl }: { home: Home; quickFactsLabel: string; videoLabels: VideoLabels; locale: string; recentArticles: ContentItem[]; categories: Category[]; identityFacts: IdentityFact[]; officialUrl: string }) {
+export default function HomePageClient({ home, quickFactsLabel, videoLabels, locale, recentArticles, categories }: { home: Home; quickFactsLabel: string; videoLabels: VideoLabels; locale: string; recentArticles: ContentItem[]; categories: Category[] }) {
   const nativeEnabled = useAdEnabled("nativeBanner");
   const banner728Enabled = useAdEnabled("banner728x90");
   const banner300Enabled = useAdEnabled("banner300x250");
@@ -171,8 +171,7 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
     switch (section) {
       case "hero":
         return (
-          <div>
-          <section className="relative mx-auto min-h-[32rem] max-w-[90rem] overflow-hidden rounded-[2rem] border border-white/10 bg-card text-center shadow-2xl shadow-black/30">
+          <section className="relative mx-auto min-h-[32rem] max-w-[84rem] overflow-hidden rounded-[2rem] border border-white/10 bg-card text-center shadow-2xl shadow-black/30">
             <Image src="/images/hero.webp" alt="" fill priority sizes="(max-width: 1440px) 100vw, 1440px" className="object-cover" />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,6,10,.38)_0%,rgba(4,6,10,.62)_48%,rgba(4,6,10,.94)_100%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,transparent_0%,rgba(0,0,0,.2)_52%,rgba(0,0,0,.6)_100%)]" />
@@ -198,22 +197,6 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
               </div>
             </div>
           </section>
-          {identityFacts.length > 0 ? (
-            <Link href={officialUrl} className="group relative z-20 mx-auto -mt-3 flex max-w-5xl flex-wrap items-stretch justify-center overflow-hidden rounded-2xl border border-border bg-background/95 shadow-xl backdrop-blur-xl">
-              <span className="flex min-w-40 items-center gap-3 border-b border-border px-5 py-4 text-sm font-bold text-foreground sm:border-b-0 sm:border-r">
-                <span className="grid h-9 w-9 place-items-center rounded-xl bg-[hsl(var(--nav-theme)/0.12)] text-[hsl(var(--nav-theme))]"><Fingerprint className="h-4 w-4" /></span>
-                {home.hero.eyebrow}
-              </span>
-              {identityFacts.map((fact) => (
-                <span key={fact.label} className="min-w-40 flex-1 border-l border-border/70 px-5 py-3.5 first:border-l-0">
-                  <span className="block text-[0.68rem] font-bold uppercase tracking-[0.16em] text-muted-foreground">{fact.label}</span>
-                  <span className="mt-1 block truncate text-sm font-semibold text-foreground">{fact.value}</span>
-                </span>
-              ))}
-              <span className="grid w-12 place-items-center text-muted-foreground transition group-hover:text-[hsl(var(--nav-theme))]"><ExternalLink className="h-4 w-4" /></span>
-            </Link>
-          ) : null}
-          </div>
         );
 
       case "ads":
@@ -290,22 +273,6 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
         // need, using real generated articles rather than synthetic tool pages.
         return <LightSectionBlock section={home.featured} locale={locale} insertAd={banner728Enabled || banner300Enabled} taskRouter />;
 
-      case "liveTools":
-        // Only renders if the game actually has time-sensitive content configured
-        return home.liveTools ? <LightSectionBlock section={home.liveTools} locale={locale} /> : null;
-
-      case "extraSections":
-        // Zero or more editor-provided blocks (e.g. one per major content category) — each
-        // one independently hides itself via LightSectionBlock if it has no items, so a
-        // partially-filled array degrades gracefully instead of leaving gaps.
-        return home.extraSections && home.extraSections.length > 0 ? (
-          <div className="space-y-16">
-            {home.extraSections.map((section, i) => (
-              <LightSectionBlock key={section.title || i} section={section} locale={locale} />
-            ))}
-          </div>
-        ) : null;
-
       case "updates":
         // Compact "what's new" list, title-only rows (not a mini article grid)
         return recentArticles.length > 0 ? (
@@ -371,7 +338,7 @@ export default function HomePageClient({ home, quickFactsLabel, videoLabels, loc
       {HOME_SECTION_ORDER.map((section) => {
         const rendered = renderSection(section);
         if (!rendered) return null;
-        const spacing = section === "hero" ? "" : section === "ads" ? "mt-5 sm:mt-6" : "mt-24 sm:mt-28";
+        const spacing = section === "hero" ? "" : section === "ads" ? "mt-5 sm:mt-6" : "mt-20 sm:mt-24";
         return <div key={section} className={spacing}>{rendered}</div>;
       })}
     </div>

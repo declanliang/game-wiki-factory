@@ -50,6 +50,7 @@ export interface ContentMetadata {
   date: string;
   lastModified?: string;
   image?: string;
+  imageAlt?: string;
   badge?: string;
   summary?: string;
 }

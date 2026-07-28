@@ -10,12 +10,12 @@
 - 付费、可恢复状态在游戏根 `.gamewiki/`；最终可部署输入在 `intake/`。
 - 后台站点任务默认完成 Private GitHub、Git-integrated Pages、`NEXT_PUBLIC_SITE_URL` 和部署。运营者只负责自定义域名绑定/DNS；正式域名尚未可达时状态为 `awaiting_domain_configuration`。
 - 所有未来游戏都作为新项目从空 workspace 生产；不再接收 `operation: rebuild` 或旧 repo 覆盖输入。
-- Factory 只接受站点生产 Job；广告转换和托管环境变量由独立广告 Agent 按 `docs/adsterra-environment-contract.md` 处理。
+- Factory 只接受站点生产 Job；广告转换和托管环境变量由独立广告 Agent 按 `docs/advertising/adsterra-environment-contract.md` 处理。
 
 ## 2. 接手顺序
 
 1. 阅读 `README.md`、`AGENTS.md`、`docs/architecture.md`、`docs/runbook.md`。
-2. 服务器/OpenClaw 工作再读 `docs/background-jobs.md`、`docs/openclaw-operator-guide.md` 和 `docs/server-deployment.md`。
+2. 服务器/OpenClaw 工作再读 `docs/operations/background-jobs.md`、`docs/agents/openclaw-factory.md` 和 `docs/operations/factory-server.md`。
 3. 全新环境按 `docs/bootstrap-from-github.md` 恢复。
 4. 查看目标子模块自己的 `AGENTS.md`。
 5. 不读取、打印、复制或提交 `.env`/`factory.env` 的值。
@@ -126,7 +126,7 @@ OpenClaw Agent `game-wiki-operator` 只负责提交、查询、日志、原 Job 
 5. 重启受影响服务；
 6. 验证提交号、服务状态、队列和 timer。
 
-详细命令见 `docs/server-deployment.md`。
+详细命令见 `docs/operations/factory-server.md`。
 
 ## 8. 最低验收
 

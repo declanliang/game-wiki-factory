@@ -84,7 +84,7 @@ Roblox Discover 的公开结果通过 Jina Reader 获取。Reader 或 Roblox 页
 
 ### 9. 模板契约存在跨仓库漂移风险
 
-当前 `TEMPLATE_SITE_IDENTITY_SCHEMA` 与 `TEMPLATE_SITE_CONTENT_SCHEMA` 根据工厂 `template/doc/homepage-info-schema.md`、`check-intake.mjs` 和 `apply-content.mjs` 实现；最终包还会强校验一张 Hero 与 favicon 7 文件。Basic Info 与模板位于同一仓库，跨契约修改必须在一个提交中同步测试。
+当前 `TEMPLATE_SITE_IDENTITY_SCHEMA` 与 `TEMPLATE_SITE_CONTENT_SCHEMA` 根据工厂 `docs/contracts/site-input.md`、`check-intake.mjs` 和 `apply-content.mjs` 实现；最终包还会强校验一张 Hero 与 favicon 7 文件。Basic Info 与模板位于同一仓库，跨契约修改必须在一个提交中同步测试。
 
 建议：模板仓库提供版本化 JSON Schema；本项目直接读取或固定依赖该 Schema，并在 CI 中运行跨仓库契约测试。
 

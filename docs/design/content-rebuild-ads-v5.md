@@ -1,6 +1,6 @@
 # Content Expansion V5（广告部分已废弃）
 
-> 本文的 Adsterra importer/background-task 设计已废弃，不是当前实现。当前 Factory 只负责站点生产与 Cloudflare Pages 发布；广告边界见 `docs/adsterra-environment-contract.md`。
+> 本文的 Adsterra importer/background-task 设计已废弃，不是当前实现。当前 Factory 只负责站点生产与 Cloudflare Pages 发布；广告边界见 `docs/advertising/adsterra-environment-contract.md`。
 
 ## Outcome
 

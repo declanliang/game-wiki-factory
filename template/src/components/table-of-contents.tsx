@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ChevronDown, X } from "lucide-react";
 
 interface Heading {
@@ -15,16 +15,20 @@ interface Heading {
  * 只在大屏幕才出现的侧边栏）。
  */
 export function MobileTOC({ headings, label }: { headings: Heading[]; label: string }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
+  const contentId = useId();
+  const sectionHeadings = headings.filter((heading) => heading.level === 2);
 
   // 只在分段较多时才启用 TOC（避免短文章出现形式大于内容的冗余目录）
-  if (headings.length < 4) return null;
+  if (sectionHeadings.length < 4) return null;
 
   return (
     <div className="mt-6 mb-6 rounded-2xl border border-border bg-card/70 p-4">
       <div className="flex items-center justify-between">
         <button
           onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-controls={contentId}
           className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.18em] text-muted-foreground"
         >
           <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -37,15 +41,13 @@ export function MobileTOC({ headings, label }: { headings: Heading[]; label: str
         )}
       </div>
       {open && (
-        <nav className="mt-3 space-y-1 border-t border-border pt-3">
-          {headings.map((h) => (
+        <nav id={contentId} aria-label={label} className="mt-3 space-y-1 border-t border-border pt-3">
+          {sectionHeadings.map((h) => (
             <a
               key={h.id}
               href={`#${h.id}`}
               onClick={() => setOpen(false)}
-              className={`block rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground ${
-                h.level === 3 ? "pl-6" : ""
-              }`}
+              className="block rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               {h.text}
             </a>

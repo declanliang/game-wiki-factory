@@ -14,7 +14,7 @@ from gamewiki_automation.pipeline import Pipeline, _generation_evidence, _genera
 from gamewiki_automation.roblox import IdentityError, RobloxClient, clean_roblox_display_name, identity_match_confidence, roblox_place_id
 from gamewiki_automation.steam import SteamClient, steam_app_id
 from gamewiki_automation.schemas import HOMEPAGE_SCHEMA, LANGUAGE_MARKET_SCHEMA, MODULES_SCHEMA, RESEARCH_SCHEMA, TEMPLATE_SITE_CONTENT_SCHEMA, TEMPLATE_SITE_IDENTITY_SCHEMA
-from gamewiki_automation.template_contract import build_site_content, export_existing_output, validate_localized_site_content, validate_template_contract
+from gamewiki_automation.template_contract import build_site_content, build_site_identity, export_existing_output, validate_localized_site_content, validate_template_contract
 from gamewiki_automation.util import clean_json_text, dump_json, normalized_name, public_game_name, slugify
 from gamewiki_automation.validate import _cost_summary
 
@@ -67,6 +67,7 @@ class FakeSteamHttp:
                 "short_description": "Survive escalating tornadoes with up to 7 friends.",
                 "about_the_game": "<p>Repair your van and escape.</p>",
                 "developers": ["Supernova Studios LLC"],
+                "publishers": ["Supernova Publishing"],
                 "genres": [{"description": "Early Access"}, {"description": "Action"}],
                 "categories": [{"description": "Online Co-op"}],
                 "price_overview": {"final": 1349, "currency": "USD", "final_formatted": "$13.49"},
@@ -232,9 +233,22 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(facts["identity"]["appId"], "3712080")
         self.assertEqual(facts["game"]["maxPlayers"], 8)
         self.assertEqual(facts["game"]["price"], 13.49)
+        self.assertEqual(facts["publisher"]["name"], "Supernova Publishing")
         self.assertEqual(facts["dynamicStats"]["approvalPercent"], 84.0)
         self.assertEqual(evidence["sources"][0]["publisher"], "Steam")
         self.assertEqual(raw["appDetails"]["controller_support"], "full")
+
+    def test_site_identity_only_labels_verified_youtube_channel_urls(self):
+        facts = {
+            "identity": {"canonicalName": "Test Game", "canonicalUrl": "https://example.com"},
+            "officialLinks": {"youtube": "https://www.youtube.com/watch?v=abcdefghijk"},
+        }
+        self.assertEqual(build_site_identity(facts)["YOUTUBE_CHANNEL_URL"], "")
+        facts["officialLinks"]["youtube"] = "https://www.youtube.com/@VerifiedStudio"
+        self.assertEqual(
+            build_site_identity(facts)["YOUTUBE_CHANNEL_URL"],
+            "https://www.youtube.com/@VerifiedStudio",
+        )
 
     def test_steam_official_url_allows_shortened_search_label(self):
         class LongTitleSteamHttp(FakeSteamHttp):

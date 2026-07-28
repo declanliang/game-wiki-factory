@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { getSiteName, localizedSiteUrl, SITE_LOGO_URL, SITE_OG_IMAGE_URL, SITE_URL } from "@/config/site";
-import { routing } from "@/i18n/routing";
 import type en from "@/locales/en.json";
 
 type Messages = typeof en;
@@ -48,7 +47,8 @@ export function buildCategoryMetadataTitle(
 ): string {
   const full = `${categoryTitle} — ${siteName}`;
   if (full.length <= metadataLimit(locale, "title")) return full;
-  return normalizeMetadataTitle(`${gameName} ${categoryTitle}`, locale);
+  const compact = `${categoryTitle} | ${gameName}`;
+  return compact.length <= metadataLimit(locale, "title") ? compact : categoryTitle;
 }
 
 /**
@@ -130,15 +130,16 @@ export function buildSiteGraph(messages: Pick<Messages, "site">, locale: string)
     logo: { "@type": "ImageObject", url: SITE_LOGO_URL },
   };
 
-  const { genre, gamePlatform, datePublished, price, priceCurrency, developer, playUrl } = messages.site as Messages["site"] & {
+  const { genre, gamePlatform, datePublished, price, priceCurrency, developer, publisher, playUrl } = messages.site as Messages["site"] & {
     genre?: string[];
     gamePlatform?: string[];
     datePublished?: string;
     price?: string;
     priceCurrency?: string;
     developer?: string;
+    publisher?: string;
   };
-  const hasGameFacts = Boolean((genre && genre.length) || (gamePlatform && gamePlatform.length) || datePublished || price || developer);
+  const hasGameFacts = Boolean((genre && genre.length) || (gamePlatform && gamePlatform.length) || datePublished || price || developer || publisher);
 
   const videoGame = hasGameFacts
     ? {
@@ -149,7 +150,8 @@ export function buildSiteGraph(messages: Pick<Messages, "site">, locale: string)
         ...(genre && genre.length ? { genre } : {}),
         ...(gamePlatform && gamePlatform.length ? { gamePlatform } : {}),
         ...(datePublished ? { datePublished } : {}),
-        ...(developer ? { author: { "@type": "Organization", name: developer }, publisher: { "@type": "Organization", name: developer } } : {}),
+        ...(developer ? { author: { "@type": "Organization", name: developer } } : {}),
+        ...(publisher ? { publisher: { "@type": "Organization", name: publisher } } : {}),
         ...buildOffer(price, priceCurrency, playUrl),
       }
     : null;
@@ -158,13 +160,14 @@ export function buildSiteGraph(messages: Pick<Messages, "site">, locale: string)
 }
 
 /**
- * Vercel sets VERCEL_ENV automatically (production/preview/development) —
- * only Preview/dev deployments get noindex'd; other hosts (Docker/Netlify)
- * never set this var, so `shouldIndex()` returns true there and this is a no-op.
+ * Git-integrated Cloudflare Pages exposes CF_PAGES_BRANCH. Only the production
+ * branch may be indexed; local static builds remain indexable so verification
+ * can assert the exact production metadata.
  */
 export function shouldIndex(): boolean {
-  const env = process.env.VERCEL_ENV;
-  return !env || env === "production";
+  const branch = process.env.CF_PAGES_BRANCH;
+  const productionBranch = process.env.CF_PAGES_PRODUCTION_BRANCH || "main";
+  return !branch || branch === productionBranch;
 }
 
 function buildOffer(price: string | undefined, priceCurrency: string | undefined, url: string) {

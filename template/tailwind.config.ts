@@ -1,7 +1,6 @@
 import type { Config } from "tailwindcss";
 
 export default {
-  darkMode: ["class"],
   // Recursive `src/**` (not just pages/components/app subfolders) on purpose — real bug:
   // src/mdx-components.tsx sits directly under src/, outside all three of the old, narrower
   // patterns, so Tailwind's JIT never scanned it. Every utility class used only there

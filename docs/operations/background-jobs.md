@@ -129,7 +129,7 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 整个 batch 先完整验证，任意一项字段错误时一个任务也不会入队；通过后每个游戏成为独立 job，互不阻塞。
 
-后台队列只接受 `taskType: site`。广告任务、原始广告代码和广告环境变量不属于 Factory；交由独立广告 Agent 按 `docs/adsterra-environment-contract.md` 处理。
+后台队列只接受 `taskType: site`。广告任务、原始广告代码和广告环境变量不属于 Factory；交由独立广告 Agent 按 `docs/advertising/adsterra-environment-contract.md` 处理。
 
 ## 常用命令
 

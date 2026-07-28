@@ -11,7 +11,7 @@ import hashlib
 import json
 import os
 import re
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 from .core.config import Config
@@ -345,6 +345,59 @@ def validate_markdown(content: str) -> tuple:
         return False, "Stray code-fence marker (```) found in body — article content must not contain code fences"
     if DUPLICATED_OUTPUT_CONTRACT_RE.search(content):
         return False, "Duplicated TITLE/DESCRIPTION/BODY output contract found inside article body"
+    article_date_match = re.search(r'^\s*date:\s*"(\d{4}-\d{2}-\d{2})"', content, re.M)
+    if article_date_match:
+        article_date = date.fromisoformat(article_date_match.group(1))
+        month_names = (
+            "January|February|March|April|May|June|July|August|September|"
+            "October|November|December"
+        )
+        for release_date_match in re.finditer(
+            rf"\b(?:{month_names})\s+\d{{1,2}},\s+\d{{4}}\b",
+            content,
+            re.I,
+        ):
+            release_date = datetime.strptime(release_date_match.group(0), "%B %d, %Y").date()
+            if release_date > article_date:
+                continue
+            sentence_start = max(
+                content.rfind(".", 0, release_date_match.start()),
+                content.rfind("\n", 0, release_date_match.start()),
+            )
+            sentence_end_candidates = [
+                boundary
+                for boundary in (
+                    content.find(".", release_date_match.end()),
+                    content.find("\n", release_date_match.end()),
+                )
+                if boundary != -1
+            ]
+            sentence_end = min(sentence_end_candidates) if sentence_end_candidates else len(content)
+            sentence = content[sentence_start + 1:sentence_end]
+            if re.search(
+                r"\b(?:will|is|are)\s+(?:officially\s+)?(?:launch|release|arrive|come out|be available)"
+                r"|\b(?:launches|releases|arrives|comes out)\s+on\b"
+                r"|\b(?:scheduled|set|slated|expected|planned)\s+to\s+(?:launch|release|arrive)\b",
+                sentence,
+                re.I,
+            ):
+                return False, (
+                    f"Stale release-state tense — {release_date_match.group(0)} is not after "
+                    f"the article date {article_date.isoformat()}"
+                )
+    deck_match = re.search(r"\bSteam Deck\b.{0,60}\b(?:Verified|Playable)\b", content, re.I | re.S)
+    if deck_match:
+        context = content[max(0, deck_match.start() - 80):deck_match.end() + 80]
+        if not re.search(r"\b(?:not|unconfirmed|unknown|no official|without official)\b", context, re.I):
+            return False, "Unsupported positive Steam Deck rating — controller support does not prove Verified or Playable"
+    speculation_markers = re.findall(
+        r"\b(?:likely|might|may|could|probably|possibly|appears to|seems to|typically|"
+        r"we can expect|we can anticipate|based on similar games)\b",
+        content,
+        re.I,
+    )
+    if len(speculation_markers) >= 6:
+        return False, f"Speculation density is too high ({len(speculation_markers)} markers); omit unsupported filler"
     return True, ""
 
 

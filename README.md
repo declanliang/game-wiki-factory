@@ -2,7 +2,7 @@
 
 输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库和 Cloudflare Pages。Factory 自动创建连接该 Private repo 的 Git-integrated Pages 项目、设置 `NEXT_PUBLIC_SITE_URL` 并触发 Cloudflare 服务端构建；自定义域名绑定和 DNS 由站点运营者完成。历史站点继续保留原托管，不在新任务中重建或迁移。
 
-第一次接手先读 [立即接手指南](docs/takeover.md)。全新电脑或服务器仅凭 GitHub 恢复时，再按 [从零恢复手册](docs/bootstrap-from-github.md) 操作。当前生产风险见 [生产就绪审计](docs/production-readiness-audit-2026-07-23.md)。
+第一次接手先读 [文档导航](docs/README.md) 和 [立即接手指南](docs/takeover.md)。全新电脑或服务器仅凭 GitHub 恢复时，再按 [从零恢复手册](docs/bootstrap-from-github.md) 操作。
 
 固定语言为英语、西班牙语、德语、法语和日语。生成的网站位于 factory 同级目录，例如 `Games/hellhole/`。
 
@@ -66,13 +66,13 @@ Copy-Item jobs\batch.example.json jobs\daily.json
 python gamewiki.py jobs submit-batch --config jobs\daily.json
 ```
 
-今后所有游戏都按新项目从空 workspace 开始生产，不再接受旧站 `rebuild` 输入。失败恢复只重试原 Job 并复用它自己的 checkpoint。完整状态机、服务器和 OpenClaw 说明见 [docs/background-jobs.md](docs/background-jobs.md)。
+今后所有游戏都按新项目从空 workspace 开始生产，不再接受旧站 `rebuild` 输入。失败恢复只重试原 Job 并复用它自己的 checkpoint。完整状态机见 [后台任务系统](docs/operations/background-jobs.md)。
 
 成功、最终失败、取消和 `needs_attention` 会进入持久化通知 outbox；渠道成功送达后再用 `jobs notifications --ack ...` 确认。共享 API 余额不足时，Factory 会在首条告警中标明供应商、端点和凭据组，并把其余任务放入 `quota_wait`，不再逐任务告警；充值后重试首条 Job 即可统一续跑。Agent 只负责队列控制和 runbook 内的常规恢复，任何核心代码或生产逻辑问题必须升级给 Codex/基础设施维护者，禁止直接热修服务器工作树。
 
 服务器可通过 `GAMEWIKI_NOTIFICATION_COMMAND_JSON` 配置渠道发送命令，并定时执行 `gamewiki.py notifier --once`。Dispatcher 只在发送命令返回成功后确认消息；发送失败会保留并指数退避，不需要让聊天 Agent 常驻或反复消耗 LLM。
 
-服务器的 Supervisor 每分钟检查一次失败事件。只有文章生成/翻译明确保存了有效 checkpoint、且失败属于可继续的内容阶段时，才自动冷却并恢复同一个 Job；默认最多 6 轮。身份、密钥/余额、schema、代码、构建、GitHub/Vercel 安全问题不会自动处理，最终才通知用户和 Codex。这样批量任务不依赖 OpenClaw 对话持续在线。
+服务器的 Supervisor 每分钟检查一次失败事件。只有文章生成/翻译明确保存了有效 checkpoint、且失败属于可继续的内容阶段时，才自动冷却并恢复同一个 Job；默认最多 6 轮。身份、密钥/余额、schema、代码、构建、GitHub/Cloudflare 安全问题不会自动处理，最终才通知用户和 Codex。这样批量任务不依赖 OpenClaw 对话持续在线。
 
 当前候选生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。0728 版本的验收规则见 [docs/releases/v1_0728.md](docs/releases/v1_0728.md)；在用户确认、推送和服务器部署前，本分支只属于本地候选。
 
@@ -132,7 +132,7 @@ Games/<slug>/.gamewiki/manifest.json
 
 Guide Search 还会生成 `.gamewiki/planning/guide-search/content-opportunity-report.json`，记录数据源返回量、研究机会数、入选页面、实体覆盖和拒绝原因。看到文章少时，先用它判断是公开资料确实少，还是机会在证据/编辑门被合并或拒绝。
 
-OpenClaw 的标准 JSON、指令和完成汇报契约见 [docs/openclaw-operator-guide.md](docs/openclaw-operator-guide.md)。日常只提交游戏资料，不要让 Agent 在聊天进程内运行长流水线。
+OpenClaw 的标准 JSON、指令和完成汇报契约见 [Factory Agent 规范](docs/agents/openclaw-factory.md)。日常只提交游戏资料，不要让 Agent 在聊天进程内运行长流水线。
 
 ## 命令行兼容方式
 
@@ -230,9 +230,9 @@ npm run verify:deploy
 
 ## 可选广告模板契约
 
-广告不是 Factory 主流程的一部分。Factory 不接收原始广告代码、不转换广告配置，也不修改 Vercel/Cloudflare 广告环境变量。模板只读取七个可选的 server-only `AD_*_B64` 变量：存在且可解码时通过同源沙箱 iframe 展示；未配置时不渲染 iframe、占位或空白。
+广告不是 Factory 主流程的一部分。Factory 不接收原始广告代码、不转换广告配置，也不修改任何托管平台的广告环境变量。模板只读取七个可选的 server-only `AD_*_B64` 变量：存在且可解码时通过同源沙箱 iframe 展示；未配置时不渲染 iframe、占位或空白。
 
-独立广告 Agent 的输入校验、Base64 转换、变量名映射和部署后验证规则见 [Adsterra 环境变量转换契约](docs/adsterra-environment-contract.md)。
+独立广告 Agent 的输入校验、Base64 转换、变量名映射和部署后验证规则见 [Adsterra 环境变量转换契约](docs/advertising/adsterra-environment-contract.md)。
 
 失败后的同一任务重试自动复用 checkpoint，不会重复已经完成的付费阶段。不要为同一个失败任务创建替代 Job。
 

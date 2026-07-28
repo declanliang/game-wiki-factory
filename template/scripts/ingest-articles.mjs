@@ -59,7 +59,7 @@ function addOfficialGameplayImage(source, slug) {
     /^(export const metadata\s*=\s*\{[\s\S]*?)(^\}\s*$)/m,
     (_match, block, closing) => {
       const normalized = /,\s*$/.test(block) ? block : `${block.replace(/\s*$/, "")},\n`;
-      return `${normalized}  image: ${JSON.stringify(image)},\n${closing}`;
+      return `${normalized}  image: ${JSON.stringify(image)},\n  imageAlt: "",\n${closing}`;
     },
   );
 }

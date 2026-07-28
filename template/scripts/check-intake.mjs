@@ -118,6 +118,12 @@ for (const key of ["GAME_NAME", "OFFICIAL_GAME_URL"]) {
   if (!env[key]) fail(`${key} 是必填项，当前拿不到值 —— 填 intake/site-identity.json 或 new-site.env 二选一`);
   else ok(`${key} = ${env[key]}`);
 }
+if (
+  env.YOUTUBE_CHANNEL_URL
+  && !/^https?:\/\/(?:www\.)?youtube\.com\/(?:@[^/?#]+|channel\/[A-Za-z0-9_-]+|c\/[^/?#]+|user\/[^/?#]+)(?:[/?#].*)?$/i.test(env.YOUTUBE_CHANNEL_URL)
+) {
+  fail("YOUTUBE_CHANNEL_URL 必须是频道主页，不能填写 watch、shorts、embed 或 youtu.be 视频链接");
+}
 
 // --- ARTICLES_DIR -------------------------------------------------------------
 function walkMdx(dir) {

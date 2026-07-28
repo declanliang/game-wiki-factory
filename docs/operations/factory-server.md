@@ -1,6 +1,6 @@
 # 生产服务器部署记录与运维手册
 
-本文记录当前单机生产环境的非敏感事实。它和 `docs/background-jobs.md` 一起使用；密钥、服务器地址、密码和 Token 不得写入本文。
+本文记录当前单机生产环境的非敏感事实。它和 `docs/operations/background-jobs.md` 一起使用；密钥、服务器地址、密码和 Token 不得写入本文。
 
 空白服务器安装、全损恢复、备份与回滚的完整步骤见 `docs/bootstrap-from-github.md`；本文只记录当前生产约定和日常运维。
 
@@ -43,7 +43,7 @@ sudo systemctl enable --now gamewiki-notifier.timer gamewiki-supervisor.timer
 
 发送失败时消息保持 pending 并退避，下一次 timer 继续尝试。
 
-Supervisor 只执行 `docs/background-jobs.md` 中的确定性白名单策略。它不读取或修改密钥，不运行 Git 维护，不热改代码。自动恢复预算耗尽后，Notifier 才把异常交给用户/Codex。
+Supervisor 只执行 `docs/operations/background-jobs.md` 中的确定性白名单策略。它不读取或修改密钥，不运行 Git 维护，不热改代码。自动恢复预算耗尽后，Notifier 才把异常交给用户/Codex。
 
 成功发布后会立即删除可重建的 `node_modules/` 和 `.next/`，但保留源码、intake、调研 checkpoint 和日志到成功任务保留期结束。可用 `GAMEWIKI_PRUNE_SUCCESS_BUILD_ARTIFACTS=0` 临时关闭这一行为。
 
@@ -176,14 +176,3 @@ OpenClaw 的 workspace 指令如果变化，还要把 `deploy/openclaw/AGENTS.md
 
 `complete` 代表 Pages 部署和目标 origin 线上验收完成。`awaiting_domain_configuration` 代表 Pages、`NEXT_PUBLIC_SITE_URL` 和部署已完成，运营者仍需绑定自定义域名/DNS，再让 `npm run verify:deploy` 通过。canonical、sitemap、robots 不得包含 `example.com`；根路径必须 301 到 `/en`。
 
-## 2026-07-22 真实验收记录
-
-| 游戏 | 平台 | Job ID | 内容产出 | 生产 QA | 发布结果 |
-|---|---|---|---|---|---|
-| Funnel Runners | Steam，本地 | `20260722T022228Z-funnel-runners-723a23` | 12 篇英文 + 60 篇翻译 | 120 loc / 840 hreflang 全部 200 | `succeeded`，按测试要求未发布 |
-| Zenith Inc | Roblox，本地完整重建 + 内容 V5 增量 | `20260722T041610Z-zenith-inc-1d45c6` | 22 篇英文 + 110 篇翻译 | 204 loc / 1428 hreflang 全部 200 | 原 Private GitHub/Vercel 原地替换；7 个广告位验证通过 |
-| Timebomb Duels | Roblox，服务器 | `20260722T023847Z-timebomb-duels-3a4676` | 6 篇英文 + 30 篇翻译 | 90 loc / 630 hreflang 全部 200 | Private GitHub + Vercel production |
-
-线上验收：`https://zenith-inc-roblox.wiki/`、`https://timebomb-duels.wiki/`、各自 sitemap 和 robots 均返回 200；sitemap 不含 `example.com`。Zenith 的 7 个隔离广告路由返回 200 且精确代码哈希一致。OpenClaw 使用独立新 session 实时读取到了服务器任务 Job ID。
-
-本次真实任务发现并修复了 Windows UTF-8 日志、随机验证端口、Next.js standalone 启动、默认语言根路径循环、旧 `.next/types`、Vercel token 进程参数、Git 提交作者关联、Vercel OIDC 临时文件和成功构建缓存占盘等问题。失败均停在 QA/发布边界，内容阶段通过 checkpoint 复用，没有重复调研与翻译。

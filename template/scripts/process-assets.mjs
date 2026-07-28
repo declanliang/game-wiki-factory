@@ -177,14 +177,32 @@ if (env.FAVICON_SET_DIR) {
 
 // --- 3. YouTube trailer thumbnail ------------------------------------------------
 if (env.YOUTUBE_VIDEO_ID) {
-  const url = `https://i.ytimg.com/vi/${env.YOUTUBE_VIDEO_ID}/hqdefault.jpg`;
-  const res = await fetch(url);
-  if (res.ok) {
+  const candidates = ["maxresdefault", "hqdefault"];
+  const thumbnailPath = path.join(root, "public", "images", "hero-trailer-thumbnail.jpg");
+  let selected = null;
+  let res = null;
+  for (const quality of candidates) {
+    try {
+      const candidate = await fetch(`https://i.ytimg.com/vi/${env.YOUTUBE_VIDEO_ID}/${quality}.jpg`, {
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (candidate.ok) {
+        selected = quality;
+        res = candidate;
+        break;
+      }
+    } catch (error) {
+      warn(`预告片缩略图请求失败（${quality}）：${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (res?.ok) {
     const buf = Buffer.from(await res.arrayBuffer());
-    fs.writeFileSync(path.join(root, "public", "images", "hero-trailer-thumbnail.jpg"), buf);
-    ok(`预告片缩略图已下载（hqdefault，${env.YOUTUBE_VIDEO_ID}）`);
+    fs.writeFileSync(thumbnailPath, buf);
+    ok(`预告片缩略图已下载（${selected}，${env.YOUTUBE_VIDEO_ID}）`);
+  } else if (fs.existsSync(thumbnailPath)) {
+    warn("预告片缩略图暂时无法刷新，保留已有文件，不阻断站点生成");
   } else {
-    warn(`预告片缩略图下载失败：HTTP ${res.status}`);
+    warn("预告片缩略图下载失败：maxresdefault/hqdefault 均不可用；站点继续生成");
   }
 }
 

@@ -8,7 +8,7 @@
 //      from new-site.env and/or intake/site-identity.json, whichever provides them.
 //   2. intake/site-content.json — structured marketing/factual copy (hero description,
 //      about-game paragraphs, FAQ, etc.) that can't be derived from identity fields
-//      alone. Schema: doc/homepage-info-schema.md. If this file doesn't exist, only
+//      alone. Schema is enforced by Factory's Basic Info contract. If this file doesn't exist, only
 //      the identity-derived fields get filled; everything else stays as __XXX__
 //      placeholders (verify:site's placeholder scan will catch that, same as it
 //      would for any other unfilled field).

@@ -17,7 +17,7 @@ from .schemas import DEFAULT_LANGUAGE_CODES, TEMPLATE_SITE_CONTENT_SCHEMA, TEMPL
 from .util import compact_number, dump_json, load_json, public_game_name
 
 
-CONTRACT = "game-wiki-template/doc/homepage-info-schema.md"
+CONTRACT = "docs/contracts/site-input.md"
 FORBIDDEN_KEYS = {
     "modules", "displayType", "themeColor", "sidebarCodes", "tertiaryCta",
     "title@home.hero", "secondaryCtaHref@home.hero", "videoId@home.hero",
@@ -51,7 +51,7 @@ def build_site_identity(facts: dict[str, Any]) -> dict[str, Any]:
         "GAME_NAME": public_game_name(identity),
         "OFFICIAL_GAME_URL": identity.get("canonicalUrl") or links.get("steam") or links.get("roblox") or "",
         "DISCORD_URL": links.get("discord") or "",
-        "YOUTUBE_CHANNEL_URL": links.get("youtube") or "",
+        "YOUTUBE_CHANNEL_URL": _youtube_channel_value(links.get("youtube")),
         # Community wikis are not collected as official evidence; this optional value stays empty.
         "FANDOM_URL": "",
         "YOUTUBE_VIDEO_ID": _youtube_video_value(links.get("trailer")),
@@ -68,6 +68,7 @@ def build_site_content(facts: dict[str, Any], homepage: dict[str, Any]) -> dict[
     platform = facts["identity"].get("platform") or "Game"
     game = facts.get("game", {})
     developer = facts.get("developer", {}).get("name") or ""
+    publisher = facts.get("publisher", {}).get("name") or ""
     home = homepage.get("home", {})
     genres = _genres(facts, homepage)
     created_date = _date_only(game.get("createdAt"))
@@ -85,6 +86,8 @@ def build_site_content(facts: dict[str, Any], homepage: dict[str, Any]) -> dict[
         site["datePublished"] = created_date
     if developer:
         site["developer"] = developer
+    if publisher:
+        site["publisher"] = publisher
     # Platform API price is evidence-backed when available.
     price = game.get("price")
     if isinstance(price, (int, float)):
@@ -168,7 +171,7 @@ def validate_site_content(content: dict[str, Any], facts: dict[str, Any]) -> lis
     name = public_game_name(facts.get("identity", {}))
     expected_content = build_site_content(facts, {"metadata": {}, "home": {}})
     expected_site = expected_content.get("site", {})
-    for key in ["gamePlatform", "datePublished", "developer", "genre", "price", "priceCurrency"]:
+    for key in ["gamePlatform", "datePublished", "developer", "publisher", "genre", "price", "priceCurrency"]:
         if key in content.get("site", {}) and content["site"].get(key) != expected_site.get(key):
             errors.append(_error("TEMPLATE_FACT_MISMATCH", f"site-content.site.{key}", f"{key} does not match evidence-backed facts.json."))
     if content.get("home", {}).get("hero", {}).get("stats") != expected_content.get("home", {}).get("hero", {}).get("stats"):
@@ -661,7 +664,7 @@ def _is_immutable_locale_path(path: str) -> bool:
     return (
         key in {"id", "href", "category"}
         or key.endswith("Href")
-        or path in {"site.datePublished", "site.priceCurrency", "site.developer"}
+        or path in {"site.datePublished", "site.priceCurrency", "site.developer", "site.publisher"}
         or re.fullmatch(r"site\.gamePlatform\.\d+", path) is not None
         or re.fullmatch(r"home\.liveTools\.items\.\d+\.title", path) is not None
     )
@@ -673,7 +676,7 @@ def _is_translatable_prose(path: str, value: str, game_name: str) -> bool:
     if value in {game_name, "Roblox", "Steam", "USD", "Free"} or re.fullmatch(r"\d[\d.,+% -]*", value):
         return False
     key = path.rsplit(".", 1)[-1]
-    if key in {"datePublished", "priceCurrency", "developer"}:
+    if key in {"datePublished", "priceCurrency", "developer", "publisher"}:
         return False
     return True
 
@@ -702,6 +705,13 @@ def _youtube_video_value(value: Any) -> str:
         return ""
     pattern = r"^(?:[A-Za-z0-9_-]{11}|https?://(?:www\.)?(?:youtube\.com/(?:watch\?v=|embed/|shorts/)|youtu\.be/)[A-Za-z0-9_-]{11}(?:[?&#/].*)?)$"
     return value if re.fullmatch(pattern, value) else ""
+
+
+def _youtube_channel_value(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    pattern = r"^https?://(?:www\.)?youtube\.com/(?:@[^/?#]+|channel/[A-Za-z0-9_-]+|c/[^/?#]+|user/[^/?#]+)(?:[/?#].*)?$"
+    return value if re.fullmatch(pattern, value, re.IGNORECASE) else ""
 
 
 def _valid_http_url(value: str) -> bool:

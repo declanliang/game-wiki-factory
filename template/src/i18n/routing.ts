@@ -16,7 +16,7 @@ export const routing = defineRouting({
   // Cloudflare Pages branch: static export has no middleware, so "as-needed"
   // (bare English URLs via a runtime rewrite) isn't possible. Every locale,
   // including English, gets an explicit prefix; public/_redirects 301s the
-  // old bare paths (from the Vercel deployment) to /en/... for SEO.
+  // accidental bare paths to /en/... for canonical consistency.
   localePrefix: "always",
   localeDetection: false,
 });

@@ -14,9 +14,9 @@ import { AdSlot } from "@/components/ad-slot";
 import { ArticleInlineAd, DesktopArticleRailAds, DesktopBanner728, DesktopFooterAdGroup, NativeFlowAd } from "@/components/ad-placements";
 import { MobileTOC } from "@/components/table-of-contents";
 import { CONTENT_TYPES } from "@/config/navigation";
-import { getSiteName, localizedSiteUrl, SITE_LOGO_URL } from "@/config/site";
-import { languageAlternates, routing, type Locale } from "@/i18n/routing";
-import { buildCategoryMetadataTitle, buildOpenGraph, buildTwitter, normalizeMetadataDescription, normalizeMetadataTitle } from "@/lib/seo";
+import { absoluteAssetUrl, getSiteName, localizedSiteUrl, SITE_LOGO_URL } from "@/config/site";
+import { languageAlternates, type Locale } from "@/i18n/routing";
+import { buildCategoryMetadataTitle, buildOpenGraph, buildTwitter } from "@/lib/seo";
 import en from "@/locales/en.json";
 
 type Messages = typeof en;
@@ -38,10 +38,7 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: L
     const categoryTitle = ctMessages?.overviewTitle || ctTitle;
     const categoryDescription = ctMessages?.overviewDescription || `Browse all ${ctTitle.toLowerCase()} guides and resources for ${messages.site.name}.`;
     const title = buildCategoryMetadataTitle(categoryTitle, messages.site.name, siteName, locale);
-    const description = normalizeMetadataDescription(
-      `${categoryDescription} ${messages.site.description}`,
-      locale,
-    );
+    const description = categoryDescription;
     const items = await getAllContent(ct, locale);
     return {
       title,
@@ -58,11 +55,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: L
   const item = await getContent(contentType, articleSlug, locale);
   if (!item) return { title: "Not Found" };
   const pathname = `/${contentType}/${articleSlug.join("/")}`;
-  const image = item.metadata.image?.startsWith("http") ? item.metadata.image : localizedSiteUrl(item.metadata.image ?? "/images/hero.webp", routing.defaultLocale);
+  const image = absoluteAssetUrl(item.metadata.image ?? "/images/hero.webp");
   // Article metadata titles already contain the game identity. Appending the
   // site name pushes a large share of SERP titles past the display limit.
-  const title = normalizeMetadataTitle(item.metadata.title, locale);
-  const description = normalizeMetadataDescription(item.metadata.description, locale);
+  const title = item.metadata.title;
+  const description = item.metadata.description;
   return {
     title,
     description,
@@ -91,7 +88,13 @@ async function NavigationPage({ locale, contentType, navGroups }: { locale: Loca
     || contentType.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   const sectionDesc = (messages as unknown as Record<string, Record<string, string>>)[contentType]?.overviewDescription || "";
   const breadcrumbData = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: messages.shared.home, item: localizedSiteUrl("/", locale) }, { "@type": "ListItem", position: 2, name: sectionTitle, item: localizedSiteUrl(`/${contentType}`, locale) }] };
-  return <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8"><JsonLd data={listData} /><JsonLd data={breadcrumbData} /><div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]"><article><Breadcrumbs items={[{ label: messages.shared.home, href: localizeHref("/", locale) }, { label: sectionTitle }]} /><h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">{sectionTitle}</h1>{sectionDesc && <p className="mt-5 text-lg leading-8 text-muted-foreground">{sectionDesc}</p>}<DesktopBanner728 className="mt-8" />{items.length > 0 ? <><div className="mt-10 grid gap-4 sm:grid-cols-2">{items.map((item, index) => <Fragment key={`/${contentType}/${item.slug}`}><Link href={localizeHref(`/${contentType}/${item.slug}`, locale)} className="group overflow-hidden rounded-2xl border border-border bg-card/70 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">{item.metadata.image ? <div className="relative aspect-[16/9] bg-muted"><Image src={item.metadata.image} alt={item.metadata.title} fill sizes="(max-width: 640px) 100vw, 420px" className="object-cover transition duration-500 group-hover:scale-[1.03]" /></div> : null}<div className="p-5"><div className="mb-4 flex items-center justify-between gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]"><Swords className="h-5 w-5" /></span>{item.metadata.badge && <Badge variant="secondary">{item.metadata.badge}</Badge>}</div><h3 className="text-lg font-bold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{item.metadata.title}</h3><p className="mt-2 min-h-[3rem] text-sm leading-6 text-muted-foreground">{item.metadata.description}</p><span className="mt-4 inline-flex items-center text-sm font-semibold text-[hsl(var(--nav-theme))]">{messages.shared.readMore}<ChevronRight className="ml-1 h-4 w-4" /></span></div></Link>{index === 1 || (items.length === 1 && index === 0) ? <div className="col-span-full py-4"><NativeFlowAd /></div> : null}{items.length >= 4 && index === 3 ? <div className="col-span-full py-4"><AdSlot format="banner300x250" /></div> : null}</Fragment>)}</div><DesktopBanner728 className="mt-10" /></> : <p className="mt-8 text-muted-foreground">{messages.shared.noGuidesAvailable}</p>}</article><WikiSidebar locale={locale} navGroups={navGroups} currentPath={`/${contentType}`} /></div></main>;
+  const seenImages = new Set<string>();
+  const cardItems = items.map((item) => {
+    const image = item.metadata.image && !seenImages.has(item.metadata.image) ? item.metadata.image : undefined;
+    if (image) seenImages.add(image);
+    return { ...item, cardImage: image };
+  });
+  return <main className="mx-auto max-w-[84rem] px-6 py-10 sm:px-8 xl:px-10"><JsonLd data={listData} /><JsonLd data={breadcrumbData} /><div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]"><article><Breadcrumbs items={[{ label: messages.shared.home, href: localizeHref("/", locale) }, { label: sectionTitle }]} /><h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">{sectionTitle}</h1>{sectionDesc && <p className="mt-5 max-w-3xl text-lg leading-8 text-muted-foreground">{sectionDesc}</p>}<nav aria-label={messages.shared.wikiNavigation} className="mt-6 flex gap-2 overflow-x-auto pb-2 lg:hidden">{navGroups.map((group) => <Link key={group.slug} href={localizeHref(`/${group.slug}`, locale)} className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-semibold ${group.slug === contentType ? "border-[hsl(var(--nav-theme))] bg-[hsl(var(--nav-theme)/0.12)] text-[hsl(var(--nav-theme))]" : "border-border text-muted-foreground"}`}>{group.title}</Link>)}</nav><DesktopBanner728 className="mt-8" />{cardItems.length > 0 ? <><div className="mt-10 grid gap-4 sm:grid-cols-2">{cardItems.map((item, index) => <Fragment key={`/${contentType}/${item.slug}`}><Link href={localizeHref(`/${contentType}/${item.slug}`, locale)} className="group overflow-hidden rounded-2xl border border-border bg-card/70 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]">{item.cardImage ? <div className="relative aspect-[16/9] bg-muted"><Image src={item.cardImage} alt={item.metadata.imageAlt || ""} fill sizes="(max-width: 640px) 100vw, 420px" className="object-cover transition duration-500 group-hover:scale-[1.03]" /></div> : null}<div className="p-5"><div className="mb-4 flex items-center justify-between gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]"><Swords className="h-5 w-5" /></span>{item.metadata.badge && <Badge variant="secondary">{item.metadata.badge}</Badge>}</div><h2 className="text-lg font-bold text-foreground group-hover:text-[hsl(var(--nav-theme))]">{item.metadata.title}</h2><p className="mt-2 min-h-[3rem] text-sm leading-6 text-muted-foreground">{item.metadata.description}</p><span className="mt-4 inline-flex items-center text-sm font-semibold text-[hsl(var(--nav-theme))]">{messages.shared.readMore}<ChevronRight className="ml-1 h-4 w-4" /></span></div></Link>{index === 1 || (cardItems.length === 1 && index === 0) ? <div className="col-span-full py-4"><NativeFlowAd /></div> : null}{cardItems.length >= 4 && index === 3 ? <div className="col-span-full py-4"><AdSlot format="banner300x250" /></div> : null}</Fragment>)}</div><DesktopBanner728 className="mt-10" /></> : <p className="mt-8 text-muted-foreground">{messages.shared.noGuidesAvailable}</p>}</article><WikiSidebar locale={locale} navGroups={navGroups} currentPath={`/${contentType}`} /></div></main>;
 }
 
 async function DetailPage({ locale, contentType, slug }: { locale: Locale; contentType: string; slug: string[] }) {
@@ -106,7 +109,7 @@ async function DetailPage({ locale, contentType, slug }: { locale: Locale; conte
   const ctMessages = (messages as unknown as Record<string, Record<string, string>>)[contentType];
   const sectionLabel = ctMessages?.overviewTitle || contentType.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   const articleUrl = localizedSiteUrl(pathname, locale);
-  const articleData = { "@context": "https://schema.org", "@type": "Article", headline: item.metadata.title, description: item.metadata.description, image: item.metadata.image?.startsWith("http") ? item.metadata.image : localizedSiteUrl(item.metadata.image ?? "/images/hero.webp", routing.defaultLocale), datePublished: item.metadata.date, dateModified: item.metadata.lastModified ?? item.metadata.date, mainEntityOfPage: articleUrl, inLanguage: locale, author: { "@type": "Organization", name: siteName }, publisher: { "@type": "Organization", name: siteName, logo: { "@type": "ImageObject", url: SITE_LOGO_URL } } };
+  const articleData = { "@context": "https://schema.org", "@type": "Article", headline: item.metadata.title, description: item.metadata.description, image: absoluteAssetUrl(item.metadata.image ?? "/images/hero.webp"), datePublished: item.metadata.date, dateModified: item.metadata.lastModified ?? item.metadata.date, mainEntityOfPage: articleUrl, inLanguage: locale, author: { "@type": "Organization", name: siteName }, publisher: { "@type": "Organization", name: siteName, logo: { "@type": "ImageObject", url: SITE_LOGO_URL } } };
   const breadcrumbData = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: messages.shared.home, item: localizedSiteUrl("/", locale) }, { "@type": "ListItem", position: 2, name: sectionLabel, item: localizedSiteUrl(`/${contentType}`, locale) }, { "@type": "ListItem", position: 3, name: item.metadata.title, item: articleUrl }] };
   const faqPageData = item.faqItems.length > 0 ? { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: item.faqItems.map((faq) => ({ "@type": "Question", name: faq.question, acceptedAnswer: { "@type": "Answer", text: faq.answer } })) } : null;
 
@@ -116,31 +119,23 @@ async function DetailPage({ locale, contentType, slug }: { locale: Locale; conte
   const showQuickGuide = item.headings.length > 0 && item.headings.length < 4;
 
   const articleBodyId = `article-body-${contentType}-${slug.join("-")}`;
-  return <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8"><JsonLd data={articleData} /><JsonLd data={breadcrumbData} />{faqPageData && <JsonLd data={faqPageData} />}<DesktopArticleRailAds /><article><Breadcrumbs items={[{ label: messages.shared.home, href: localizeHref("/", locale) }, { label: sectionLabel, href: localizeHref(`/${contentType}`, locale) }, { label: item.metadata.title }]} /><h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">{item.metadata.title}</h1><p className="mt-5 text-lg leading-8 text-muted-foreground">{item.metadata.summary ?? item.metadata.description}</p><div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><Badge variant="secondary">{sectionLabel}</Badge>{item.metadata.badge ? <Badge variant="outline">{item.metadata.badge}</Badge> : null}<span>{item.metadata.lastModified ?? item.metadata.date}{" · "}{siteName}</span></div>{item.metadata.image ? <div className="relative mt-7 aspect-[16/9] overflow-hidden rounded-2xl border border-border bg-muted"><Image src={item.metadata.image} alt={item.metadata.title} fill priority sizes="(max-width: 896px) 100vw, 896px" className="object-cover" /></div> : null}{showQuickGuide && h2Headings.length >= 2 && <div className="mt-6 rounded-2xl border border-border bg-card/70 p-5"><h3 className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">{messages.shared.quickGuide}</h3><ul className="mt-3 space-y-1.5">{h2Headings.map((h) => <li key={h.id}><a href={`#${h.id}`} className="text-sm text-muted-foreground hover:text-foreground">{h.text}</a></li>)}</ul></div>}<MobileTOC headings={item.headings} label={tocLabel} /><div id={articleBodyId} className="prose prose-lg mt-10 max-w-none"><item.MDXContent /></div><ArticleInlineAd containerId={articleBodyId} /><DesktopFooterAdGroup className="mt-12" /><ArticleCards locale={locale} contentType={contentType} currentSlug={slug.join("/")} relatedLabel={relatedLabel} sectionLabel={sectionLabel} browseAllLabel={messages.shared.viewAllInCategory} /></article></main>;
+  return <main className="mx-auto max-w-4xl px-6 py-10 sm:px-8"><JsonLd data={articleData} /><JsonLd data={breadcrumbData} />{faqPageData && <JsonLd data={faqPageData} />}<DesktopArticleRailAds /><article><Breadcrumbs items={[{ label: messages.shared.home, href: localizeHref("/", locale) }, { label: sectionLabel, href: localizeHref(`/${contentType}`, locale) }, { label: item.metadata.title }]} /><h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">{item.metadata.title}</h1><p className="mt-5 text-lg leading-8 text-muted-foreground">{item.metadata.summary ?? item.metadata.description}</p><div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground"><Badge variant="secondary">{sectionLabel}</Badge>{item.metadata.badge ? <Badge variant="outline">{item.metadata.badge}</Badge> : null}<span>{item.metadata.lastModified ?? item.metadata.date}{" · "}{siteName}</span></div>{item.metadata.image ? <div className="relative mt-7 aspect-[16/9] overflow-hidden rounded-2xl border border-border bg-muted"><Image src={item.metadata.image} alt={item.metadata.imageAlt || ""} fill priority sizes="(max-width: 896px) 100vw, 896px" className="object-cover" /></div> : null}{showQuickGuide && h2Headings.length >= 2 && <div className="mt-6 rounded-2xl border border-border bg-card/70 p-5"><h2 className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">{messages.shared.quickGuide}</h2><ul className="mt-3 space-y-1.5">{h2Headings.map((h) => <li key={h.id}><a href={`#${h.id}`} className="text-sm text-muted-foreground hover:text-foreground">{h.text}</a></li>)}</ul></div>}<MobileTOC headings={item.headings} label={tocLabel} /><div id={articleBodyId} className="prose prose-lg mt-10 max-w-none"><item.MDXContent /></div><ArticleInlineAd containerId={articleBodyId} /><DesktopFooterAdGroup className="mt-12" /><ArticleCards locale={locale} contentType={contentType} currentSlug={slug.join("/")} relatedLabel={relatedLabel} sectionLabel={sectionLabel} browseAllLabel={messages.shared.viewAllInCategory} /></article></main>;
 }
 
 async function ArticleCards({ locale, contentType, currentSlug, relatedLabel, sectionLabel, browseAllLabel }: { locale: string; contentType: string; currentSlug: string; relatedLabel: string; sectionLabel: string; browseAllLabel: string }) {
-  // 动态获取同分类其他文章（排除当前文章），不足 3 篇时跨分类按时间倒序补足，避免模块空白
+  // Related content must share the same user intent/category. A short relevant
+  // list is better than filling the module with unrelated pages.
   const sameCategory = (await getAllContent(contentType, locale as Locale)).filter((item) => item.slug !== currentSlug);
-  let related = sameCategory.slice(0, 4);
-
-  if (related.length < 3) {
-    const usedSlugs = new Set(related.map((item) => `${item.contentType}/${item.slug}`));
-    const otherItems: ContentItem[] = [];
-    for (const ct of CONTENT_TYPES) {
-      if (ct === contentType) continue;
-      otherItems.push(...(await getAllContent(ct, locale as Locale)));
-    }
-    const fallback = otherItems
-      .filter((item) => !usedSlugs.has(`${item.contentType}/${item.slug}`))
-      .sort((a, b) => (b.metadata.lastModified || b.metadata.date).localeCompare(a.metadata.lastModified || a.metadata.date))
-      .slice(0, 4 - related.length);
-    related = [...related, ...fallback];
-  }
+  const related = sameCategory.slice(0, 4);
 
   if (related.length === 0) return null;
 
-  return <div className="mt-12 space-y-8"><section><h2 className="text-xl font-bold text-foreground">{relatedLabel}</h2><div className="mt-4 grid gap-4 sm:grid-cols-2">{related.map((item) => <SmallCard key={`${item.contentType}/${item.slug}`} icon={<Swords className="h-5 w-5" />} title={item.metadata.title} description={item.metadata.description} image={item.metadata.image} href={localizeHref(`/${item.contentType}/${item.slug}`, locale)} />)}</div><Link href={localizeHref(`/${contentType}`, locale)} className="mt-4 inline-flex items-center text-sm font-semibold text-[hsl(var(--nav-theme))] hover:underline">{browseAllLabel.replace("{category}", sectionLabel)}<ChevronRight className="ml-1 h-4 w-4" /></Link></section></div>;
+  const seenImages = new Set<string>();
+  return <div className="mt-12 space-y-8"><section><h2 className="text-xl font-bold text-foreground">{relatedLabel}</h2><div className="mt-4 grid gap-4 sm:grid-cols-2">{related.map((item) => {
+    const image = item.metadata.image && !seenImages.has(item.metadata.image) ? item.metadata.image : undefined;
+    if (image) seenImages.add(image);
+    return <SmallCard key={`${item.contentType}/${item.slug}`} icon={<Swords className="h-5 w-5" />} title={item.metadata.title} description={item.metadata.description} image={image} imageAlt={item.metadata.imageAlt} href={localizeHref(`/${item.contentType}/${item.slug}`, locale)} />;
+  })}</div><Link href={localizeHref(`/${contentType}`, locale)} className="mt-4 inline-flex items-center text-sm font-semibold text-[hsl(var(--nav-theme))] hover:underline">{browseAllLabel.replace("{category}", sectionLabel)}<ChevronRight className="ml-1 h-4 w-4" /></Link></section></div>;
 }
 
-function SmallCard({ title, description, href, icon, image }: { title: string; description: string; href: string; icon?: React.ReactNode; image?: string }) { return <Link href={href} className="block overflow-hidden rounded-2xl border border-border bg-card/70 transition hover:border-[hsl(var(--nav-theme-light))]">{image ? <div className="relative aspect-[16/9] bg-muted"><Image src={image} alt={title} fill sizes="(max-width: 640px) 100vw, 420px" className="object-cover" /></div> : null}<div className="p-5">{icon && <div className="mb-3 text-[hsl(var(--nav-theme))]">{icon}</div>}<h4 className="font-bold text-foreground">{title}</h4><p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p></div></Link>; }
+function SmallCard({ title, description, href, icon, image, imageAlt }: { title: string; description: string; href: string; icon?: React.ReactNode; image?: string; imageAlt?: string }) { return <Link href={href} className="block overflow-hidden rounded-2xl border border-border bg-card/70 transition hover:border-[hsl(var(--nav-theme-light))]">{image ? <div className="relative aspect-[16/9] bg-muted"><Image src={image} alt={imageAlt || ""} fill sizes="(max-width: 640px) 100vw, 420px" className="object-cover" /></div> : null}<div className="p-5">{icon && <div className="mb-3 text-[hsl(var(--nav-theme))]">{icon}</div>}<h3 className="font-bold text-foreground">{title}</h3><p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p></div></Link>; }

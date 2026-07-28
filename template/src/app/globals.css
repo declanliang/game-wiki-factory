@@ -3,84 +3,38 @@
 @tailwind utilities;
 
 @layer base {
-  /* Per-game appearance is selected from a small reviewed preset list. Arbitrary
-     LLM colors remain forbidden; every preset has separate light/dark values. */
+  /* Every game gets one reviewed accent preset on a fixed dark reading surface.
+     Arbitrary LLM colors and a second light-mode palette are intentionally absent. */
   :root {
-    --background: 0 0% 98%;
-    --foreground: 0 0% 12%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 12%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 12%;
-    --primary: var(--nav-theme);
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 95%;
-    --secondary-foreground: 0 0% 20%;
-    --muted: 0 0% 94%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 0 0% 93%;
-    --accent-foreground: 0 0% 12%;
-    --destructive: 8 70% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 88%;
-    --input: 0 0% 88%;
+    color-scheme: dark;
+    --background: 220 15% 5%;
+    --foreground: 210 15% 91%;
+    --card: 220 13% 8%;
+    --card-foreground: 210 15% 91%;
+    --popover: 220 13% 8%;
+    --popover-foreground: 210 15% 91%;
+    --primary: 0 0% 92%;
+    --primary-foreground: 220 15% 7%;
+    --secondary: 220 10% 13%;
+    --secondary-foreground: 210 15% 90%;
+    --muted: 220 10% 12%;
+    --muted-foreground: 215 10% 62%;
+    --accent: 220 10% 15%;
+    --accent-foreground: 210 15% 92%;
+    --destructive: 8 70% 45%;
+    --destructive-foreground: 0 0% 96%;
+    --border: 220 9% 19%;
+    --input: 220 9% 19%;
     --ring: var(--nav-theme);
     --radius: 0.75rem;
-    --nav-theme: 258 90% 66%;
-    --nav-theme-light: 188 86% 53%;
+    --nav-theme: 258 90% 70%;
+    --nav-theme-light: 188 82% 58%;
     --chart-1: var(--nav-theme);
     --chart-2: 175 32% 42%;
     --chart-3: 221 30% 42%;
     --chart-4: 38 62% 42%;
     --chart-5: 0 0% 45%;
     /* Optional <Callout type="..."> in article MDX (see src/mdx-components.tsx) */
-    --callout-info-bg: 217 91% 97%;
-    --callout-info-border: 217 91% 85%;
-    --callout-info-text: 217 91% 30%;
-    --callout-tip-bg: 142 76% 97%;
-    --callout-tip-border: 142 76% 85%;
-    --callout-tip-text: 142 76% 30%;
-    --callout-warning-bg: 45 93% 97%;
-    --callout-warning-border: 45 93% 85%;
-    --callout-warning-text: 45 93% 30%;
-    --callout-success-bg: 152 76% 97%;
-    --callout-success-border: 152 76% 85%;
-    --callout-success-text: 152 76% 30%;
-  }
-
-  :root[data-site-theme="arcade"] { --nav-theme: 260 60% 48%; --nav-theme-light: 190 64% 36%; }
-  :root[data-site-theme="forest"] { --nav-theme: 145 55% 32%; --nav-theme-light: 89 48% 36%; }
-  :root[data-site-theme="ocean"] { --nav-theme: 195 72% 32%; --nav-theme-light: 174 58% 34%; }
-  :root[data-site-theme="ember"] { --nav-theme: 9 60% 41%; --nav-theme-light: 35 72% 39%; }
-  :root[data-site-theme="mystic"] { --nav-theme: 282 44% 44%; --nav-theme-light: 322 48% 42%; }
-  :root[data-site-theme="industrial"] { --nav-theme: 207 15% 38%; --nav-theme-light: 38 42% 38%; }
-
-  .dark {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 88%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 88%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 88%;
-    --primary: 0 0% 92%;
-    --primary-foreground: 0 0% 8%;
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 88%;
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 56%;
-    --accent: 0 0% 15%;
-    --accent-foreground: 0 0% 92%;
-    --destructive: 8 70% 45%;
-    --destructive-foreground: 0 0% 96%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: var(--nav-theme);
-    --nav-theme: 258 90% 66%;
-    --nav-theme-light: 188 86% 53%;
-    /* Lower saturation + lightness than the light-mode set on purpose — the light-mode
-       values (91-93% saturation) ported directly to a dark background read as a loud,
-       near-neon solid color block instead of a soft tinted panel. Text stays bright for
-       contrast; only bg/border are toned down. */
     --callout-info-bg: 217 45% 16%;
     --callout-info-border: 217 50% 36%;
     --callout-info-text: 217 85% 78%;
@@ -95,18 +49,21 @@
     --callout-success-text: 152 65% 72%;
   }
 
-  .dark[data-site-theme="arcade"] { --nav-theme: 258 90% 70%; --nav-theme-light: 188 82% 58%; }
-  .dark[data-site-theme="forest"] { --nav-theme: 145 62% 62%; --nav-theme-light: 88 60% 62%; }
-  .dark[data-site-theme="ocean"] { --nav-theme: 194 86% 67%; --nav-theme-light: 174 70% 58%; }
-  .dark[data-site-theme="ember"] { --nav-theme: 10 82% 67%; --nav-theme-light: 38 88% 62%; }
-  .dark[data-site-theme="mystic"] { --nav-theme: 282 72% 72%; --nav-theme-light: 320 70% 67%; }
-  .dark[data-site-theme="industrial"] { --nav-theme: 202 26% 68%; --nav-theme-light: 40 55% 64%; }
+  :root[data-site-theme="arcade"] { --nav-theme: 258 90% 70%; --nav-theme-light: 188 82% 58%; }
+  :root[data-site-theme="forest"] { --nav-theme: 145 62% 62%; --nav-theme-light: 88 60% 62%; }
+  :root[data-site-theme="ocean"] { --nav-theme: 194 86% 67%; --nav-theme-light: 174 70% 58%; }
+  :root[data-site-theme="ember"] { --nav-theme: 10 82% 67%; --nav-theme-light: 38 88% 62%; }
+  :root[data-site-theme="mystic"] { --nav-theme: 282 72% 72%; --nav-theme-light: 320 70% 67%; }
+  :root[data-site-theme="industrial"] { --nav-theme: 202 26% 68%; --nav-theme-light: 40 55% 64%; }
 }
 
 @layer base {
   * { @apply border-border; }
   html { scroll-behavior: smooth; }
-  body { @apply bg-background text-foreground; }
+  body {
+    @apply bg-background text-foreground;
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
   body::before {
     content: "";
     position: fixed;
@@ -126,8 +83,8 @@
      component classes in mdx-components.tsx (e.g. two different h2 border rules).
      These custom properties are typography's own extension point: because they
      reference `hsl(var(--x))` rather than baked-in values, the same `.prose` class
-     reads correctly in both :root and .dark automatically — no `prose-invert`
-     variant needed. Anything typography doesn't cover (step badges, callouts, the
+     reads correctly from the one fixed surface palette. Anything typography
+     doesn't cover (step badges, callouts, the
      blockquote treatment) is added below as plain rules scoped under `.prose`. */
   .prose {
     --tw-prose-body: hsl(var(--muted-foreground));

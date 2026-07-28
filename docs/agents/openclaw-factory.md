@@ -1,4 +1,4 @@
-# OpenClaw Game Wiki Operator 使用规范
+# OpenClaw Game Wiki Factory Agent 使用规范
 
 这是用户、OpenClaw Agent 和后续 AI 之间的稳定接口。Agent 是控制面：验证输入、提交后台任务、查询状态和汇报异常；`gamewiki-worker` 才执行几十分钟的采集、生成、翻译、构建和发布。聊天断线或上下文清空不能终止任务。
 
@@ -59,7 +59,7 @@ Prompt：
 OpenClaw 不接收 Cloudflare Pages 广告任务，也不要让用户把原始代码粘贴进聊天正文。
 
 ```text
-Factory 和 OpenClaw 不接收 `taskType: ads` 或任何原始广告代码。广告由独立 Agent 按 `docs/adsterra-environment-contract.md` 转换并写入托管平台环境变量；不得打印或提交原始代码。
+Factory 和 OpenClaw 不接收 `taskType: ads` 或任何原始广告代码。广告由独立 Agent 按 `docs/advertising/adsterra-environment-contract.md` 转换并写入托管平台环境变量；不得打印或提交原始代码。
 ```
 
 手工广告配置不重跑内容。缺少广告变量时站点不展示广告、不保留空白；配置后必须验证七个 `/api/ads/<format>` 路由的代码哈希。

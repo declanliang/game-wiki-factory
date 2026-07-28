@@ -81,13 +81,13 @@ npm run build
 
 ## Adsterra 广告
 
-广告是可选的模板运行时能力，不属于 Factory。独立广告 Agent 把已验证的完整 snippet 转成七个 server-only `AD_*_B64` 环境变量；变量名和转换规则见 Factory 的 `docs/adsterra-environment-contract.md`。
+广告是可选的模板运行时能力，不属于 Factory。独立广告 Agent 把已验证的完整 snippet 转成七个 server-only `AD_*_B64` 环境变量；变量名和转换规则见 Factory 的 `docs/advertising/adsterra-environment-contract.md`。
 
 页面先调用 `/api/ads/availability` 获取运行时可用性，再按需挂载 `/api/ads/<format>` 同源沙箱 iframe。未配置或 Base64 无效时不会渲染 iframe、占位容器或空白间距。修改 Cloudflare Pages Production 变量后必须重新部署。
 
 ## Cloudflare Pages 部署
 
-Factory 会通过 Pages API 创建连接 Private GitHub `main` 的项目，Root directory 留空，Build command 为 `npm run build`，Build output directory 为 `out`。Production 环境必须设置最终公开域名对应的 `NEXT_PUBLIC_SITE_URL`。部署后运行 `npm run verify:deploy`；根路径应 301 到 `/en`，而 sitemap 中的所有 loc/hreflang 必须直接返回 200。详细步骤见 `doc/Cloudflare-Pages部署指南.md`。
+Factory 会通过 Pages API 创建连接 Private GitHub `main` 的项目，Root directory 留空，Build command 为 `npm run build`，Build output directory 为 `out`。Production 环境必须设置最终公开域名对应的 `NEXT_PUBLIC_SITE_URL`。部署后运行 `npm run verify:deploy`；根路径应 301 到 `/en`，而 sitemap 中的所有 loc/hreflang 必须直接返回 200。发布契约只维护在 Factory 的 `docs/deployment/cloudflare-pages.md`，不会复制进每个游戏仓库。
 
 ## 设计边界
 
@@ -97,7 +97,7 @@ Factory 会通过 Pages API 创建连接 Private GitHub `main` 的项目，Root 
 - `content/` 是生成投影，每次 ingest 会先清空，防止旧游戏或已删除文章残留。
 - site-plan 至少包含 1 个有真实关键词证据、最多 8 个 published 分类；不为数量生成 fallback 分类，每种语言必须交付相同文章树。
 - `NEXT_PUBLIC_SITE_URL` 集中规范化：裸域名自动补 HTTPS，非法协议在构建前失败；`verify:deploy` 会检查线上 metadata、self-canonical 和 sitemap 直接 200，而不只检查首页 HTTP 200。
-- 首页按“媒体入口 + 信息枢纽”组织：桌面 Hero 控制在约 576px，缩短页头后的留白，核心标题位于视觉中心、紧凑数据卡固定在内容下沿，保证常见首屏能立即看到主要信息；有可信视频时在首屏后展示点击加载的 YouTube；正文、分类和更新区使用受控宽度；专题卡片按三列从左到右排列，换行后从左侧继续；深度 section 使用醒目的无分割线编号卡片。Footer 的内容导航总标题统一为 `Wiki`，避免和其中的 Guides 分类重名。
+- 首页按“媒体入口 + 信息枢纽”组织：Hero 直接给出主要任务入口，下面不重复身份条；正文、分类和更新区使用受控宽度；系统与专题卡片使用分类语义图标而不是无意义编号；固定深色阅读面配合每个游戏的一个审核主题强调色，不提供明暗切换。Footer 的内容导航总标题统一为 `Wiki`，避免和其中的 Guides 分类重名。
 - 分类标签和描述来自 site-plan 的五语言 `labels` / `descriptions`，模板只负责机械使用。
 - 所有语言都使用显式前缀（`/en`、`/es`、`/de`、`/fr`、`/ja`），根 URL 301 到 `/en`；JSON-LD 和 sitemap 使用同一套路径。缺少译文时构建失败，不做英语回退。
 - 具体游戏仓库必须提交 `intake/`；原始调研、cache 和日志位于被 Git 忽略的 `.gamewiki/`。

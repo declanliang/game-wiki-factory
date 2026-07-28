@@ -309,6 +309,17 @@ def _compact_serp_field(
     # The suffix matcher requires leading whitespace, so applying it to every
     # locale cannot strip a native word or Japanese particle.
     value = _trim_dangling_serp_suffix(value)
+    if not prefer_sentence:
+        # When a title has a complete primary clause plus a promotional
+        # subtitle, drop the subtitle instead of slicing it into nonsense such
+        # as Spanish "...: Marca tu" or "...: Domina tus".
+        for separator in (" — ", " – ", ": ", " | "):
+            if separator not in value:
+                continue
+            primary, subtitle = (part.strip() for part in value.split(separator, 1))
+            incomplete_subtitle = len(subtitle.split()) <= 2
+            if max(20, int(limit * 0.5)) <= len(primary) <= limit and (len(value) > limit or incomplete_subtitle):
+                return _trim_dangling_serp_suffix(primary)
     if len(value) <= limit:
         return value
     if prefer_sentence:

@@ -337,6 +337,7 @@ TEMPLATE_SITE_CONTENT_SCHEMA: dict[str, Any] = {
                 "price": {"type": "string"},
                 "priceCurrency": {"type": "string", "pattern": "^(?:$|[A-Z]{3})$"},
                 "developer": {"type": "string", "minLength": 1},
+                "publisher": {"type": "string", "minLength": 1},
             },
         },
         "home": {

@@ -129,6 +129,7 @@ class SteamClient:
         approval = round(total_positive / total_reviews * 100, 1) if total_reviews else None
         retrieved = utc_now()
         developer = next(iter(game.get("developers") or []), None)
+        publisher = next(iter(game.get("publishers") or []), None)
         website = game.get("website") or None
         screenshots = [item.get("path_full") for item in game.get("screenshots", []) if item.get("path_full")]
         facts = {
@@ -139,6 +140,7 @@ class SteamClient:
                 "matchConfidence": 1.0 if selected.get("identitySelection") == "explicit-app-id" else selected["matchScore"],
             },
             "developer": {"name": developer, "type": "Studio", "id": None, "url": website, "verified": None},
+            "publisher": {"name": publisher, "type": "Studio", "verified": True} if publisher else {},
             "game": {
                 "officialDescription": game.get("short_description", ""),
                 "detailedDescription": _plain_html(game.get("about_the_game")),
@@ -182,6 +184,7 @@ class SteamClient:
                     "identity.appId", "identity.currentPlatformName", "developer.name",
                     "game.officialDescription", "game.createdAt", "game.price",
                     "game.genres", "dynamicStats.reviewCount", "dynamicStats.approvalPercent",
+                    *(["publisher.name"] if publisher else []),
                 ]
             ],
         }

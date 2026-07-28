@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Selects home.featured.items[] from the English article tree, then reads each
 // selected article's localized metadata for every declared locale.
-// deterministic rule documented in doc/新游戏上站提示词流程.md Part 3 — this used to be
+// deterministic task-router rule — this used to be
 // "an AI reads the rule and executes it by hand each time"; the rule itself is fully
 // mechanical (no content understanding needed, just category/date/title lookups), so
 // it belongs in a script, not a prompt.

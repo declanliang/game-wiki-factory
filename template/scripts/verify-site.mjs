@@ -1,8 +1,6 @@
 #!/usr/bin/env node
-// Full-site verification with zero AI judgment — this is doc/新游戏上站提示词流程.md
-// Part 5, as a script: every check there is already a command someone reads the
-// output of and either says "looks fine" or "fix X"; a script can make that same
-// pass/fail call without a human in the loop.
+// Full-site verification with zero AI judgment. This is the executable
+// postcondition for Factory's content/SEO contract.
 //
 // Usage:
 //   npm run verify:site                 # build + start + check everything
@@ -180,29 +178,31 @@ function inspectStructuredPageUrls(html, pageUrl) {
   return issues;
 }
 
-function inspectHtmlMetadata(html, label, expectedOrigin = null, expectedPageUrl = null) {
+function inspectHtmlMetadata(html, label, expectedOrigin = null, expectedPageUrl = null, quiet = false) {
   const title = html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() || "";
+  const description = extractMetaContent(html, "description");
   const canonical = extractLinkHref(html, "canonical");
   const ogUrl = extractMetaContent(html, "og:url");
   const ogImage = extractMetaContent(html, "og:image");
   const twitterImage = extractMetaContent(html, "twitter:image");
   if (!title) fail(`${label}返回了 HTML，但没有非空 <title>；metadata 可能渲染失败，请检查 NEXT_PUBLIC_SITE_URL 和部署日志`);
-  else ok(`${label}<title> = ${title}`);
+  else if (!quiet) ok(`${label}<title> = ${title}`);
+  if (!description) fail(`${label}HTML 里没有非空 meta description`);
   if (!canonical) fail(`${label}HTML 里没有找到 canonical`);
   else if (expectedPageUrl && new URL(canonical).href !== new URL(expectedPageUrl).href) {
     fail(`${label}canonical 为 ${canonical}，期望 self-canonical ${expectedPageUrl}`);
-  } else ok(`${label}canonical = ${canonical}`);
+  } else if (!quiet) ok(`${label}canonical = ${canonical}`);
   for (const [key, value] of [["og:url", ogUrl], ["og:image", ogImage], ["twitter:image", twitterImage]]) {
     if (!value) fail(`${label}HTML 里没有找到 ${key}`);
     else if (!/^https?:\/\//i.test(value)) fail(`${label}${key} 不是绝对 HTTP(S) URL：${value}`);
     else if (expectedOrigin && new URL(value).origin !== expectedOrigin) {
       fail(`${label}${key} origin 为 ${new URL(value).origin}，期望 ${expectedOrigin}`);
-    } else ok(`${label}${key} = ${value}`);
+    } else if (!quiet) ok(`${label}${key} = ${value}`);
   }
   if (/Application error|metadata render error|An error occurred in the Server Components render/i.test(html)) {
     fail(`${label}HTML 包含 Next.js/metadata 运行时错误标记`);
   }
-  return { title, canonical, ogUrl, ogImage, twitterImage };
+  return { title, description, canonical, ogUrl, ogImage, twitterImage };
 }
 
 function inspectOriginDocument(text, label, expectedOrigin) {
@@ -222,6 +222,108 @@ function inspectOriginDocument(text, label, expectedOrigin) {
   });
   if (bad.length > 0) fail(`${label}包含非规范 origin：${[...new Set(bad)].slice(0, 3).join(", ")}`);
   else ok(`${label}中的绝对 URL 全部使用 ${expectedOrigin}`);
+}
+
+function decodeHtmlUrl(value) {
+  return value.replace(/&amp;/g, "&").replace(/&#x2F;/gi, "/").replace(/&#47;/g, "/");
+}
+
+function extractHtmlUrls(html, tag, attribute) {
+  const values = [];
+  const tagPattern = new RegExp(`<${tag}\\b[^>]*>`, "gi");
+  for (const match of html.matchAll(tagPattern)) {
+    const value = match[0].match(new RegExp(`${attribute}=["']([^"']+)["']`, "i"))?.[1];
+    if (value) values.push(decodeHtmlUrl(value));
+  }
+  return values;
+}
+
+async function auditPublishedSite(sitemapXml, requestOrigin, canonicalOrigin, label) {
+  const locs = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
+  const hreflangTargets = [...sitemapXml.matchAll(/<xhtml:link[^>]+href=["']([^"']+)["']/g)].map((match) => match[1]);
+  const targets = [...new Set([...locs, ...hreflangTargets])];
+  const targetUrls = new Set(targets.map((target) => new URL(target).href));
+  const inbound = new Map(targets.map((target) => [new URL(target).href, 0]));
+  const internalRoutes = new Set();
+  const imageAssets = new Set();
+  let badPages = 0;
+
+  for (const target of targets) {
+    const canonicalUrl = new URL(target);
+    if (canonicalUrl.origin !== canonicalOrigin || canonicalUrl.pathname.startsWith("//")) {
+      fail(`${label}${target} 不属于规范域名或包含双斜杠`);
+      badPages++;
+      continue;
+    }
+    const requestUrl = new URL(`${canonicalUrl.pathname}${canonicalUrl.search}`, requestOrigin);
+    const response = await fetch(requestUrl, { redirect: "manual" });
+    if (response.status !== 200) {
+      fail(`${label}${canonicalUrl.pathname} 返回 ${response.status}（期望直接 200）`);
+      badPages++;
+      continue;
+    }
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("text/html")) continue;
+    const html = await response.text();
+    inspectHtmlMetadata(html, `${label}${canonicalUrl.pathname}：`, canonicalOrigin, canonicalUrl.href, true);
+    badPages += inspectStructuredPageUrls(html, canonicalUrl.href);
+
+    const pageHreflangs = [...html.matchAll(/rel=["']alternate["'][^>]+hreflang=["']([^"']+)["']/gi)].map((match) => match[1]);
+    const actualHreflangs = new Set(pageHreflangs.map((value) => value.toLowerCase()));
+    if (REQUIRED_HREFLANGS.some((value) => !actualHreflangs.has(value))) {
+      fail(`${label}${canonicalUrl.pathname} hreflang 不完整`);
+      badPages++;
+    }
+
+    for (const href of extractHtmlUrls(html, "a", "href")) {
+      if (/^(?:#|mailto:|tel:|javascript:)/i.test(href)) continue;
+      let parsed;
+      try { parsed = new URL(href, canonicalUrl); } catch { continue; }
+      if (parsed.origin !== canonicalOrigin) continue;
+      parsed.hash = "";
+      internalRoutes.add(parsed.href);
+      if (targetUrls.has(parsed.href)) inbound.set(parsed.href, (inbound.get(parsed.href) || 0) + 1);
+    }
+    for (const src of [
+      ...extractHtmlUrls(html, "img", "src"),
+      extractMetaContent(html, "og:image"),
+      extractMetaContent(html, "twitter:image"),
+    ].filter(Boolean)) {
+      try {
+        const parsed = new URL(src, canonicalUrl);
+        if (parsed.origin === canonicalOrigin) imageAssets.add(parsed.href);
+      } catch { /* malformed metadata is already reported above */ }
+    }
+  }
+
+  for (const route of internalRoutes) {
+    const canonicalUrl = new URL(route);
+    const response = await fetch(new URL(`${canonicalUrl.pathname}${canonicalUrl.search}`, requestOrigin), { redirect: "manual" });
+    if (response.status !== 200) {
+      fail(`${label}内部链接不是直接 200：${route}（HTTP ${response.status}）`);
+      badPages++;
+    }
+  }
+  for (const asset of imageAssets) {
+    const canonicalUrl = new URL(asset);
+    const response = await fetch(new URL(`${canonicalUrl.pathname}${canonicalUrl.search}`, requestOrigin), { redirect: "manual" });
+    const contentType = response.headers.get("content-type") || "";
+    if (response.status !== 200 || !contentType.startsWith("image/")) {
+      fail(`${label}图片不可用：${asset}（HTTP ${response.status}，${contentType || "无 content-type"}）`);
+      badPages++;
+    }
+  }
+  for (const [target, count] of inbound) {
+    const pathname = new URL(target).pathname;
+    if (!/^\/(?:en|es|de|fr|ja)\/?$/.test(pathname) && count === 0) {
+      fail(`${label}孤立 sitemap 页面：${target}`);
+      badPages++;
+    }
+  }
+  if (badPages === 0) {
+    ok(`${label}${targets.length} 个公开页面 metadata/hreflang/内链、${imageAssets.size} 个图片资源和孤立页检查全部通过`);
+  }
+  return badPages;
 }
 
 function waitForServer(url, timeoutMs) {
@@ -343,6 +445,7 @@ try {
       }
     }
     if (badCount === 0) ok(`sitemap.xml 的 ${locs.length} 个 loc 和 ${hreflangTargets.length} 个 hreflang 目标均为 self-canonical 且直接返回 200`);
+    await auditPublishedSite(sitemapXml, localOrigin, new URL(locs[0]).origin, "本地全站：");
   }
 
   const sitemapLocs = [...sitemapXml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
@@ -456,6 +559,7 @@ if (args.includes("--deploy")) {
         }
       }
       if (badTargets === 0) ok(`线上 sitemap 的 ${targets.length} 个唯一 loc/hreflang 目标全部直接返回 200`);
+      await auditPublishedSite(live["/sitemap.xml"], siteUrl, siteUrl, "线上全站：");
     }
     if (live["/robots.txt"]) inspectOriginDocument(live["/robots.txt"], "线上 robots.txt", siteUrl);
   }

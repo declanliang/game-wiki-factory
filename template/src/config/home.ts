@@ -7,7 +7,7 @@
 //
 // "extraSections" is the one section that isn't a single fixed block: it renders however
 // many category-highlight blocks intake/site-content.json's home.extraSections array
-// provides (zero, one, or many) — see doc/homepage-info-schema.md. This is the homepage's
+// provides (zero, one, or many). This is the homepage's
 // one open-ended extension point, for content a game genuinely needs beyond the fixed
 // hero/about/featured/faq set (e.g. a keyword-dense "Characters"/"Classes"/"Items"
 // highlight block per major content category) without turning the whole homepage into a
@@ -15,15 +15,13 @@
 export const HOME_SECTIONS = [
   "hero",
   "ads",
-  "video",
   // Featured pages are the homepage's task router: players choose the job
   // they need before reading the longer editorial sections below.
   "featured",
   "about",
   "guideSections",
   "categories",
-  "liveTools",
-  "extraSections",
+  "video",
   "updates",
   "bottomAd",
   "faq",

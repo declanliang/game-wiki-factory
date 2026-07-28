@@ -36,6 +36,15 @@ Generate a title based on the keyword field in the reference material:
 10. The research query may include "Roblox" or "Steam" only to disambiguate
     sources. Do not force that platform word into the title when the natural
     player-facing keyword and game identity are already clear.
+11. Treat the supplied current date and official release state as binding.
+    Never describe an already released game, feature, or update as a future
+    launch. Distinguish confirmed facts, community reports, and unknowns.
+12. Never infer Steam Deck Verified or Playable from controller support,
+    achievements, or ordinary Steam availability. Without an official Deck
+    rating, say the status is unconfirmed and give only cautious test advice.
+13. Do not pad missing evidence with speculation such as "likely", "might",
+    "could", "we can expect", or "based on similar games". If a useful claim
+    is unsupported, omit it or label the exact unknown instead.
 
 ## Article Structure
 

@@ -1,17 +1,16 @@
 import Link from "next/link";
-import { ChevronRight, ExternalLink, Moon, Sun, Menu } from "lucide-react";
+import { ChevronRight, ExternalLink, Menu } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { NAVIGATION_CONFIG } from "@/config/navigation";
-import { getDynamicNavigation, type NavGroup } from "@/lib/content";
+import { CONTENT_TYPES, getDynamicNavigation, type NavGroup } from "@/lib/content";
 import type { Locale } from "@/i18n/routing";
 import { localizeHref } from "@/lib/locale-path";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { CollapsibleNavGroup } from "@/components/collapsible-nav-group";
 import { AdSlot } from "@/components/ad-slot";
 import { LanguageSwitcher } from "@/components/language-switcher";
-import { ClientThemeToggle } from "@/components/theme-toggle";
 import { HeaderNavLinks } from "@/components/header-nav";
 
 export async function SiteHeader({ locale }: { locale: string }) {
@@ -44,10 +43,11 @@ export async function SiteHeader({ locale }: { locale: string }) {
       />
       <div className="flex items-center gap-2">
         <LanguageSwitcher locale={locale} />
-        <ThemeToggle label={t("toggleTheme")} />
         <Sheet>
           <SheetTrigger asChild className="md:hidden"><Button variant="outline" size="icon" aria-label={t("menu")}><Menu className="h-4 w-4" /></Button></SheetTrigger>
           <SheetContent className="border-border bg-background text-foreground">
+            <SheetTitle className="sr-only">{t("menu")}</SheetTitle>
+            <SheetDescription className="sr-only">{site("name")}</SheetDescription>
             <div className="mt-8 grid gap-2">
               {NAVIGATION_CONFIG.map((item) => <Link key={item.key} href={localizeHref(item.path, locale)} className="rounded-lg px-3 py-3 text-sm font-semibold hover:bg-muted">{t(item.key)}</Link>)}
               <Link href={playUrl} className="rounded-lg bg-[hsl(var(--nav-theme))] px-3 py-3 text-sm font-semibold text-primary-foreground">{t("playCta")}</Link>
@@ -57,18 +57,15 @@ export async function SiteHeader({ locale }: { locale: string }) {
       </div>
     </div>
   );
-  return <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-xl"><div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">{header}</div></header>;
-}
-
-function ThemeToggle({ label }: { label: string }) {
-  return <ClientThemeToggle label={label} />;
+  return <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-xl"><div className="mx-auto max-w-[84rem] px-6 py-3 sm:px-8 xl:px-10">{header}</div></header>;
 }
 
 export async function WikiSidebar({ locale, navGroups, currentPath }: { locale: string; navGroups: NavGroup[]; currentPath?: string }) {
   const t = await getTranslations({ locale, namespace: "shared" });
   const isActive = (href: string) => currentPath === href;
-  const activeCodes = t.raw("activeCodesList") as { code: string; reward: string }[];
-  return <aside className="space-y-6 lg:sticky lg:top-24 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-1"><section className="rounded-2xl border border-border bg-card/60 p-5 shadow-sm"><h3 className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">{t("wikiNavigation")}</h3><div className="space-y-4">{navGroups.map((group) => <CollapsibleNavGroup key={group.slug} title={group.title} icon={<span className="grid h-4 w-4 place-items-center rounded text-[10px] font-bold text-[hsl(var(--nav-theme))]">{group.title[0]}</span>} count={group.count} currentPath={currentPath}><ul className="space-y-1">{group.links.map((link) => <li key={link.href}><Link href={localizeHref(link.href, locale)} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors ${isActive(link.href) ? "bg-[hsl(var(--nav-theme)/0.15)] font-semibold text-[hsl(var(--nav-theme))]" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><span className="truncate">{link.label}</span>{link.badge && <Badge variant="secondary" className="ml-auto h-5 border-border px-1.5 text-[10px]">{link.badge}</Badge>}</Link></li>)}</ul></CollapsibleNavGroup>)}</div></section><section className="rounded-2xl border border-border bg-card/60 p-5"><h3 className="mb-3 text-sm font-bold text-foreground">{t("activeCodes")}</h3><div className="space-y-3 text-sm">{activeCodes.length > 0 ? activeCodes.map((c) => <div key={c.code} className="rounded-xl bg-muted p-3"><code className="font-bold text-foreground">{c.code}</code><p className="mt-1 text-muted-foreground">{c.reward}</p></div>) : <p className="text-muted-foreground">{t("noCodesAvailable")}</p>}<Link href={localizeHref("/codes", locale)} className="inline-flex items-center gap-1 text-sm font-semibold text-[hsl(var(--nav-theme))]">{t("viewAllCodes")} <ChevronRight className="h-4 w-4" /></Link></div></section><AdSlot format="sidebar160x600" /></aside>;
+  const hasCodes = CONTENT_TYPES.includes("codes");
+  const activeCodes = hasCodes ? t.raw("activeCodesList") as { code: string; reward: string }[] : [];
+  return <aside className="hidden space-y-6 lg:sticky lg:top-24 lg:block lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-1"><section className="rounded-2xl border border-border bg-card/60 p-5 shadow-sm"><h3 className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">{t("wikiNavigation")}</h3><div className="space-y-4">{navGroups.map((group) => <CollapsibleNavGroup key={group.slug} title={group.title} icon={<span className="grid h-4 w-4 place-items-center rounded text-[10px] font-bold text-[hsl(var(--nav-theme))]">{group.title[0]}</span>} count={group.count} currentPath={currentPath}><ul className="space-y-1">{group.links.map((link) => <li key={link.href}><Link href={localizeHref(link.href, locale)} className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors ${isActive(link.href) ? "bg-[hsl(var(--nav-theme)/0.15)] font-semibold text-[hsl(var(--nav-theme))]" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}><span className="truncate">{link.label}</span>{link.badge && <Badge variant="secondary" className="ml-auto h-5 border-border px-1.5 text-[10px]">{link.badge}</Badge>}</Link></li>)}</ul></CollapsibleNavGroup>)}</div></section>{hasCodes ? <section className="rounded-2xl border border-border bg-card/60 p-5"><h3 className="mb-3 text-sm font-bold text-foreground">{t("activeCodes")}</h3><div className="space-y-3 text-sm">{activeCodes.length > 0 ? activeCodes.map((c) => <div key={c.code} className="rounded-xl bg-muted p-3"><code className="font-bold text-foreground">{c.code}</code><p className="mt-1 text-muted-foreground">{c.reward}</p></div>) : <p className="text-muted-foreground">{t("noCodesAvailable")}</p>}<Link href={localizeHref("/codes", locale)} className="inline-flex items-center gap-1 text-sm font-semibold text-[hsl(var(--nav-theme))]">{t("viewAllCodes")} <ChevronRight className="h-4 w-4" /></Link></div></section> : null}<AdSlot format="sidebar160x600" /></aside>;
 }
 
 // Placeholder social hrefs (e.g. "https://discord.gg/REPLACE-WITH-REAL-INVITE") shouldn't be
@@ -82,10 +79,13 @@ export async function SiteFooter({ locale }: { locale: string }) {
   const t = await getTranslations({ locale, namespace: "footer" });
   const site = await getTranslations({ locale, namespace: "site" });
   const nav = await getTranslations({ locale, namespace: "nav" });
+  const legal = await getTranslations({ locale, namespace: "legal" });
   // Content-type links are derived from NAVIGATION_CONFIG, not hardcoded —
   // adding/removing a category here automatically updates the footer.
   const contentLinks: string[][] = NAVIGATION_CONFIG.filter((item) => item.isContentType).map((item) => [nav(item.key), item.path]);
   const legalLinks: string[][] = [
+    [t("aboutTitle"), "/about"],
+    [legal("copyright.title"), "/copyright"],
     [t("privacyPolicy"), "/privacy-policy"],
     [t("termsOfService"), "/terms-of-service"],
   ];
@@ -98,7 +98,7 @@ export async function SiteFooter({ locale }: { locale: string }) {
   ].filter(([, href]) => !isPlaceholderHref(href));
   return (
     <footer className="mt-16 border-t border-border bg-card/30">
-      <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[84rem] px-6 py-10 sm:px-8 xl:px-10">
         <div className="grid gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
             <h3 className="font-bold text-foreground">{t("aboutTitle")}</h3>

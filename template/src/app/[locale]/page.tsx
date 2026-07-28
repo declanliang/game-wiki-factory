@@ -6,7 +6,7 @@ import { NAVIGATION_CONFIG } from "@/config/navigation";
 import { getSiteName, localizedSiteUrl } from "@/config/site";
 import { localizeHref } from "@/lib/locale-path";
 import { languageAlternates, type Locale } from "@/i18n/routing";
-import { buildOpenGraph, buildTwitter, normalizeMetadataDescription, normalizeMetadataTitle } from "@/lib/seo";
+import { buildOpenGraph, buildTwitter } from "@/lib/seo";
 import en from "@/locales/en.json";
 import HomePageClient from "./HomePageClient";
 
@@ -16,8 +16,8 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   const messages = (await getMessages({ locale })) as Messages;
   const siteName = getSiteName(messages);
-  const title = normalizeMetadataTitle(messages.home.meta.title, locale);
-  const description = normalizeMetadataDescription(messages.home.meta.description, locale);
+  const title = messages.home.meta.title;
+  const description = messages.home.meta.description;
   return {
     title,
     description,
@@ -80,15 +80,6 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
       };
     });
 
-  const officialUrl = messages.site.playUrl;
-  const robloxPlace = officialUrl.match(/roblox\.com\/games\/(\d+)/i)?.[1];
-  const steamApp = officialUrl.match(/store\.steampowered\.com\/app\/(\d+)/i)?.[1];
-  const aboutStats = messages.home.aboutGame.stats;
-  const identityFacts = [
-    robloxPlace ? { label: "Roblox Place ID", value: robloxPlace } : steamApp ? { label: "Steam App ID", value: steamApp } : null,
-    messages.site.developer ? { label: aboutStats[0]?.label || "Developer", value: messages.site.developer } : null,
-    messages.site.gamePlatform?.[0] ? { label: aboutStats[1]?.label || "Platform", value: messages.site.gamePlatform[0] } : null,
-  ].filter((item): item is { label: string; value: string } => Boolean(item?.value));
   const articleImages = new Map(
     allArticles.map((article) => [
       `/${article.contentType}/${article.slug}`,
@@ -101,19 +92,59 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
     href: string;
     category?: string;
   }>;
+  type GuideItem = { title: string; description: string; href?: string; category?: string };
+  type GuideSection = { id: string; eyebrow: string; title: string; description: string; items: GuideItem[] };
+  const guideSections = (messages.home as unknown as { guideSections?: GuideSection[] }).guideSections;
+  const exactArticlePaths = new Set(articleImages.keys());
+  const gameTokens = new Set(tokenize(messages.site.name));
+  const stopTokens = new Set([
+    ...gameTokens,
+    "guide", "wiki", "game", "steam", "roblox", "how", "to", "the", "a", "an",
+    "and", "for", "with", "overview", "guia", "juego", "como", "para", "con", "und",
+    "der", "die", "das", "jeu", "avec", "pour",
+  ]);
+  const meaningfulTokens = (value: string) => tokenize(value).filter((token) => !stopTokens.has(token));
+  const resolveArticleHref = (item: { title: string; description?: string; href?: string }) => {
+    if (item.href && exactArticlePaths.has(item.href)) return item.href;
+    const queryTokens = meaningfulTokens(`${item.title} ${item.description || ""}`);
+    const titleTokens = meaningfulTokens(item.title);
+    if (titleTokens.length === 0) return item.href;
+    const ranked = allArticles
+      .map((article) => {
+        const href = `/${article.contentType}/${article.slug}`;
+        const candidateTitleTokens = new Set(meaningfulTokens(`${article.metadata.title} ${article.slug.replace(/-/g, " ")}`));
+        const candidateBodyTokens = new Set(meaningfulTokens(article.metadata.description));
+        const titleMatches = titleTokens.filter((token) => candidateTitleTokens.has(token)).length;
+        const contextMatches = queryTokens.filter((token) => candidateBodyTokens.has(token)).length;
+        const completeTitleMatch = titleMatches === titleTokens.length;
+        return { href, score: titleMatches * 5 + contextMatches + (completeTitleMatch ? 8 : 0), completeTitleMatch };
+      })
+      .sort((a, b) => b.score - a.score);
+    const winner = ranked[0];
+    return winner && winner.completeTitleMatch && winner.score >= 13 ? winner.href : item.href;
+  };
+  const usedFeaturedImages = new Set<string>();
+  const resolvedFeaturedItems = featuredItems.map((item) => {
+    const href = resolveArticleHref(item) || item.href;
+    const candidateImage = articleImages.get(href);
+    const image = candidateImage && !usedFeaturedImages.has(candidateImage) ? candidateImage : undefined;
+    if (image) usedFeaturedImages.add(image);
+    return { ...item, href, image };
+  });
   const home = {
     ...messages.home,
     featured: {
       ...messages.home.featured,
-      items: featuredItems.map((item) => ({
-        ...item,
-        image: articleImages.get(item.href),
-      })),
+      items: resolvedFeaturedItems,
     },
+    guideSections: guideSections?.map((section) => ({
+      ...section,
+      items: section.items.map((item) => ({ ...item, href: resolveArticleHref(item) })),
+    })),
   };
 
   return (
-    <main className="mx-auto max-w-[90rem] px-5 pb-10 pt-5 sm:px-8 sm:pt-6 lg:px-12">
+    <main className="mx-auto max-w-[84rem] px-6 pb-10 pt-5 sm:px-8 sm:pt-6 xl:px-10">
       {messages.home.faq.items.length > 0 && <JsonLd data={faqPage} />}
       <HomePageClient
         home={home}
@@ -122,9 +153,16 @@ export default async function LocaleHomePage({ params }: { params: Promise<{ loc
         locale={locale}
         recentArticles={recentArticles}
         categories={categories}
-        identityFacts={identityFacts}
-        officialUrl={officialUrl}
       />
     </main>
   );
+}
+
+function tokenize(value: string): string[] {
+  return value
+    .toLocaleLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((token) => token.length >= 2);
 }

@@ -6,7 +6,7 @@
 
 如果本地或服务器不存在，先严格执行 `docs/bootstrap-from-github.md`，不要凭历史对话猜测目录、服务或密钥位置。
 
-业务目标是为具体 Roblox 或 Steam 游戏生成信息型 Wiki。Factory 的职责到站点生产与 Cloudflare Pages 发布为止，不处理广告代码或广告环境变量。模板保留可选广告运行时接口；未配置环境变量时必须零渲染、零占位。广告配置由独立 Agent 按 `docs/adsterra-environment-contract.md` 处理。
+业务目标是为具体 Roblox 或 Steam 游戏生成信息型 Wiki。Factory 的职责到站点生产与 Cloudflare Pages 发布为止，不处理广告代码或广告环境变量。模板保留可选广告运行时接口；未配置环境变量时必须零渲染、零占位。广告配置由独立 Agent 按 `docs/advertising/adsterra-environment-contract.md` 处理。
 
 首页数据所有权：Basic Info 提供事实和深度文案；Guide Search 的缓存 YouTube 结果只可补一个严格匹配游戏的长视频；site-plan 决定可发布分类；现有文章提供具体内链和分类专题。模板不得反向发明事实、分类或文章。
 
@@ -78,4 +78,4 @@ C:\Users\liang\Documents\Games\<game-slug>，保留 intake 和 `.gamewiki` check
 4. 统计已存在的英文和翻译文件，避免重复 API。
 5. 修改跨模块契约时同步更新 schema、模板和测试。
 6. 完成后报告验证证据，不只说“代码已改”。
-7. 服务器/OpenClaw 接手时优先阅读 `docs/openclaw-operator-guide.md`，只通过后台队列控制长任务。
+7. 服务器/OpenClaw 接手时优先阅读 `docs/agents/openclaw-factory.md`，只通过后台队列控制长任务。

@@ -167,10 +167,17 @@ for (const locale of localeDirs) {
     }
 
     const callouts = calloutSignature(articleBody(source));
+    const body = articleBody(source);
+    if (/^\s*(?:import|export)\b/m.test(body)) {
+      fail(`${rel}：正文不允许 import/export；文章只能使用 metadata、Markdown 和受支持的 Callout`);
+    }
+    if (/(?<!\\)[{}]/.test(body)) {
+      fail(`${rel}：正文不允许 MDX JavaScript 表达式花括号；请改为普通 Markdown 文本`);
+    }
     if (!balancedCallouts(callouts)) {
       fail(`${rel}：<Callout> 标签未正确闭合`);
     }
-    if (/<\/?(?:h[1-6]|ul|ol|li|p)(?:\s+[^>]*)?>/i.test(articleBody(source))) {
+    if (/<\/?(?:h[1-6]|ul|ol|li|p)(?:\s+[^>]*)?>/i.test(body)) {
       fail(`${rel}：包含不受支持的原始 HTML 标题/列表标签，应转换为 Markdown`);
     }
   }

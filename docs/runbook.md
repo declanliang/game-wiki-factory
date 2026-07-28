@@ -154,4 +154,4 @@ npm run verify:deploy
 
 ## 广告职责边界
 
-Factory、后台 Worker 和 OpenClaw 只处理站点生产与 Cloudflare Pages 发布，不接收、解析或部署广告代码。广告由独立 Agent 按 [Adsterra 环境变量转换契约](adsterra-environment-contract.md)操作。模板保留可选运行时展示能力；全部变量缺失时零渲染。
+Factory、后台 Worker 和 OpenClaw 只处理站点生产与 Cloudflare Pages 发布，不接收、解析或部署广告代码。广告由独立 Agent 按 [Adsterra 环境变量转换契约](advertising/adsterra-environment-contract.md)操作。模板保留可选运行时展示能力；全部变量缺失时零渲染。
