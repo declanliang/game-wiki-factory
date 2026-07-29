@@ -180,13 +180,13 @@ for (const locale of localeDirs) {
     const descriptionLimit = cjk ? 90 : 160;
     if (title.length > titleLimit) warn(`${rel}：title 有 ${title.length} 个字符，超过 ${locale} 建议上限 ${titleLimit}`);
     if (description.length > descriptionLimit) warn(`${rel}：description 有 ${description.length} 个字符，超过 ${locale} 建议上限 ${descriptionLimit}`);
-    if (/(?:&|\b(?:and|or|with|for|to|vs\.?|und|oder|mit|für|y|o|con|para|et|ou|avec|pour))\s*$/i.test(title)) {
+    if (/(?:&|(?<![\p{L}\p{M}])(?:and|or|with|for|to|vs\.?|und|oder|mit|für|y|o|con|para|et|ou|avec|pour))\s*$/iu.test(title)) {
       fail(`${rel}：title 以未完成的连接词结尾，应在发布前压缩为完整短语`);
     }
-    // `\b` is ASCII-oriented in JavaScript.  Without a Unicode-aware left
-    // boundary, a Spanish word such as "guía" falsely looks like the dangling
-    // English article "a".  Keep rejecting a real standalone trailing word
-    // while never inspecting the final letter of a localized word.
+    // `\b` is ASCII-oriented in JavaScript. Without a Unicode-aware left
+    // boundary, Spanish words such as "Vacío" and "guía" falsely look like
+    // dangling `o`/`a`. Keep rejecting real standalone trailing words while
+    // never inspecting the final letter of a localized word.
     if (/(?:&|(?<![\p{L}\p{M}])(?:and|or|with|for|to|the|a|an|in|on|at|of|from|into|this|that|your|our))\s*[.!?]?\s*$/iu.test(description)) {
       fail(`${rel}：description 以未完成的虚词结尾，应在发布前压缩为完整句子`);
     }
