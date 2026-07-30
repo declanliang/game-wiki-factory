@@ -17,9 +17,11 @@ from publisher import (
     _resolve_cloudflare_project,
     _resolve_git_author,
     _set_cloudflare_project_environment,
+    _ensure_cloudflare_custom_domain,
     _validate_cloudflare_git_project,
     _validate_project,
     _verify_online_deployment,
+    _verify_online_advertising,
     _wait_cloudflare_deployment,
     _wait_cloudflare_commit_deployment,
 )
@@ -221,7 +223,7 @@ class PublisherValidationTests(unittest.TestCase):
         preview = payload["deployment_configs"]["preview"]["env_vars"]
         production = payload["deployment_configs"]["production"]["env_vars"]
         self.assertEqual(set(preview), set(ads))
-        self.assertTrue(all(value["type"] == "secret_text" for value in preview.values()))
+        self.assertTrue(all(value["type"] == "plain_text" for value in preview.values()))
         self.assertEqual(set(production), {"NEXT_PUBLIC_SITE_URL", *ads})
         self.assertEqual(
             production["NEXT_PUBLIC_SITE_URL"],
@@ -243,13 +245,41 @@ class PublisherValidationTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "complete ordered 8-variable"):
             _cloudflare_environment_payload("https://game.example", {})
 
+    @patch("publisher._http_response")
+    def test_online_advertising_verifies_exact_eight_first_party_endpoints(self, response) -> None:
+        formats = [
+            "nativeBanner", "nativeBannerMobile", "banner728x90", "banner300x250",
+            "banner468x60", "sidebar160x600", "sidebar160x300", "mobile320x50",
+        ]
+        availability_headers = {
+            "content-type": "application/json", "cache-control": "no-store",
+            "x-content-type-options": "nosniff",
+        }
+        html_headers = {
+            "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+            "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'",
+            "referrer-policy": "strict-origin-when-cross-origin",
+        }
+        response.side_effect = [
+            (200, availability_headers, json.dumps({name: True for name in formats})),
+            *[(200, html_headers, "<script>gamewiki-ad-start; invoke.js</script>") for _ in formats],
+        ]
+        self.assertEqual(_verify_online_advertising("https://game.example"), tuple(formats))
+
+    @patch("publisher._http_response")
+    def test_online_advertising_rejects_missing_security_header(self, response) -> None:
+        response.return_value = (200, {"content-type": "application/json"}, "{}")
+        with self.assertRaisesRegex(RuntimeError, "Cache-Control"):
+            _verify_online_advertising("https://game.example")
+
+    @patch("publisher._ensure_cloudflare_custom_domain")
     @patch("publisher._wait_cloudflare_deployment")
     @patch("publisher._cloudflare_create_git_deployment")
     @patch("publisher._set_cloudflare_project_environment")
     @patch("publisher.load_shared_ad_environment")
     @patch("publisher._resolve_cloudflare_project")
     def test_cloudflare_deploy_uses_git_integration(
-        self, resolve_project, load_ads, set_environment, create_deployment, wait_deployment
+        self, resolve_project, load_ads, set_environment, create_deployment, wait_deployment, ensure_domain
     ) -> None:
         resolve_project.return_value = ("game", self._git_project(), True)
         load_ads.return_value = {name: "encoded" for name in (
@@ -266,6 +296,7 @@ class PublisherValidationTests(unittest.TestCase):
             "deployment_trigger": {"metadata": {"commit_hash": "abc123"}},
             "latest_stage": {"status": "success"},
         }
+        ensure_domain.return_value = {"name": "game.example", "status": "active"}
         result = _deploy_cloudflare_pages(
             Path("C:/game"),
             "game",
@@ -291,6 +322,23 @@ class PublisherValidationTests(unittest.TestCase):
         wait_deployment.assert_called_once()
         self.assertEqual(len(result["environmentVariables"]), 9)
         self.assertEqual(result["adProfile"], "animal-hospital-anomalies.wiki")
+        self.assertEqual(result["customDomain"], {"name": "game.example", "status": "active"})
+
+    @patch("publisher.time.sleep")
+    @patch("publisher._cloudflare_request")
+    def test_cloudflare_custom_domain_is_created_then_polled_to_active(self, request, _sleep) -> None:
+        request.side_effect = [
+            RuntimeError("HTTP 404 from domain"),
+            {"name": "game.example", "status": "pending"},
+            {"name": "game.example", "status": "active"},
+        ]
+        result = _ensure_cloudflare_custom_domain(
+            "account", "token", "game", "https://game.example", attempts=2, interval_seconds=0,
+        )
+        self.assertEqual(result["status"], "active")
+        self.assertEqual(request.call_args_list[1].args[0], "POST")
+        self.assertEqual(request.call_args_list[1].args[3], "pages/projects/game/domains")
+        self.assertEqual(request.call_args_list[1].args[4], {"name": "game.example"})
 
     @patch("publisher.time.sleep")
     @patch("publisher._cloudflare_request")
@@ -432,9 +480,10 @@ class PublisherValidationTests(unittest.TestCase):
         self.assertEqual(author, ("declanliang", "130889021+declanliang@users.noreply.github.com"))
         self.assertNotIn("hidden", run.call_args.args[0])
 
+    @patch("publisher._verify_online_advertising", return_value=("nativeBanner", "nativeBannerMobile", "banner728x90", "banner300x250", "banner468x60", "sidebar160x600", "sidebar160x300", "mobile320x50"))
     @patch("publisher.shutil.which", return_value="npm")
     @patch("publisher.subprocess.run")
-    def test_online_verification_is_a_logged_publish_postcondition(self, run, _which) -> None:
+    def test_online_verification_is_a_logged_publish_postcondition(self, run, _which, ads) -> None:
         run.return_value.returncode = 0
         run.return_value.stdout = "0 error(s).\n"
         run.return_value.stderr = ""
@@ -449,6 +498,7 @@ class PublisherValidationTests(unittest.TestCase):
         self.assertEqual(command, ["npm", "run", "verify:deploy"])
         self.assertEqual(run.call_args.kwargs["env"]["NEXT_PUBLIC_SITE_URL"], "https://game.example")
         self.assertNotIn("hidden", command)
+        self.assertEqual(result["advertising"]["formats"], list(ads.return_value))
 
     @patch("publisher.shutil.which", return_value="npm")
     @patch("publisher.subprocess.run")
@@ -459,7 +509,7 @@ class PublisherValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary)
             with self.assertRaisesRegex(RuntimeError, "online deployment verification failed"):
-                _verify_online_deployment(project, "https://game.example", {})
+                _verify_online_deployment(project, "https://game.example", {}, attempts=1)
             self.assertTrue((project / ".gamewiki" / "deploy-verification.log").is_file())
 
 

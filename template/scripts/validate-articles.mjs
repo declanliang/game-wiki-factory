@@ -46,6 +46,25 @@ function articleBody(source) {
   return metaMatch ? source.slice(metaMatch[0].length).trim() : "";
 }
 
+const PLACEHOLDER_DESTINATIONS = new Set(["url", "link", "todo", "#", "example.com"]);
+
+function placeholderMarkdownDestination(body) {
+  let fenced = false;
+  const lines = body.split(/\r?\n/);
+  for (const [index, line] of lines.entries()) {
+    if (/^\s*```/.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue;
+    for (const match of line.matchAll(/\[[^\]]+\]\(([^\s)]+)(?:\s+"[^"]*")?\)/g)) {
+      const destination = match[1].trim().toLocaleLowerCase();
+      if (PLACEHOLDER_DESTINATIONS.has(destination)) return { line: index + 1, destination: match[1] };
+    }
+  }
+  return null;
+}
+
 function headingSignature(body) {
   return [...body.matchAll(/^(#{2,6})[ \t]+\S/gm)].map((match) => match[1]);
 }
@@ -209,6 +228,10 @@ for (const locale of localeDirs) {
 
     const callouts = calloutSignature(articleBody(source));
     const body = articleBody(source);
+    const placeholder = placeholderMarkdownDestination(body);
+    if (placeholder) {
+      fail(`${rel}：第 ${placeholder.line} 行 Markdown 链接目标 ${placeholder.destination} 是占位符，必须替换为真实 URL、有效站内路径或具体锚点`);
+    }
     if (/^\s*(?:import|export)\b/m.test(body)) {
       fail(`${rel}：正文不允许 import/export；文章只能使用 metadata、Markdown 和受支持的 Callout`);
     }

@@ -58,7 +58,7 @@ python gamewiki.py publish <slug>
 
 新 Pages 项目默认关闭非 main 分支的自动 Preview 构建（`preview_deployment_setting: none`）。普通 Factory Job 只发布已批准的 `main`，并使用 Production deployment 自身唯一、可直接访问的 `*.pages.dev` URL 做绑定域名前验收。Preview 环境变量仍会配置；确需分支 Preview 时，由维护者在 Cloudflare 将 Preview 设置改为 `all` 或指定分支，再推送非 main 分支，Cloudflare 会生成可访问的 Preview deployment URL。Factory 不自动创建临时 Git 分支。
 
-给出正式域名但域名尚未指向项目时，部署仍成功，回执为 `hosting.status=awaiting_domain_configuration`。运营者只需在该 Pages 项目绑定自定义域名并配置 DNS；不要新建另一个项目。域名生效后在游戏根运行 `npm run verify:deploy`，检查根路径 301 到 `/en`、metadata/canonical、sitemap、robots 和全部 loc/hreflang 直接 200。完整输出保存在 `.gamewiki/deploy-verification.log`。
+给出正式域名时，发布器会调用 Pages API 创建或复用该 Custom Domain，并轮询状态。DNS/验证未就绪时部署仍成功但回执为 `hosting.status=awaiting_domain_configuration`；运营者只需按 Cloudflare 显示的 DNS/验证要求完成配置，不要新建另一个项目。域名生效后重试同一 Job，发布器会自动完成根路径 301 到 `/en`、metadata/canonical、sitemap、robots、全部 loc/hreflang 和八个广告 API 的线上验收。完整输出保存在 `.gamewiki/deploy-verification.log`。
 
 SEO metadata 有两层确定性保护：SEO Scout 先把文章 title/description 压到
 各语言上限并拒绝以 `&`、`and` 等未完成连接词结尾的标题；模板渲染时再对

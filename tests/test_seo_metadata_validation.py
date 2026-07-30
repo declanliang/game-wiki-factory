@@ -78,6 +78,19 @@ class SeoMetadataValidationTests(unittest.TestCase):
         self.assertIsNone(content)
         self.assertIn("Duplicated TITLE/DESCRIPTION/BODY", error)
 
+    def test_rejects_placeholder_link_before_english_checkpoint_save(self) -> None:
+        body = BODY + "\n\n[Official page](URL)"
+        raw = f"TITLE: Timebomb Duels Tips\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{body}"
+        content, error = process_english(raw, "guide", "2026-07-19")
+        self.assertIsNone(content)
+        self.assertIn("Placeholder Markdown link", error)
+
+    def test_allows_real_url_containing_url_text(self) -> None:
+        body = BODY + "\n\n[Official page](https://example.org/url-guide)"
+        raw = f"TITLE: Timebomb Duels Tips\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{body}"
+        content, error = process_english(raw, "guide", "2026-07-19")
+        self.assertIsNotNone(content, error)
+
     def test_normalizes_basic_raw_html_blocks_before_saving_mdx(self) -> None:
         body = "<h2>Maps</h2>\n<ul><li><h3>Facility</h3>Use cover carefully.</li></ul>\n" + BODY
         raw = f"TITLE: Dino Hunters Maps\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{body}"

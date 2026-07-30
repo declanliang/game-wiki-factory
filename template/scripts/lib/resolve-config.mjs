@@ -120,6 +120,24 @@ function normalizeYoutubeVideoId(raw) {
   return { value: raw, status: "invalid" };
 }
 
+function normalizeYoutubeChannelUrl(raw) {
+  if (!raw) return { value: "", status: "empty" };
+  let parsed;
+  try {
+    parsed = new URL(decodeURIComponent(raw.trim()));
+  } catch {
+    return { value: raw, status: "invalid" };
+  }
+  if (!/^www\.youtube\.com$|^youtube\.com$/i.test(parsed.hostname)) return { value: raw, status: "invalid" };
+  const parts = parsed.pathname.split("/").filter(Boolean);
+  if (!parts.length || /^(watch|embed|shorts|live)$/i.test(parts[0])) return { value: raw, status: "invalid" };
+  let channel = "";
+  if (parts[0].startsWith("@")) channel = parts[0];
+  else if (/^(channel|c|user)$/i.test(parts[0]) && parts[1]) channel = `${parts[0]}/${parts[1]}`;
+  if (!channel) return { value: raw, status: "invalid" };
+  return { value: `https://www.youtube.com/${channel}`, status: "normalized", original: raw };
+}
+
 /**
  * Resolves the effective intake configuration: new-site.env (if present) overlaid with
  * intake/site-identity.json identity fields, then filled out with intake/ directory
@@ -193,6 +211,8 @@ export function resolveIntakeConfig(root, { warn } = {}) {
 
   const videoId = normalizeYoutubeVideoId(env.YOUTUBE_VIDEO_ID || "");
   if (videoId.status === "bare-id" || videoId.status === "extracted") env.YOUTUBE_VIDEO_ID = videoId.value;
+  const channelUrl = normalizeYoutubeChannelUrl(env.YOUTUBE_CHANNEL_URL || "");
+  if (channelUrl.status === "normalized") env.YOUTUBE_CHANNEL_URL = channelUrl.value;
 
-  return { env, identity, resolvedByConvention, videoId };
+  return { env, identity, resolvedByConvention, videoId, channelUrl };
 }

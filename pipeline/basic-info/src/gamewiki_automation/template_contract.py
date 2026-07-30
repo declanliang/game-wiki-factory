@@ -8,7 +8,7 @@ import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from jsonschema import Draft202012Validator, FormatChecker
 from PIL import Image
@@ -710,8 +710,21 @@ def _youtube_video_value(value: Any) -> str:
 def _youtube_channel_value(value: Any) -> str:
     if not isinstance(value, str):
         return ""
-    pattern = r"^https?://(?:www\.)?youtube\.com/(?:@[^/?#]+|channel/[A-Za-z0-9_-]+|c/[^/?#]+|user/[^/?#]+)(?:[/?#].*)?$"
-    return value if re.fullmatch(pattern, value, re.IGNORECASE) else ""
+    decoded = unquote(value.strip())
+    parsed = urlparse(decoded)
+    if parsed.scheme not in {"http", "https"} or parsed.netloc.casefold() not in {"youtube.com", "www.youtube.com"}:
+        return ""
+    parts = [part for part in parsed.path.split("/") if part]
+    if not parts or parts[0].casefold() in {"watch", "embed", "shorts", "live"}:
+        return ""
+    first = parts[0]
+    if first.startswith("@"):
+        canonical = first
+    elif first.casefold() in {"channel", "c", "user"} and len(parts) >= 2:
+        canonical = f"{first}/{parts[1]}"
+    else:
+        return ""
+    return f"https://www.youtube.com/{canonical}"
 
 
 def _valid_http_url(value: str) -> bool:

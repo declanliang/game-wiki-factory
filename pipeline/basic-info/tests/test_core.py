@@ -14,7 +14,7 @@ from gamewiki_automation.pipeline import Pipeline, _generation_evidence, _genera
 from gamewiki_automation.roblox import IdentityError, RobloxClient, clean_roblox_display_name, identity_match_confidence, roblox_place_id
 from gamewiki_automation.steam import SteamClient, steam_app_id
 from gamewiki_automation.schemas import HOMEPAGE_SCHEMA, LANGUAGE_MARKET_SCHEMA, MODULES_SCHEMA, RESEARCH_SCHEMA, TEMPLATE_SITE_CONTENT_SCHEMA, TEMPLATE_SITE_IDENTITY_SCHEMA
-from gamewiki_automation.template_contract import build_site_content, build_site_identity, export_existing_output, validate_localized_site_content, validate_template_contract
+from gamewiki_automation.template_contract import _youtube_channel_value, build_site_content, build_site_identity, export_existing_output, validate_localized_site_content, validate_template_contract
 from gamewiki_automation.util import clean_json_text, dump_json, normalized_name, public_game_name, slugify
 from gamewiki_automation.validate import _cost_summary
 
@@ -25,6 +25,22 @@ class FakeResponse:
     [Anime Expeditions](https://www.roblox.com/games/84515722934860/Anime-Expeditions?placeId=84515722934860&position=0&universeId=7613921865)
     [Other Anime](https://www.roblox.com/games/123/Other-Anime?placeId=123&position=1&universeId=456)
     """
+
+
+class YoutubeChannelNormalizationTests(unittest.TestCase):
+    def test_channel_subpage_and_encoded_handle_become_homepage(self) -> None:
+        self.assertEqual(
+            _youtube_channel_value("https://youtube.com/%40GameStudio/videos?view=0"),
+            "https://www.youtube.com/@GameStudio",
+        )
+        self.assertEqual(
+            _youtube_channel_value("https://www.youtube.com/channel/UC123/shorts"),
+            "https://www.youtube.com/channel/UC123",
+        )
+
+    def test_video_urls_are_not_accepted_as_channels(self) -> None:
+        self.assertEqual(_youtube_channel_value("https://youtube.com/watch?v=abcdefghijk"), "")
+        self.assertEqual(_youtube_channel_value("https://youtube.com/shorts/abcdefghijk"), "")
 
 
 class FakeHttp:

@@ -286,6 +286,9 @@ DUPLICATED_OUTPUT_CONTRACT_RE = re.compile(
     r'^TITLE:\s*.+\nDESCRIPTION:\s*.+\n(?:(?:QUICKGUIDE|BODY):)',
     re.MULTILINE,
 )
+PLACEHOLDER_LINK_RE = re.compile(
+    r'\[[^\]]+\]\(\s*(?:url|link|todo|#|example\.com)\s*\)', re.IGNORECASE
+)
 
 
 def _has_repeated_chunk(content: str, min_repeats: int = 10,
@@ -358,6 +361,8 @@ def validate_markdown(content: str) -> tuple:
         return False, "Stray code-fence marker (```) found in body — article content must not contain code fences"
     if DUPLICATED_OUTPUT_CONTRACT_RE.search(content):
         return False, "Duplicated TITLE/DESCRIPTION/BODY output contract found inside article body"
+    if PLACEHOLDER_LINK_RE.search(content):
+        return False, "Placeholder Markdown link destination found; use a real URL or route"
     article_date_match = re.search(r'^\s*date:\s*"(\d{4}-\d{2}-\d{2})"', content, re.M)
     if article_date_match:
         article_date = date.fromisoformat(article_date_match.group(1))

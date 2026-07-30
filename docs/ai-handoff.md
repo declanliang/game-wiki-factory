@@ -31,7 +31,7 @@ python gamewiki.py --config jobs/<game>.json
 - 不打印或提交任何 .env/API key。
 - 先确认 platform；Steam 身份使用 App ID，Roblox 身份使用 Place/Universe，不能混用事实字段。
 - 所有游戏 GitHub 仓库只能是 Private；发布器不得创建 Public repo。
-- 有正式域名时填写 `siteUrl`。后台任务自动发布 Private GitHub、创建连接该 repo `main` 的 Git-integrated Pages 项目、设置 `NEXT_PUBLIC_SITE_URL` 并触发 Cloudflare 构建部署；运营者只负责自定义域名绑定/DNS，禁止 `example.com` 出现在真实生产 sitemap/canonical。
+- 有正式域名时填写 `siteUrl`。后台任务自动发布 Private GitHub、创建连接该 repo `main` 的 Git-integrated Pages 项目、设置 `NEXT_PUBLIC_SITE_URL`、创建或复用同名 Custom Domain 并触发 Cloudflare 构建部署；仅在 Cloudflare 返回 DNS/验证 pending 时，由运营者按控制台指示完成该动作，禁止 `example.com` 出现在真实生产 sitemap/canonical。
 - 不接纳完全无关主题，不为凑数量降低门槛；也不要把资料丰富的游戏强行压成 3–5 篇长文。
 - 检查 Guide Search 的 page_opportunities 及审计结果；Codes、Tier List、Updates 和实体资料页必须保留其页面类型元数据。
 - 不生成 Calculator、Planner、Team Builder 等工具页。

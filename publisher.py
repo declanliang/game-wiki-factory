@@ -23,6 +23,10 @@ from orchestrate_wiki import build_subprocess_env, read_json, write_json
 
 ROOT = Path(__file__).resolve().parent
 PROJECTS_ROOT = Path(os.environ.get("GAMEWIKI_PROJECTS_ROOT", ROOT.parent)).expanduser().resolve()
+AD_FORMATS = (
+    "nativeBanner", "nativeBannerMobile", "banner728x90", "banner300x250",
+    "banner468x60", "sidebar160x600", "sidebar160x300", "mobile320x50",
+)
 
 
 def _now() -> str:
@@ -297,7 +301,10 @@ def _cloudflare_environment_payload(
     if tuple(ad_environment) != AD_ENV_NAMES:
         raise RuntimeError("Cloudflare ad provisioning requires the complete ordered 8-variable contract")
     shared_ads = {
-        name: {"type": "secret_text", "value": ad_environment[name]}
+        # These are public client-side ad wrapper payloads, not credentials.
+        # Pages must retain their literal values so the server-side API route can
+        # expose only the isolated first-party iframe document.
+        name: {"type": "plain_text", "value": ad_environment[name]}
         for name in AD_ENV_NAMES
     }
     return {
@@ -383,6 +390,80 @@ def _append_cloudflare_log(log_path: Path, message: str) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log:
         log.write(f"[{_now()}] {message.rstrip()}\n")
+
+
+def _custom_domain_status(domain: object) -> str:
+    if not isinstance(domain, dict):
+        return "unknown"
+    return str(domain.get("status") or "unknown").casefold()
+
+
+def _ensure_cloudflare_custom_domain(
+    account_id: str,
+    token: str,
+    project_name: str,
+    origin: str,
+    *,
+    attempts: int = 60,
+    interval_seconds: int = 5,
+    log_path: Path | None = None,
+) -> dict:
+    """Create/reuse a Pages Custom Domain and wait for its API status.
+
+    Pages can accept a domain before its DNS/validation has converged.  That
+    is an operator handoff, not a successful canonical deployment, so callers
+    receive the current API status rather than a fabricated success.
+    """
+    hostname = urllib.parse.urlparse(origin).hostname
+    if not hostname:
+        raise RuntimeError("Custom domain provisioning requires a hostname")
+    encoded_project = urllib.parse.quote(project_name)
+    encoded_domain = urllib.parse.quote(hostname, safe="")
+    try:
+        domain = _cloudflare_request(
+            "GET", account_id, token,
+            f"pages/projects/{encoded_project}/domains/{encoded_domain}",
+        )
+    except RuntimeError as exc:
+        if "HTTP 404" not in str(exc):
+            raise
+        try:
+            domain = _cloudflare_request(
+                "POST", account_id, token,
+                f"pages/projects/{encoded_project}/domains",
+                {"name": hostname},
+            )
+        except RuntimeError as create_exc:
+            # A concurrent or earlier run can make POST report an existing
+            # binding. Re-read it so resume remains idempotent.
+            if "already" not in str(create_exc).casefold() and "exist" not in str(create_exc).casefold():
+                raise
+            domain = _cloudflare_request(
+                "GET", account_id, token,
+                f"pages/projects/{encoded_project}/domains/{encoded_domain}",
+            )
+    if not isinstance(domain, dict):
+        raise RuntimeError("Cloudflare Pages Custom Domain response was not an object")
+
+    for attempt in range(1, attempts + 1):
+        status = _custom_domain_status(domain)
+        if log_path is not None:
+            _append_cloudflare_log(log_path, f"custom domain {hostname}: attempt {attempt}/{attempts}, status={status}")
+        if status == "active":
+            return domain
+        if status in {"blocked", "deactivated", "error"}:
+            raise RuntimeError(
+                f"Cloudflare Pages Custom Domain {hostname} is {status}; complete the DNS/validation action shown in Cloudflare before retrying"
+            )
+        if attempt < attempts:
+            time.sleep(interval_seconds)
+            domain = _cloudflare_request(
+                "GET", account_id, token,
+                f"pages/projects/{encoded_project}/domains/{encoded_domain}",
+            )
+            if not isinstance(domain, dict):
+                raise RuntimeError("Cloudflare Pages Custom Domain response was not an object")
+    return domain
 
 
 def _cloudflare_deployment_failure_tail(
@@ -582,6 +663,11 @@ def _deploy_cloudflare_pages(
         commit_sha,
         log_path=log_path,
     )
+    custom_domain = None
+    if canonical_origin != pages_origin:
+        custom_domain = _ensure_cloudflare_custom_domain(
+            account_id, token, project_name, canonical_origin, log_path=log_path,
+        )
     deployment_url = str(deployment.get("url") or "").rstrip("/")
     return {
         "provider": "cloudflare-pages",
@@ -593,6 +679,13 @@ def _deploy_cloudflare_pages(
         "deploymentUrl": deployment_url,
         "pagesOrigin": pages_origin,
         "siteUrl": canonical_origin,
+        "customDomain": (
+            {
+                "name": urllib.parse.urlparse(canonical_origin).hostname,
+                "status": _custom_domain_status(custom_domain),
+            }
+            if custom_domain is not None else None
+        ),
         "environmentVariables": list(configured_variables),
         "adProfile": "animal-hospital-anomalies.wiki",
         "deploymentMode": "git-integration",
@@ -611,8 +704,69 @@ def _deploy_cloudflare_pages(
     }
 
 
-def _verify_online_deployment(project: Path, origin: str, env: dict[str, str]) -> dict:
-    """Make remote SEO/runtime verification a publish postcondition."""
+def _http_response(url: str) -> tuple[int, dict[str, str], str]:
+    request = urllib.request.Request(url, headers={"User-Agent": "GameWikiFactory/1.0"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        headers = {key.casefold(): value for key, value in response.headers.items()}
+        return response.status, headers, response.read().decode("utf-8", errors="replace")
+
+
+def _verify_online_advertising(origin: str) -> tuple[str, ...]:
+    """Validate only first-party wrapper responses; never fetch Adsterra itself."""
+    base = origin.rstrip("/")
+    status, headers, body = _http_response(f"{base}/api/ads/availability")
+    if status != 200:
+        raise RuntimeError(f"advertising availability returned HTTP {status}")
+    if "application/json" not in headers.get("content-type", "").casefold():
+        raise RuntimeError("advertising availability did not return JSON")
+    if headers.get("cache-control", "").casefold() != "no-store":
+        raise RuntimeError("advertising availability is missing Cache-Control: no-store")
+    if headers.get("x-content-type-options", "").casefold() != "nosniff":
+        raise RuntimeError("advertising availability is missing X-Content-Type-Options: nosniff")
+    try:
+        availability = json.loads(body)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("advertising availability returned invalid JSON") from exc
+    if not isinstance(availability, dict) or set(availability) != set(AD_FORMATS) or any(availability.get(name) is not True for name in AD_FORMATS):
+        raise RuntimeError("advertising availability does not contain exactly eight enabled formats")
+    for name in AD_FORMATS:
+        status, headers, body = _http_response(f"{base}/api/ads/{name}")
+        if status != 200:
+            raise RuntimeError(f"advertising format {name} returned HTTP {status}")
+        if "text/html" not in headers.get("content-type", "").casefold():
+            raise RuntimeError(f"advertising format {name} did not return HTML")
+        required = {
+            "cache-control": "no-store",
+            "referrer-policy": "strict-origin-when-cross-origin",
+            "x-content-type-options": "nosniff",
+        }
+        for header, expected in required.items():
+            if headers.get(header, "").casefold() != expected:
+                raise RuntimeError(f"advertising format {name} is missing {header}")
+        if not headers.get("content-security-policy"):
+            raise RuntimeError(f"advertising format {name} is missing content-security-policy")
+        if "gamewiki-ad-start" not in body or "invoke.js" not in body:
+            raise RuntimeError(f"advertising format {name} is missing the first-party wrapper contract")
+    return AD_FORMATS
+
+
+def _is_transient_online_verification_failure(output: str) -> bool:
+    normalized = output.casefold()
+    return any(marker in normalized for marker in (
+        " 404", "http 404", " 500", " 502", " 503", " 504",
+        "fetch failed", "econn", "enotfound", "timed out", "timeout",
+    ))
+
+
+def _verify_online_deployment(
+    project: Path,
+    origin: str,
+    env: dict[str, str],
+    *,
+    attempts: int = 60,
+    interval_seconds: int = 5,
+) -> dict:
+    """Make remote SEO/runtime and the eight-ad contract publish postconditions."""
     npm = shutil.which("npm.cmd") or shutil.which("npm")
     if not npm:
         raise RuntimeError("npm is required for online deployment verification")
@@ -625,36 +779,37 @@ def _verify_online_deployment(project: Path, origin: str, env: dict[str, str]) -
     # Rebuild with the final public origin. The generation build may have used
     # example.com intentionally, while Cloudflare injects the production env in
     # the remote build.
-    command = [npm, "run", "verify:deploy"]
-    result = subprocess.run(
-        command,
-        cwd=project,
-        env=verify_env,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        capture_output=True,
-    )
-    output = (result.stdout or "") + (result.stderr or "")
     log_path = project / ".gamewiki" / "deploy-verification.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_path.write_text(output, encoding="utf-8")
-    if result.returncode:
-        tail = output[-2000:].strip()
-        raise RuntimeError(
-            f"online deployment verification failed for {verify_env['NEXT_PUBLIC_SITE_URL']}; "
-            f"see {log_path}{(': ' + tail) if tail else ''}"
-        )
-    return {
-        "status": "complete",
-        "origin": verify_env["NEXT_PUBLIC_SITE_URL"],
-        "checks": [
-            "home metadata", "canonical", "sitemap", "robots",
-            "all sitemap loc/hreflang targets direct 200",
-        ],
-        "log": str(log_path),
-        "checkedAt": _now(),
-    }
+    last_error = ""
+    for attempt in range(1, attempts + 1):
+        command = [npm, "run", "verify:deploy"]
+        result = subprocess.run(command, cwd=project, env=verify_env, text=True, encoding="utf-8", errors="replace", capture_output=True)
+        output = (result.stdout or "") + (result.stderr or "")
+        log_path.write_text(output, encoding="utf-8")
+        if result.returncode:
+            tail = output[-2000:].strip()
+            if not _is_transient_online_verification_failure(output) or attempt == attempts:
+                # Local config/build failures cannot converge while waiting for DNS.
+                raise RuntimeError(f"online deployment verification failed for {verify_env['NEXT_PUBLIC_SITE_URL']}; see {log_path}{(': ' + tail) if tail else ''}")
+            last_error = tail.splitlines()[-1][:240] if tail else "temporary online verification failure"
+            _append_cloudflare_log(project / ".gamewiki" / "logs" / "cloudflare-pages-publish.log", f"online verification attempt {attempt}/{attempts} pending: {last_error}")
+            time.sleep(interval_seconds)
+            continue
+        try:
+            verified_formats = _verify_online_advertising(verify_env["NEXT_PUBLIC_SITE_URL"])
+            return {
+                "status": "complete", "origin": verify_env["NEXT_PUBLIC_SITE_URL"],
+                "checks": ["home metadata", "canonical", "sitemap", "robots", "all sitemap loc/hreflang targets direct 200"],
+                "advertising": {"status": "complete", "formats": list(verified_formats)},
+                "log": str(log_path), "checkedAt": _now(),
+            }
+        except (OSError, urllib.error.URLError, urllib.error.HTTPError, TimeoutError, RuntimeError) as exc:
+            last_error = str(exc).splitlines()[0][:240]
+            _append_cloudflare_log(project / ".gamewiki" / "logs" / "cloudflare-pages-publish.log", f"online verification attempt {attempt}/{attempts} pending: {last_error}")
+            if attempt < attempts:
+                time.sleep(interval_seconds)
+    raise RuntimeError(f"online deployment verification did not converge for {verify_env['NEXT_PUBLIC_SITE_URL']} after {attempts} attempts: {last_error}")
 
 
 class _CanonicalParser(HTMLParser):
@@ -855,19 +1010,19 @@ def publish(argv: list[str]) -> int:
 
         custom_domain_pending = (
             hosting["siteUrl"] != hosting["pagesOrigin"]
-            and not _custom_origin_is_ready(hosting["siteUrl"])
+            and (hosting.get("customDomain") or {}).get("status") != "active"
         )
         if custom_domain_pending:
             receipt["stages"]["onlineVerification"] = {
                 "status": "awaiting_domain_configuration",
                 "origin": hosting["siteUrl"],
                 "deploymentUrl": hosting["deploymentUrl"],
-                "nextAction": "Bind the custom domain in Cloudflare Pages, then run npm run verify:deploy.",
+                "nextAction": "Cloudflare Pages added the custom domain. Complete the pending DNS/validation action in Cloudflare, then retry this Job for final verification.",
                 "updatedAt": _now(),
             }
             receipt["stages"]["hosting"].update({
                 "status": "awaiting_domain_configuration",
-                "nextAction": "Pages deployment is complete. Bind the custom domain; NEXT_PUBLIC_SITE_URL is already configured.",
+                "nextAction": "Pages deployment is complete and the custom domain was requested. Complete the pending DNS/validation action in Cloudflare; NEXT_PUBLIC_SITE_URL is already configured.",
                 "updatedAt": _now(),
             })
         else:

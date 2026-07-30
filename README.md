@@ -1,6 +1,6 @@
 # Game Wiki Factory
 
-输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库和 Cloudflare Pages。Factory 自动创建连接该 Private repo 的 Git-integrated Pages 项目、设置 `NEXT_PUBLIC_SITE_URL` 并触发 Cloudflare 服务端构建；自定义域名绑定和 DNS 由站点运营者完成。历史站点继续保留原托管，不在新任务中重建或迁移。
+输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库和 Cloudflare Pages。Factory 自动创建连接该 Private repo 的 Git-integrated Pages 项目、设置 `NEXT_PUBLIC_SITE_URL` 并触发 Cloudflare 服务端构建；提供正式域名时还会自动创建或复用同名 Custom Domain，DNS/验证 pending 才交给站点运营者完成。历史站点继续保留原托管，不在新任务中重建或迁移。
 
 第一次接手先读 [文档导航](docs/README.md) 和 [立即接手指南](docs/takeover.md)。全新电脑或服务器仅凭 GitHub 恢复时，再按 [从零恢复手册](docs/bootstrap-from-github.md) 操作。
 
@@ -116,7 +116,7 @@ python gamewiki.py --config jobs\my-game.json
 - `platform` 只能是 `roblox`、`steam` 或 `auto`。
 - `siteUrl` 可以是裸域名或完整 HTTPS URL；已知正式域名时填写。
 - `manualKeywords` 是可选字符串数组，最多 200 项；系统会清理空白、按大小写去重，并作为 `user_provided` 来源进入 Guide Search。它们仍受风险过滤、证据门和 Basic Info 分类边界约束。
-- `publish: true` 会创建新的 Private GitHub 仓库和 Git-integrated Pages 项目，自动设置 Production `NEXT_PUBLIC_SITE_URL`，让 Cloudflare 从 `main` 执行 `npm run build`、发布 `out` 并轮询成功状态。未填写 `siteUrl` 时使用 `<slug>.pages.dev` 并自动验收；填写的正式域名尚未绑定时返回 `hosting.status=awaiting_domain_configuration`。
+- `publish: true` 会创建新的 Private GitHub 仓库和 Git-integrated Pages 项目，自动设置 Production `NEXT_PUBLIC_SITE_URL`，让 Cloudflare 从 `main` 执行 `npm run build`、发布 `out` 并轮询成功状态。填写 `siteUrl` 时还会自动创建或复用同名 Custom Domain；Cloudflare 显示 DNS/验证 pending 时返回 `hosting.status=awaiting_domain_configuration`，按控制台指示完成后重试同一 Job。未填写 `siteUrl` 时使用 `<slug>.pages.dev` 并自动验收。
 - 日常配置不需要 GitHub repo 或托管平台项目名。每个游戏都创建新的 Private GitHub repo。
 - `refresh` 默认全部为 `false`。普通续跑不要开启，防止重复 API 成本。
 - 配置中的多余换行和连续空格会在执行前规范化，未知字段和拼写错误会直接报错。
@@ -248,7 +248,7 @@ Factory 发布新 Cloudflare Pages 站点时，从 `config/ads/animal-hospital-p
 读取该项目 .gamewiki/manifest.json、configs 和最新 logs。
 已完成的 Basic Info、关键词、文章和翻译不要重新生成。
 修复实际问题后从 checkpoint 继续，使用最新版 factory 模板。
-GitHub 仓库必须为 Private。后台任务自动完成 Git-integrated Pages 项目、`NEXT_PUBLIC_SITE_URL` 和首次 Git 部署；若状态为 `awaiting_domain_configuration`，明确汇报只剩自定义域名绑定/DNS和最终域名验收。
+GitHub 仓库必须为 Private。后台任务自动完成 Git-integrated Pages 项目、`NEXT_PUBLIC_SITE_URL`、Custom Domain 请求和首次 Git 部署；若状态为 `awaiting_domain_configuration`，明确汇报 Cloudflare 所示 DNS/验证动作和最终域名验收。
 最后检查 canonical、sitemap、robots 和 hreflang。
 ```
 

@@ -271,6 +271,9 @@ def deduplicate_translated_descriptions(articles_root: Path, target_langs: list[
 MAX_ARTICLE_CHARS = 50_000
 REPEATED_WHITESPACE_RE = re.compile(r'\s{200,}')
 STARTS_WITH_METADATA_RE = re.compile(r'\Aexport const metadata\s*=\s*\{')
+PLACEHOLDER_LINK_RE = re.compile(
+    r'\[[^\]]+\]\(\s*(?:url|link|todo|#|example\.com)\s*\)', re.IGNORECASE
+)
 HEADING_RE = re.compile(r'^(#{2,6})[ \t]+\S', re.MULTILINE)
 CALLOUT_RE = re.compile(r'<Callout\b[^>]*>|</Callout>')
 TERMINAL_PUNCTUATION_RE = re.compile(r'[.!?。！？…|>\])}\"\'’”]$')
@@ -286,7 +289,7 @@ FORMATTED_QUESTION_RE = re.compile(
 BOLD_STANDALONE_RE = re.compile(r'^\s*\*\*[^\n]+\*\*\s*$', re.MULTILINE)
 DANGLING_SERP_SUFFIX_RE = re.compile(
     r"\s+(?:and|or|with|for|to|vs\.?|the|a|an|in|on|at|of|from|into|this|that|your|our|"
-    r"und|oder|mit|für|y|o|con|para|et|ou|avec|pour)[.!?。！？…]*$",
+    r"und|oder|aber|mit|für|y|o|con|para|pero|et|ou|avec|pour|mais)[.!?。！？…]*$",
     re.IGNORECASE,
 )
 
@@ -456,6 +459,8 @@ def validate_markdown(content: str) -> tuple:
         return False, "Content does not start with 'export const metadata = {'"
     if '```' in content:
         return False, "Stray code-fence marker (```) found in body — article content must not contain code fences"
+    if PLACEHOLDER_LINK_RE.search(content):
+        return False, "Placeholder Markdown link destination found; use a real URL or route"
     return True, ""
 
 
