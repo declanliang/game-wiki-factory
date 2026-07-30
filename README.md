@@ -74,7 +74,7 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 服务器的 Supervisor 每分钟检查一次失败事件。只有文章生成/翻译明确保存了有效 checkpoint、且失败属于可继续的内容阶段时，才自动冷却并恢复同一个 Job；默认最多 6 轮。身份、密钥/余额、schema、代码、构建、GitHub/Cloudflare 安全问题不会自动处理，最终才通知用户和 Codex。这样批量任务不依赖 OpenClaw 对话持续在线。
 
-当前候选生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。0728 版本的验收规则见 [docs/releases/v1_0728.md](docs/releases/v1_0728.md)；在用户确认、推送和服务器部署前，本分支只属于本地候选。
+当前稳定生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。0730 版本的验收规则见 [docs/releases/v1_0730.md](docs/releases/v1_0730.md)。`v1_0728` 及更早版本继续作为历史认证记录，不因 Factory 升级而自动重建。
 
 首页采用任务优先的信息架构，并支持有证据的 Codes/Update 等“当前无结果”状态页；网站本身即 Wiki，不生成 `/wiki/` 分类。设计与验收边界见 [docs/design/task-first-home-and-status-pages.md](docs/design/task-first-home-and-status-pages.md)。
 
@@ -233,6 +233,8 @@ npm run verify:deploy
 Factory 发布新 Cloudflare Pages 站点时，从 `config/ads/animal-hospital-profile.json` 读取统一 Adsterra shared profile，验证并转换为 8 个 server-only `AD_*_B64` 变量，同时写入 Preview 和 Production。模板通过同源、无 sandbox 的独立 iframe 展示广告；桌面 Native 与移动 Native 使用不同 placement，媒体查询确定前不创建 iframe。Job 不接收任意广告代码或变量覆盖，Cloudflare 凭据仍只来自根 `.env`/CI secret。
 
 完整映射、provisioning 和验收规则见 [Adsterra 共享 Profile 与环境变量合同](docs/advertising/adsterra-environment-contract.md)。
+
+`v1_0730` 不改变上述 8 个环境变量。模板只调整展示预算与布局：广告不得插入 Featured 卡片区、Callout、表格或其他嵌套内容块；首页中段广告必须是两个完整 section 之间的独立区块；全局底部只选择一个响应式广告。
 
 失败后的同一任务重试自动复用 checkpoint，不会重复已经完成的付费阶段。不要为同一个失败任务创建替代 Job。
 

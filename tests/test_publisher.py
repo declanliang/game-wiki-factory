@@ -378,7 +378,7 @@ class PublisherValidationTests(unittest.TestCase):
         ):
             (root / "intake" / name).write_text("{}", encoding="utf-8")
         (root / "intake" / "factory-release.json").write_text(
-            json.dumps({"release": "v1_0728"}), encoding="utf-8"
+            json.dumps({"release": "v1_0730"}), encoding="utf-8"
         )
         return root
 
@@ -386,6 +386,15 @@ class PublisherValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             manifest = _validate_project(self._project(Path(temporary)))
         self.assertEqual(manifest["status"], "complete")
+
+    def test_previous_release_cannot_publish_as_current(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = self._project(Path(temporary))
+            (project / "intake" / "factory-release.json").write_text(
+                json.dumps({"release": "v1_0728"}), encoding="utf-8"
+            )
+            with self.assertRaisesRegex(RuntimeError, "expected 'v1_0730'"):
+                _validate_project(project)
 
     def test_secret_file_blocks_publish(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

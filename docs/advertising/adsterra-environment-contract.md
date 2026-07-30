@@ -65,7 +65,21 @@ Desktop/Mobile Native 必须先在客户端解析现有 `900px` 断点，再创�
 - desktop：只创建 `nativeBanner`，使用 `4:1` 容器；
 - mobile：只创建 `nativeBannerMobile`，使用约 300×300 的 `1:1` 容器。
 
-不得先加载桌面 Native 后用 CSS 隐藏，也不得产生两个 Native 请求。其他广告位置、数量和插入顺序保持不变。
+不得先加载桌面 Native 后用 CSS 隐藏，也不得产生两个 Native 请求。
+
+## v1_0730 展示预算与区块隔离
+
+环境变量和 shared profile 不变，页面只按以下预算消费它们：
+
+- 顶部固定广告使用 `mobile320x50`，广告与导航均保持固定且背景不透明，二者不得重叠；
+- 首页中段广告只能作为两个完整 section 之间的同级区块，不能插入 Featured 卡片网格；
+- 分类页不显示首尾横幅；至少 4 张卡片时只在第 2 张卡片后显示一个响应式 Native；
+- 文章桌面侧栏广告固定在左侧，不与右侧滚动条竞争空间；
+- 文章内文广告只检查正文容器的直属段落，不进入 Callout、表格或其他嵌套结构；最后 4 个直属段落及最后 25% 正文区域禁止插入；
+- 8–13 个直属段落最多 1 个内文广告，14–22 个最多 2 个，23 个及以上最多 3 个；
+- 页面末尾不再叠加文章专属或分类专属广告组；全局 Footer 前只选择一个广告，桌面优先 728×90、回退 468×60，移动端使用 300×250。
+
+模板未获得对应变量时继续零渲染、零占位。调整展示预算不需要修改 Cloudflare Pages 中的变量名或重新转换 snippet。
 
 ## 验收
 
@@ -76,5 +90,6 @@ Desktop/Mobile Native 必须先在客户端解析现有 `900px` 断点，再创�
 5. 固定 Banner/Sidebar 使用合同尺寸，不因父容器裁切。
 6. 页面主 HTML和客户端 bundle 不含 Base64 值或 raw snippet。
 7. 环境变量变更后完成新部署；不以 Adsterra 是否立即填充 creative 作为部署成功条件。
+8. 首页 Featured、文章 Callout/表格和其他声明的排除区内没有广告 iframe；Footer 广告区最多一个 iframe。
 
 历史站点不由本 Factory PR 修改。PR 合并后使用新模板和同一 provisioning 机制单独迁移，不提供缺少 Mobile Native 时复用 Desktop Native 的旧合同回退。
