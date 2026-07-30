@@ -22,7 +22,6 @@ import { TrailerButton } from "@/components/trailer";
 import { localizeHref } from "@/lib/locale-path";
 import { useAdEnabled } from "@/components/ad-slot";
 import {
-  DesktopBanner728,
   NativeFlowAd,
   ResponsiveContentAd,
 } from "@/components/ad-placements";
@@ -170,18 +169,17 @@ function LightCard({ item, locale }: { item: LightItem; locale: string }) {
 function LightSectionBlock({
   section,
   locale,
-  insertAd = false,
   taskRouter = false,
 }: {
   section: LightSection;
   locale: string;
-  insertAd?: boolean;
   taskRouter?: boolean;
 }) {
   if (!section.items || section.items.length === 0) return null;
   return (
     <section
-      className={`mx-auto ${taskRouter ? "max-w-[1000px] rounded-[2rem] border border-border bg-card/40 px-5 py-8 sm:px-8 sm:py-10" : "max-w-[920px]"}`}
+      className={`mx-auto ${taskRouter ? "max-w-[960px] rounded-[2rem] border border-border bg-card/40 px-5 py-8 sm:px-8 sm:py-10" : "max-w-[880px]"}`}
+      data-ad-exclusion="section"
     >
       {taskRouter ? (
         <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[hsl(var(--nav-theme)/0.12)] text-[hsl(var(--nav-theme))]">
@@ -197,18 +195,9 @@ function LightSectionBlock({
         </p>
       )}
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {(taskRouter ? section.items.slice(0, 6) : section.items).map(
-          (item, index) => (
-            <Fragment key={item.href}>
-              <LightCard item={item} locale={locale} />
-              {insertAd && index === 2 && section.items.length > 3 ? (
-                <div className="py-4 sm:col-span-2 lg:col-span-3">
-                  <ResponsiveContentAd />
-                </div>
-              ) : null}
-            </Fragment>
-          ),
-        )}
+        {(taskRouter ? section.items.slice(0, 6) : section.items).map((item) => (
+          <LightCard key={item.href} item={item} locale={locale} />
+        ))}
       </div>
       {section.viewAllHref && (
         <div className="mt-6 text-center">
@@ -232,7 +221,7 @@ function GuideSectionsBlock({
   return (
     <section
       aria-label="Game field guide"
-      className="mx-auto max-w-[1040px] space-y-14 sm:space-y-16"
+      className="mx-auto max-w-[1000px] space-y-14 sm:space-y-16"
     >
       {sections.map((section) => {
         const SectionIcon =
@@ -321,13 +310,11 @@ export default function HomePageClient({
   const nativeEnabled = useAdEnabled("nativeBanner");
   const nativeMobileEnabled = useAdEnabled("nativeBannerMobile");
   const anyNativeEnabled = nativeEnabled || nativeMobileEnabled;
-  const banner728Enabled = useAdEnabled("banner728x90");
-  const banner300Enabled = useAdEnabled("banner300x250");
   function renderSection(section: HomeSection) {
     switch (section) {
       case "hero":
         return (
-          <section className="relative mx-auto min-h-[32rem] max-w-[1160px] overflow-hidden rounded-[2rem] border border-white/10 bg-card text-center shadow-2xl shadow-black/30">
+          <section className="relative mx-auto min-h-[32rem] max-w-[1120px] overflow-hidden rounded-[2rem] border border-white/10 bg-card text-center shadow-2xl shadow-black/30">
             <Image
               src="/images/hero.webp"
               alt=""
@@ -338,7 +325,7 @@ export default function HomePageClient({
             />
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(4,6,10,.38)_0%,rgba(4,6,10,.62)_48%,rgba(4,6,10,.94)_100%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,transparent_0%,rgba(0,0,0,.2)_52%,rgba(0,0,0,.6)_100%)]" />
-            <div className="relative z-10 mx-auto flex min-h-[32rem] max-w-[1040px] flex-col px-5 pb-6 pt-6 sm:px-10 lg:px-14">
+            <div className="relative z-10 mx-auto flex min-h-[32rem] max-w-[1000px] flex-col px-5 pb-6 pt-6 sm:px-10 lg:px-14">
               <div className="flex flex-1 flex-col items-center justify-center py-4 sm:py-5">
                 <div className="mx-auto mb-4 flex justify-center">
                   <span className="inline-flex items-center rounded-full border border-white/25 bg-black/35 px-4 py-1.5 text-sm font-semibold text-white backdrop-blur-md">
@@ -395,13 +382,20 @@ export default function HomePageClient({
       case "ads":
         return anyNativeEnabled ? <NativeFlowAd /> : null;
 
-      case "bottomAd":
-        return banner728Enabled ? <DesktopBanner728 /> : null;
+      case "sectionAd":
+        return (
+          <section
+            className="mx-auto max-w-[1000px]"
+            aria-label="Section advertisement"
+          >
+            <ResponsiveContentAd />
+          </section>
+        );
 
       case "about":
         return (
           // Centered heading + divider, then paragraphs (left) / Quick Facts box (right)
-          <section className="mx-auto max-w-[1040px]">
+          <section className="mx-auto max-w-[1000px]">
             <div className="text-center">
               <h2 className="text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
                 {home.aboutGame.title}
@@ -464,7 +458,7 @@ export default function HomePageClient({
       case "categories":
         // Auto-generated from NAVIGATION_CONFIG, zero extra config
         return categories.length > 0 ? (
-          <section className="mx-auto max-w-[1040px]">
+          <section className="mx-auto max-w-[1000px]">
             <h2 className="text-center text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
               {home.categories.title}
             </h2>
@@ -512,7 +506,6 @@ export default function HomePageClient({
           <LightSectionBlock
             section={home.featured}
             locale={locale}
-            insertAd={banner728Enabled || banner300Enabled}
             taskRouter
           />
         );
@@ -595,7 +588,7 @@ export default function HomePageClient({
       case "finalCta":
         // Curated, stays in JSON
         return (
-          <section className="mx-auto max-w-[960px] rounded-3xl border border-border bg-gradient-to-br from-muted to-card p-8 text-center sm:p-12">
+          <section className="mx-auto max-w-[920px] rounded-3xl border border-border bg-gradient-to-br from-muted to-card p-8 text-center sm:p-12">
             <h2 className="text-4xl font-bold tracking-tight text-foreground">
               {home.finalCta.title}
             </h2>

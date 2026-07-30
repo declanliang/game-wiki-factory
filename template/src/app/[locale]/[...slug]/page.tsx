@@ -206,7 +206,7 @@ async function NavigationPage({
     return { ...item, cardImage: image };
   });
   return (
-    <main className="mx-auto max-w-[1180px] px-5 py-10 sm:px-8 lg:px-10">
+    <main className="mx-auto max-w-[1140px] px-5 py-10 sm:px-8 lg:px-10">
       <JsonLd data={listData} />
       <JsonLd data={breadcrumbData} />
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_280px]">

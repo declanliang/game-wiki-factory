@@ -18,12 +18,14 @@ export const HOME_SECTIONS = [
   // Featured pages are the homepage's task router: players choose the job
   // they need before reading the longer editorial sections below.
   "featured",
+  // Homepage ads are full siblings between content sections. Never insert an
+  // ad into a card grid, callout, or other editorial section.
+  "sectionAd",
   "about",
   "guideSections",
   "categories",
   "video",
   "updates",
-  "bottomAd",
   "faq",
   "finalCta",
 ] as const;

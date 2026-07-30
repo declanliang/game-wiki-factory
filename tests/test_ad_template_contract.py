@@ -93,6 +93,24 @@ class AdTemplateContractTests(unittest.TestCase):
             content = (TEMPLATE / relative).read_text(encoding="utf-8")
             self.assertIn('data-ad-exclusion="callout"', content, relative)
 
+    def test_homepage_ads_are_siblings_between_editorial_sections(self) -> None:
+        homepage = (TEMPLATE / "src/app/[locale]/HomePageClient.tsx").read_text(
+            encoding="utf-8"
+        )
+        light_section = homepage.split("function LightSectionBlock", 1)[1].split(
+            "function GuideSectionsBlock", 1
+        )[0]
+        self.assertNotIn("ResponsiveContentAd", light_section)
+        self.assertNotIn("insertAd", light_section)
+        self.assertIn('data-ad-exclusion="section"', light_section)
+        self.assertIn('case "sectionAd"', homepage)
+        self.assertIn('aria-label="Section advertisement"', homepage)
+
+        order = (TEMPLATE / "src/config/home.ts").read_text(encoding="utf-8")
+        self.assertLess(order.index('"featured"'), order.index('"sectionAd"'))
+        self.assertLess(order.index('"sectionAd"'), order.index('"about"'))
+        self.assertNotIn('"bottomAd"', order)
+
 
 if __name__ == "__main__":
     unittest.main()

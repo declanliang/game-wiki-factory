@@ -22,7 +22,7 @@ export function TrailerButton({
 
   return (
     <section
-      className="mx-auto max-w-[960px]"
+      className="mx-auto max-w-[920px]"
       aria-labelledby="homepage-video-title"
     >
       <div className="mb-7 text-center">

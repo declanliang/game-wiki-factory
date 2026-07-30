@@ -108,7 +108,7 @@ export async function SiteHeader({ locale }: { locale: string }) {
       className="sticky z-50 border-b border-border bg-background"
       style={{ top: "var(--top-ad-height, 0px)" }}
     >
-      <div className="mx-auto max-w-[1280px] px-5 py-3 sm:px-8 lg:px-10">
+      <div className="mx-auto max-w-[1240px] px-5 py-3 sm:px-8 lg:px-10">
         {header}
       </div>
     </header>
@@ -231,7 +231,7 @@ export async function SiteFooter({ locale }: { locale: string }) {
   ].filter(([, href]) => !isPlaceholderHref(href));
   return (
     <footer className="mt-16 border-t border-border bg-card/30">
-      <div className="mx-auto max-w-[1200px] px-5 py-10 sm:px-8 lg:px-10">
+      <div className="mx-auto max-w-[1160px] px-5 py-10 sm:px-8 lg:px-10">
         <div className="grid gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
             <h3 className="font-bold text-foreground">{t("aboutTitle")}</h3>

@@ -233,7 +233,7 @@ export default async function LocaleHomePage({
   };
 
   return (
-    <main className="mx-auto max-w-[1240px] px-5 pb-10 pt-5 sm:px-8 sm:pt-6 lg:px-10">
+    <main className="mx-auto max-w-[1200px] px-5 pb-10 pt-5 sm:px-8 sm:pt-6 lg:px-10">
       {messages.home.faq.items.length > 0 && <JsonLd data={faqPage} />}
       <HomePageClient
         home={home}
