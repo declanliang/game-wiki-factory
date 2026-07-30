@@ -34,6 +34,16 @@ class AdTemplateContractTests(unittest.TestCase):
         self.assertIn('format="nativeBannerMobile"', content)
         self.assertIn("aspect-square", content)
 
+    def test_article_rail_ad_is_left_only(self) -> None:
+        content = (TEMPLATE / "src/components/ad-placements.tsx").read_text(encoding="utf-8")
+        rail = content.split("export function DesktopArticleRailAds()", 1)[1].split(
+            "export function ArticleInlineAd", 1
+        )[0]
+        self.assertIn('left: "calc(50% - 632px)"', rail)
+        self.assertIn('aria-label="Left advertisement"', rail)
+        self.assertNotIn("right:", rail)
+        self.assertNotIn("Right advertisement", rail)
+
 
 if __name__ == "__main__":
     unittest.main()

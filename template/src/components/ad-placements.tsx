@@ -82,10 +82,16 @@ export function DesktopBanner728({ className = "" }: { className?: string }) {
 export function DesktopArticleRailAds() {
   const wide = useMediaQuery("(min-width: 1280px)");
   const tall = useMediaQuery("(min-height: 720px)");
-  const leftEnabled = useAdEnabled("sidebar160x600");
-  const rightEnabled = useAdEnabled("sidebar160x300");
-  if (!wide || (!leftEnabled && !rightEnabled)) return null;
-  return <>{tall && leftEnabled ? <aside className="fixed z-10" style={{ left: "calc(50% - 632px)", top: "calc(var(--top-ad-height, 0px) + 88px)" }} aria-label="Left advertisement"><AdSlot format="sidebar160x600" eager /></aside> : null}{rightEnabled ? <aside className="fixed z-10" style={{ right: "calc(50% - 632px)", top: "calc(var(--top-ad-height, 0px) + 88px)" }} aria-label="Right advertisement"><AdSlot format="sidebar160x300" eager /></aside> : null}</>;
+  const tallEnabled = useAdEnabled("sidebar160x600");
+  const compactEnabled = useAdEnabled("sidebar160x300");
+  if (!wide) return null;
+  const format = tall && tallEnabled
+    ? "sidebar160x600"
+    : compactEnabled
+      ? "sidebar160x300"
+      : null;
+  if (!format) return null;
+  return <aside className="fixed z-10" style={{ left: "calc(50% - 632px)", top: "calc(var(--top-ad-height, 0px) + 88px)" }} aria-label="Left advertisement"><AdSlot format={format} eager /></aside>;
 }
 
 export function ArticleInlineAd({ containerId }: { containerId: string }) {
