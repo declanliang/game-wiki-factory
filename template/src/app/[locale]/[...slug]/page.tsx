@@ -16,12 +16,9 @@ import {
 import { WikiSidebar } from "@/components/site";
 import { Breadcrumbs, JsonLd } from "@/components/site-widgets";
 import { localizeHref } from "@/lib/locale-path";
-import { AdSlot } from "@/components/ad-slot";
 import {
   ArticleInlineAd,
   DesktopArticleRailAds,
-  DesktopBanner728,
-  DesktopFooterAdGroup,
   NativeFlowAd,
 } from "@/components/ad-placements";
 import { MobileTOC } from "@/components/table-of-contents";
@@ -242,7 +239,6 @@ async function NavigationPage({
               </Link>
             ))}
           </nav>
-          <DesktopBanner728 className="mt-8" />
           {cardItems.length > 0 ? (
             <>
               <div className="mt-10 grid gap-4 sm:grid-cols-2">
@@ -289,20 +285,14 @@ async function NavigationPage({
                         </span>
                       </div>
                     </Link>
-                    {index === 1 || (cardItems.length === 1 && index === 0) ? (
+                    {cardItems.length >= 4 && index === 1 ? (
                       <div className="col-span-full py-4">
                         <NativeFlowAd />
-                      </div>
-                    ) : null}
-                    {cardItems.length >= 4 && index === 3 ? (
-                      <div className="col-span-full py-4">
-                        <AdSlot format="banner300x250" />
                       </div>
                     ) : null}
                   </Fragment>
                 ))}
               </div>
-              <DesktopBanner728 className="mt-10" />
             </>
           ) : (
             <p className="mt-8 text-muted-foreground">
@@ -473,7 +463,6 @@ async function DetailPage({
           <item.MDXContent />
         </div>
         <ArticleInlineAd containerId={articleBodyId} />
-        <DesktopFooterAdGroup className="mt-12" />
         <ArticleCards
           locale={locale}
           contentType={contentType}

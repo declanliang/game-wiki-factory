@@ -58,6 +58,41 @@ class AdTemplateContractTests(unittest.TestCase):
         )[0]
         self.assertIn("justify-center bg-background", top_ad)
 
+    def test_global_footer_selects_exactly_one_responsive_format(self) -> None:
+        content = (TEMPLATE / "src/components/ad-placements.tsx").read_text(encoding="utf-8")
+        footer = content.split("export function GlobalFooterAds()", 1)[1].split(
+            "export function DesktopBanner728", 1
+        )[0]
+        self.assertIn('useResolvedMediaQuery("(min-width: 900px)")', footer)
+        self.assertIn("if (desktop === null) return null", footer)
+        self.assertEqual(footer.count("<AdSlot"), 1)
+        self.assertIn("<AdSlot format={format}", footer)
+
+    def test_category_and_article_pages_do_not_add_terminal_ad_groups(self) -> None:
+        content = (TEMPLATE / "src/app/[locale]/[...slug]/page.tsx").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("DesktopFooterAdGroup", content)
+        self.assertNotIn("DesktopBanner728", content)
+        self.assertNotIn('format="banner300x250"', content)
+        self.assertIn("cardItems.length >= 4 && index === 1", content)
+
+    def test_inline_article_ads_exclude_nested_blocks_and_article_tail(self) -> None:
+        placements = (TEMPLATE / "src/components/ad-placements.tsx").read_text(
+            encoding="utf-8"
+        )
+        inline = placements.split("export function ArticleInlineAd", 1)[1]
+        self.assertIn("Array.from(container.children)", inline)
+        self.assertIn('node.closest("[data-ad-exclusion]")', inline)
+        self.assertIn("paragraphs.length - 5", inline)
+        self.assertIn("Math.floor(paragraphs.length * 0.75) - 1", inline)
+        self.assertIn("paragraphs.length >= 23 ? 3", inline)
+        self.assertIn("paragraphs.length >= 14 ? 2", inline)
+        self.assertIn("paragraphs.length >= 8 ? 1", inline)
+        for relative in ("src/mdx-components.tsx", "src/components/mdx/Callout.tsx"):
+            content = (TEMPLATE / relative).read_text(encoding="utf-8")
+            self.assertIn('data-ad-exclusion="callout"', content, relative)
+
 
 if __name__ == "__main__":
     unittest.main()

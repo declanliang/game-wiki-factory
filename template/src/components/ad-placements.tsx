@@ -55,22 +55,23 @@ export function ResponsiveContentAd({ className = "" }: { className?: string }) 
   return banner300 ? <AdSlot format="banner300x250" className={className} /> : null;
 }
 
-export function DesktopFooterAdGroup({ className = "" }: { className?: string }) {
-  const desktop = useMediaQuery("(min-width: 900px)");
-  const banner728 = useAdEnabled("banner728x90");
-  const banner468 = useAdEnabled("banner468x60");
-  if (!desktop || (!banner728 && !banner468)) return null;
-  return <div className={`space-y-4 ${className}`}>{banner728 && <AdSlot format="banner728x90" />}{banner468 && <AdSlot format="banner468x60" />}</div>;
-}
-
 export function GlobalFooterAds() {
-  const desktop = useMediaQuery("(min-width: 900px)");
+  const desktop = useResolvedMediaQuery("(min-width: 900px)");
   const banner728 = useAdEnabled("banner728x90");
   const banner468 = useAdEnabled("banner468x60");
   const banner300 = useAdEnabled("banner300x250");
-  const hasAd = desktop ? banner728 || banner468 : banner300;
-  if (!hasAd) return null;
-  return <section className="mx-auto mt-20 w-full max-w-5xl border-t border-border/70 px-4 py-10 sm:px-6" aria-label="Footer advertisements">{desktop ? <div className="space-y-5">{banner728 && <AdSlot format="banner728x90" />}{banner468 && <AdSlot format="banner468x60" />}</div> : <AdSlot format="banner300x250" />}</section>;
+  if (desktop === null) return null;
+  const format = desktop
+    ? banner728
+      ? "banner728x90"
+      : banner468
+        ? "banner468x60"
+        : null
+    : banner300
+      ? "banner300x250"
+      : null;
+  if (!format) return null;
+  return <section className="mx-auto mt-20 w-full max-w-5xl border-t border-border/70 px-4 py-10 sm:px-6" aria-label="Footer advertisement"><AdSlot format={format} /></section>;
 }
 
 export function DesktopBanner728({ className = "" }: { className?: string }) {
@@ -101,10 +102,21 @@ export function ArticleInlineAd({ containerId }: { containerId: string }) {
     if (!enabled) { setMounts([]); return; }
     const container = document.getElementById(containerId);
     if (!container) return;
-    const paragraphs = Array.from(container.querySelectorAll("p"));
-    const targetIndexes = [2, 9, 17].filter((index) => index < paragraphs.length);
-    if (targetIndexes.length === 0 && paragraphs[1]) targetIndexes.push(1);
-    const nodes = targetIndexes.map((index) => { const node = document.createElement("div"); node.className = "not-prose my-12 flex justify-center"; paragraphs[index].insertAdjacentElement("afterend", node); return node; });
+    const paragraphs = Array.from(container.children).filter(
+      (node): node is HTMLParagraphElement =>
+        node instanceof HTMLParagraphElement &&
+        !node.closest("[data-ad-exclusion]") &&
+        !node.matches(".not-prose *"),
+    );
+    const maxAds = paragraphs.length >= 23 ? 3 : paragraphs.length >= 14 ? 2 : paragraphs.length >= 8 ? 1 : 0;
+    const lastAllowedIndex = Math.min(
+      Math.floor(paragraphs.length * 0.75) - 1,
+      paragraphs.length - 5,
+    );
+    const targetIndexes = [2, 9, 16]
+      .filter((index) => index <= lastAllowedIndex)
+      .slice(0, maxAds);
+    const nodes = targetIndexes.map((index) => { const node = document.createElement("div"); node.className = "not-prose my-12 flex justify-center"; node.dataset.articleInlineAd = "true"; paragraphs[index].insertAdjacentElement("afterend", node); return node; });
     setMounts(nodes);
     return () => nodes.forEach((node) => node.remove());
   }, [containerId, enabled]);

@@ -24,7 +24,7 @@ const CALLOUT_STYLES = {
 function Callout({ type = "info", children }: { type?: keyof typeof CALLOUT_STYLES; children: React.ReactNode }) {
   const { icon: Icon, className } = CALLOUT_STYLES[type];
   return (
-    <div className={`callout ${className}`}>
+    <div className={`callout ${className}`} data-ad-exclusion="callout">
       <Icon className="callout-icon" />
       <div>{children}</div>
     </div>
@@ -47,7 +47,7 @@ const defaultComponents: MDXComponents = {
   h3: ({ children, id }) => <h3 id={id || toHeadingId(children)}>{children}</h3>,
   a: ({ href = "", children }) => <Link href={href}>{children}</Link>,
   table: ({ children }) => (
-    <div className="mt-9 mb-7 overflow-hidden rounded-xl border border-border bg-card">
+    <div className="mt-9 mb-7 overflow-hidden rounded-xl border border-border bg-card" data-ad-exclusion="table">
       <table className="my-0 w-full text-sm">{children}</table>
     </div>
   ),
