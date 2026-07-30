@@ -3,7 +3,7 @@
 // Keeps the same contract: ad snippets stay server-only (Pages env vars),
 // never shipped in the client bundle, and never cached (no-store).
 
-const AD_FORMATS = ["nativeBanner", "banner728x90", "banner300x250", "banner468x60", "sidebar160x600", "sidebar160x300", "mobile320x50"] as const;
+const AD_FORMATS = ["nativeBanner", "nativeBannerMobile", "banner728x90", "banner300x250", "banner468x60", "sidebar160x600", "sidebar160x300", "mobile320x50"] as const;
 type AdFormat = (typeof AD_FORMATS)[number];
 
 function isAdFormat(value: string): value is AdFormat {
@@ -21,23 +21,19 @@ function decodeSnippet(encoded: string | undefined): string | undefined {
 
 type Env = Record<string, string | undefined>;
 
-// Matches the env var names documented in .env.example exactly — do not derive
-// these programmatically, the format-name-to-ENV_VAR casing isn't a clean regex
-// (e.g. banner728x90 -> BANNER_728X90, not BANNER_728X_90).
 const ENV_KEY: Record<AdFormat, string> = {
-  nativeBanner: "NATIVE_BANNER",
-  banner728x90: "BANNER_728X90",
-  banner300x250: "BANNER_300X250",
-  banner468x60: "BANNER_468X60",
-  sidebar160x600: "SIDEBAR_160X600",
-  sidebar160x300: "SIDEBAR_160X300",
-  mobile320x50: "MOBILE_320X50",
+  nativeBanner: "AD_NATIVE_BANNER_B64",
+  nativeBannerMobile: "AD_NATIVE_BANNER_MOBILE_B64",
+  banner728x90: "AD_BANNER_728X90_B64",
+  banner300x250: "AD_BANNER_300X250_B64",
+  banner468x60: "AD_BANNER_468X60_B64",
+  sidebar160x600: "AD_SIDEBAR_160X600_B64",
+  sidebar160x300: "AD_SIDEBAR_160X300_B64",
+  mobile320x50: "AD_MOBILE_320X50_B64",
 };
 
 function getAdSnippet(format: AdFormat, env: Env): string | undefined {
-  const key = ENV_KEY[format];
-  const b64 = env[`AD_${key}_B64`];
-  return decodeSnippet(b64);
+  return decodeSnippet(env[ENV_KEY[format]]);
 }
 
 export const onRequestGet: PagesFunction<Env> = async (context) => {
@@ -47,7 +43,7 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   const snippet = getAdSnippet(format, context.env);
   if (!snippet) return new Response("Not found", { status: 404 });
 
-  const native = format === "nativeBanner";
+  const native = format === "nativeBanner" || format === "nativeBannerMobile";
   const normalizedSnippet = snippet.replace(/(<script\b[^>]*\bsrc=["'])\/\//gi, "$1https://");
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}body{display:${native ? "block" : "flex"};align-items:center;justify-content:center}body>div{max-width:100%}</style></head><body><!--gamewiki-ad-start-->${normalizedSnippet}<!--gamewiki-ad-end--></body></html>`;
 

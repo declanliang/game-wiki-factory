@@ -1,86 +1,74 @@
-# Adsterra 原始代码到环境变量转换契约
+# Adsterra 共享 Profile 与 Cloudflare Pages 环境变量合同
 
-本文档面向独立广告 Agent。Game Wiki Factory 和 OpenClaw 不执行本流程，不接收原始广告代码，也不修改任何托管平台的广告环境变量。
+Game Wiki Factory 为新建的 Cloudflare Pages 站点自动配置统一 Adsterra shared profile。当前 profile 来源为 `animal-hospital-anomalies.wiki`，声明文件位于 `config/ads/animal-hospital-profile.json`；广告 custom domain 及完整 snippet 以该文件为准，页面组件不得硬编码来源域名或 placement ID。
 
-## 输入与安全边界
+共享 snippet 允许提交到 Factory 仓库，但只能由发布器读取、规范化并转换为服务端环境变量。Cloudflare API token、账户 ID 之外的密钥和部署凭据仍必须来自根 `.env`、CI secret 或其他安全凭据存储，禁止提交、打印或复制到游戏仓库。
 
-每个游戏站点使用自己在 Adsterra 创建的 ad units。广告 Agent 应直接从用户提供的私密文件读取原始 snippet，不把 snippet、Base64 值或完整脚本 URL写入聊天、Git、日志、Job JSON或 `.gamewiki`。
+## 固定的 8 个变量
 
-允许缺少任意广告位。只转换实际提供且验证通过的项；不能用其他尺寸代码代替。所有环境变量必须配置在 Production，建议使用 Secret/Sensitive 类型。
-
-## 固定映射
-
-| Adsterra 标题/尺寸 | 环境变量 | 模板格式 | 页面用途 |
+| 用途 | 模板格式 | 环境变量 | placement 约束 |
 |---|---|---|---|
-| Native Banner | `AD_NATIVE_BANNER_B64` | `nativeBanner` | Hero 后、卡片流 |
-| Banner 728×90 | `AD_BANNER_728X90_B64` | `banner728x90` | 桌面正文/页脚 |
-| Banner 300×250 | `AD_BANNER_300X250_B64` | `banner300x250` | 移动端/正文 |
-| Banner 468×60 | `AD_BANNER_468X60_B64` | `banner468x60` | 桌面页脚 |
-| Banner 160×600 | `AD_SIDEBAR_160X600_B64` | `sidebar160x600` | 宽屏左侧 |
-| Banner 160×300 | `AD_SIDEBAR_160X300_B64` | `sidebar160x300` | 宽屏右侧/文章栏 |
-| Banner 320×50 | `AD_MOBILE_320X50_B64` | `mobile320x50` | 移动端顶部 |
+| Desktop Native | `nativeBanner` | `AD_NATIVE_BANNER_B64` | 独立 placement，后台布局 `4:1` |
+| Mobile Native | `nativeBannerMobile` | `AD_NATIVE_BANNER_MOBILE_B64` | 独立 placement，后台布局 `1:1` |
+| 728×90 Banner | `banner728x90` | `AD_BANNER_728X90_B64` | 728×90 |
+| 300×250 Banner | `banner300x250` | `AD_BANNER_300X250_B64` | 300×250 |
+| 468×60 Banner | `banner468x60` | `AD_BANNER_468X60_B64` | 468×60 |
+| 160×600 Sidebar | `sidebar160x600` | `AD_SIDEBAR_160X600_B64` | 160×600 |
+| 160×300 Sidebar | `sidebar160x300` | `AD_SIDEBAR_160X300_B64` | 160×300 |
+| 320×50 Mobile Banner | `mobile320x50` | `AD_MOBILE_320X50_B64` | 320×50 |
 
-不要创建 `NEXT_PUBLIC_AD_*`，也不要使用不带 `_B64` 的 `AD_*`。广告代码必须保持 server-only，不能进入静态 JavaScript bundle。
+不使用 `NEXT_PUBLIC_AD_*` 或不带 `_B64` 的变量。Native 尺寸由 Adsterra 后台 placement 决定，不能通过修改容器或复用同一个 placement 模拟桌面/移动布局。
 
-## 转换算法
+## Profile 验证与转换
 
-对每一个广告位独立执行：
+发布器在内存中对每个 placement 执行：
 
-1. 保留 Adsterra 返回的完整 snippet，包括 `atOptions`、容器元素和所有 `<script>`；不要只提取 key 或 URL。
-2. 把换行统一为 LF（`\n`），去除文件开头/末尾的空白，但不要改写 snippet 内部内容。
-3. 按 UTF-8 编码为字节。
-4. 使用标准 Base64 编码，不使用 Base64URL，不插入换行。
-5. 把编码结果写入上表对应的唯一环境变量。
+1. 统一换行为 LF 并去除首尾空白；
+2. 验证存在完整 `<script>` 和 `invoke.js`；
+3. Native 验证 invoke key 与容器 ID 一致；
+4. 固定 Banner 验证 snippet 中的宽高与 profile 一致；
+5. 按 UTF-8 转为标准、单行 Base64，并做逐字节 round-trip；
+6. 确认 profile 恰好覆盖上述 8 个变量。
 
-参考实现：
+转换值不写入源码、日志、Job JSON、`.gamewiki` 或发布回执。日志和回执只允许列出变量名与 shared profile 名称。
 
-```python
-import base64
+## Cloudflare Pages provisioning
 
-normalized = raw_snippet.replace("\r\n", "\n").replace("\r", "\n").strip()
-value = base64.b64encode(normalized.encode("utf-8")).decode("ascii")
-```
+Factory 创建或续跑 Git-integrated Pages 项目时，在触发 Production Git deployment 前执行 provisioning：
 
-PowerShell 可使用：
+- Preview：写入全部 8 个 `AD_*_B64`；
+- Production：写入全部 8 个 `AD_*_B64` 和 `NEXT_PUBLIC_SITE_URL`；
+- 广告变量使用 server-only `secret_text`；
+- Preview 与 Production 独立配置；
+- 环境变量修改后必须触发新的对应环境部署才会生效。
 
-```powershell
-$normalized = $rawSnippet.Replace("`r`n", "`n").Replace("`r", "`n").Trim()
-$value = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($normalized))
-```
+模板运行时提供：
 
-转换后必须在内存中 Base64 解码并与规范化后的原文逐字节比较；不相等则禁止写入环境变量。
+- `/api/ads/availability`：返回 8 个格式的真实可用状态；缺失、无效 Base64 或空 HTML 均为 `false`；
+- `/api/ads/<format>`：只接受白名单格式，解码后返回独立 HTML；不可用时返回 404。
 
-## 写入前验证
+接口响应保持 `Cache-Control: no-store`、`X-Content-Type-Options: nosniff`、严格 `Referrer-Policy` 和 CSP，不输出异常堆栈或变量内容。
 
-- Banner 的 `width` 和 `height` 必须与目标变量尺寸完全一致。
-- `atOptions.key` 必须与外部 invoke script URL 中的 key 一致。
-- Native Banner 的容器 ID 必须与 invoke script 指定的容器一致。
-- 同一输入不能出现重复标题、重复尺寸或同一个 key 被错误分配给不同尺寸。
-- snippet 必须属于目标游戏对应的 Adsterra app/domain；不要跨站复用。
-- 不接受未知标题、拼写猜测、缺失 `<script>` 的残片或已经 Base64 编码过的输入。
+## iframe 与响应式 Native
 
-## Cloudflare Pages
+广告继续由主页面通过同源 iframe 请求 `/api/ads/<format>`。iframe 隔离第三方 DOM、CSS、全局变量和 hydration，但不设置 `sandbox`：线上验证表明 Adsterra 在 sandbox 中可能请求成功却不渲染。
 
-把变量写入目标 Pages 项目的 Production 环境。变量更新后创建一次新的 Production deployment；仅修改变量但不重新部署，不能视为完成。
+Desktop/Mobile Native 必须先在客户端解析现有 `900px` 断点，再创建唯一 iframe：
 
-模板在运行时访问：
+- viewport 未确定：不创建任何 Native iframe，也不预留空白；
+- desktop：只创建 `nativeBanner`，使用 `4:1` 容器；
+- mobile：只创建 `nativeBannerMobile`，使用约 300×300 的 `1:1` 容器。
 
-- `/api/ads/availability`：返回七个广告位的布尔可用性。
-- `/api/ads/<format>`：返回隔离广告 HTML；未配置或 Base64 无效时返回 404。
+不得先加载桌面 Native 后用 CSS 隐藏，也不得产生两个 Native 请求。其他广告位置、数量和插入顺序保持不变。
 
-广告 iframe 是同源地址，并带 `sandbox`、`no-store`、CSP、严格 referrer policy 和 `nosniff`。变量不存在时客户端不会挂载 iframe，也不预留广告高度。
+## 验收
 
-## Vercel
+1. 8 个格式的 availability 与 API 状态一致；未配置格式不创建 iframe或占位。
+2. API 返回 HTML、`no-store`、`nosniff`，且 snippet 只存在于 iframe 文档。
+3. 广告 iframe 不含任何 `sandbox` 属性。
+4. 桌面只请求 4:1 Native，移动只请求 1:1 Native；首屏没有重复或 `(canceled)` Native 请求。
+5. 固定 Banner/Sidebar 使用合同尺寸，不因父容器裁切。
+6. 页面主 HTML和客户端 bundle 不含 Base64 值或 raw snippet。
+7. 环境变量变更后完成新部署；不以 Adsterra 是否立即填充 creative 作为部署成功条件。
 
-若历史站点仍部署在 Vercel，使用完全相同的七个变量名和值，作用域设为 Production，并触发新的 Production deployment。只有目标站点仍保留兼容的 `/api/ads/<format>` 服务端路由时才可配置；不要把 Cloudflare Pages Function 文件本身当作 Vercel Function。
-
-## 完成验收
-
-1. 未配置的格式：`/api/ads/<format>` 返回 404，页面 DOM 中没有对应 `data-ad-format` iframe或空白。
-2. 已配置的格式：接口返回 200，`Content-Type` 为 HTML，`Cache-Control` 包含 `no-store`。
-3. 接口响应中 `gamewiki-ad-start` 与 `gamewiki-ad-end` 之间的 snippet，经规范化后与原始输入一致。
-4. 浏览器中广告脚本只存在于同源沙箱 iframe 内，不出现在主页面 HTML或客户端 bundle。
-5. 桌面和移动布局没有因缺失广告产生空白；已配置固定尺寸 Banner 预留正确宽高，避免 CLS。
-6. 不以 Adsterra 是否立即填充 creative 作为部署成功条件；新 ad unit 可能存在平台同步延迟。
-
-最终报告只能列出：目标站点、已配置的变量名、部署 ID/URL、各格式 HTTP 状态和代码哈希。不得报告变量值或原始 snippet。
+历史站点不由本 Factory PR 修改。PR 合并后使用新模板和同一 provisioning 机制单独迁移，不提供缺少 Mobile Native 时复用 Desktop Native 的旧合同回退。

@@ -9,13 +9,14 @@ from unittest.mock import MagicMock, patch
 from publisher import (
     _cloudflare_create_git_deployment,
     _cloudflare_credentials,
+    _cloudflare_environment_payload,
     _cloudflare_git_project_payload,
     _deploy_cloudflare_pages,
     _ensure_cloudflare_project,
     _ensure_private_github_repo,
     _resolve_cloudflare_project,
     _resolve_git_author,
-    _set_cloudflare_site_url,
+    _set_cloudflare_project_environment,
     _validate_cloudflare_git_project,
     _validate_project,
     _verify_online_deployment,
@@ -166,76 +167,57 @@ class PublisherValidationTests(unittest.TestCase):
             )
 
     @patch("publisher._cloudflare_request")
-    def test_cloudflare_site_url_patch_is_scoped_to_production(self, request) -> None:
-        changed = _set_cloudflare_site_url(
+    def test_cloudflare_environment_patch_sets_ads_in_preview_and_production(self, request) -> None:
+        ads = {name: f"encoded-{index}" for index, name in enumerate((
+            "AD_NATIVE_BANNER_B64",
+            "AD_NATIVE_BANNER_MOBILE_B64",
+            "AD_BANNER_728X90_B64",
+            "AD_BANNER_300X250_B64",
+            "AD_BANNER_468X60_B64",
+            "AD_SIDEBAR_160X600_B64",
+            "AD_SIDEBAR_160X300_B64",
+            "AD_MOBILE_320X50_B64",
+        ))}
+        configured = _set_cloudflare_project_environment(
             "account",
             "token",
             "game",
             "https://game.example",
-            self._git_project(),
-            created=True,
+            ads,
         )
-        self.assertTrue(changed)
         payload = request.call_args.args[4]
+        preview = payload["deployment_configs"]["preview"]["env_vars"]
+        production = payload["deployment_configs"]["production"]["env_vars"]
+        self.assertEqual(set(preview), set(ads))
+        self.assertTrue(all(value["type"] == "secret_text" for value in preview.values()))
+        self.assertEqual(set(production), {"NEXT_PUBLIC_SITE_URL", *ads})
         self.assertEqual(
-            payload["deployment_configs"]["production"]["env_vars"]["NEXT_PUBLIC_SITE_URL"],
+            production["NEXT_PUBLIC_SITE_URL"],
             {"type": "plain_text", "value": "https://game.example"},
         )
+        self.assertEqual(configured, ("NEXT_PUBLIC_SITE_URL", *ads))
         self.assertNotIn("token", json.dumps(payload).casefold())
 
-    @patch("publisher._cloudflare_request")
-    def test_cloudflare_site_url_does_not_rewrite_matching_environment(self, request) -> None:
-        project = self._git_project(deployment_configs={
-            "production": {
-                "env_vars": {
-                    "NEXT_PUBLIC_SITE_URL": {
-                        "type": "plain_text",
-                        "value": "https://game.example",
-                    },
-                    "AD_NATIVE_BANNER_B64": {"type": "secret_text", "value": ""},
-                },
-            },
-        })
-        changed = _set_cloudflare_site_url(
-            "account",
-            "token",
-            "game",
-            "https://game.example",
-            project,
-            created=False,
-        )
-        self.assertFalse(changed)
-        request.assert_not_called()
-
-    @patch("publisher._cloudflare_request")
-    def test_cloudflare_site_url_refuses_to_overwrite_unrelated_environment(self, request) -> None:
-        project = self._git_project(deployment_configs={
-            "production": {
-                "env_vars": {
-                    "AD_NATIVE_BANNER_B64": {"type": "secret_text", "value": ""},
-                },
-            },
-        })
-        with self.assertRaisesRegex(RuntimeError, "Refusing to replace"):
-            _set_cloudflare_site_url(
-                "account",
-                "token",
-                "game",
-                "https://game.example",
-                project,
-                created=False,
-            )
-        request.assert_not_called()
+    def test_cloudflare_environment_payload_requires_all_eight_ads(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "complete ordered 8-variable"):
+            _cloudflare_environment_payload("https://game.example", {})
 
     @patch("publisher._wait_cloudflare_deployment")
     @patch("publisher._cloudflare_create_git_deployment")
-    @patch("publisher._set_cloudflare_site_url")
+    @patch("publisher._set_cloudflare_project_environment")
+    @patch("publisher.load_shared_ad_environment")
     @patch("publisher._resolve_cloudflare_project")
     def test_cloudflare_deploy_uses_git_integration(
-        self, resolve_project, set_site_url, create_deployment, wait_deployment
+        self, resolve_project, load_ads, set_environment, create_deployment, wait_deployment
     ) -> None:
         resolve_project.return_value = ("game", self._git_project(), True)
-        set_site_url.return_value = True
+        load_ads.return_value = {name: "encoded" for name in (
+            "AD_NATIVE_BANNER_B64", "AD_NATIVE_BANNER_MOBILE_B64",
+            "AD_BANNER_728X90_B64", "AD_BANNER_300X250_B64",
+            "AD_BANNER_468X60_B64", "AD_SIDEBAR_160X600_B64",
+            "AD_SIDEBAR_160X300_B64", "AD_MOBILE_320X50_B64",
+        )}
+        set_environment.return_value = ("NEXT_PUBLIC_SITE_URL", *load_ads.return_value)
         create_deployment.return_value = {"id": "deployment-id"}
         wait_deployment.return_value = {
             "id": "deployment-id",
@@ -257,15 +239,16 @@ class PublisherValidationTests(unittest.TestCase):
         create_deployment.assert_called_once_with(
             "account", "hidden-token", "game", "main"
         )
-        set_site_url.assert_called_once_with(
+        set_environment.assert_called_once_with(
             "account",
             "hidden-token",
             "game",
             "https://game.example",
-            resolve_project.return_value[1],
-            created=True,
+            load_ads.return_value,
         )
         wait_deployment.assert_called_once()
+        self.assertEqual(len(result["environmentVariables"]), 9)
+        self.assertEqual(result["adProfile"], "animal-hospital-anomalies.wiki")
 
     @patch("publisher.time.sleep")
     @patch("publisher._cloudflare_request")

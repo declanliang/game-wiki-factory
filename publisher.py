@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 
+from ad_profile import AD_ENV_NAMES, load_shared_ad_environment
 from orchestrate_wiki import build_subprocess_env, read_json, write_json
 
 
@@ -286,51 +287,47 @@ def _resolve_cloudflare_project(
         return fallback_name, project, created
 
 
-def _set_cloudflare_site_url(
+def _cloudflare_environment_payload(
+    origin: str,
+    ad_environment: dict[str, str],
+) -> dict:
+    if tuple(ad_environment) != AD_ENV_NAMES:
+        raise RuntimeError("Cloudflare ad provisioning requires the complete ordered 8-variable contract")
+    shared_ads = {
+        name: {"type": "secret_text", "value": ad_environment[name]}
+        for name in AD_ENV_NAMES
+    }
+    return {
+        "deployment_configs": {
+            "preview": {"env_vars": dict(shared_ads)},
+            "production": {
+                "env_vars": {
+                    "NEXT_PUBLIC_SITE_URL": {
+                        "type": "plain_text",
+                        "value": origin,
+                    },
+                    **shared_ads,
+                }
+            },
+        }
+    }
+
+
+def _set_cloudflare_project_environment(
     account_id: str,
     token: str,
     project_name: str,
     origin: str,
-    cloudflare_project: dict,
-    *,
-    created: bool,
-) -> bool:
-    production = (
-        (cloudflare_project.get("deployment_configs") or {}).get("production") or {}
-    )
-    env_vars = production.get("env_vars") or {}
-    current = env_vars.get("NEXT_PUBLIC_SITE_URL") or {}
-    if (
-        str(current.get("type") or "") == "plain_text"
-        and str(current.get("value") or "").rstrip("/") == origin.rstrip("/")
-    ):
-        return False
-    unrelated = sorted(key for key in env_vars if key != "NEXT_PUBLIC_SITE_URL")
-    if unrelated and not created:
-        raise RuntimeError(
-            "Refusing to replace Cloudflare Pages Production env_vars while unrelated "
-            f"variables exist: {', '.join(unrelated)}. Update them with the dedicated "
-            "environment-variable Agent so encrypted values are preserved."
-        )
+    ad_environment: dict[str, str],
+) -> tuple[str, ...]:
     _cloudflare_request(
         "PATCH",
         account_id,
         token,
         f"pages/projects/{urllib.parse.quote(project_name)}",
-        {
-            "deployment_configs": {
-                "production": {
-                    "env_vars": {
-                        "NEXT_PUBLIC_SITE_URL": {
-                            "type": "plain_text",
-                            "value": origin,
-                        }
-                    }
-                }
-            }
-        },
+        _cloudflare_environment_payload(origin, ad_environment),
     )
-    return True
+    return ("NEXT_PUBLIC_SITE_URL", *AD_ENV_NAMES)
 
 
 def _append_cloudflare_log(log_path: Path, message: str) -> None:
@@ -504,17 +501,18 @@ def _deploy_cloudflare_pages(
         log_path,
         f"resolved Git-integrated project {project_name} for {full_repo}; created={created}",
     )
-    changed = _set_cloudflare_site_url(
+    ad_environment = load_shared_ad_environment()
+    configured_variables = _set_cloudflare_project_environment(
         account_id,
         token,
         project_name,
         canonical_origin,
-        cloudflare_project,
-        created=created,
+        ad_environment,
     )
     _append_cloudflare_log(
         log_path,
-        f"Production NEXT_PUBLIC_SITE_URL {'updated' if changed else 'already matched'}",
+        "configured Preview/Production server-only variables: "
+        + ", ".join(configured_variables),
     )
     deployment = _cloudflare_create_git_deployment(
         account_id, token, project_name, "main"
@@ -545,7 +543,8 @@ def _deploy_cloudflare_pages(
         "deploymentUrl": deployment_url,
         "pagesOrigin": pages_origin,
         "siteUrl": canonical_origin,
-        "environmentVariables": ["NEXT_PUBLIC_SITE_URL"],
+        "environmentVariables": list(configured_variables),
+        "adProfile": "animal-hospital-anomalies.wiki",
         "deploymentMode": "git-integration",
         "source": {
             "type": "github",

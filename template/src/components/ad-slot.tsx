@@ -29,7 +29,7 @@ export function useAdEnabled(format: AdFormat) {
 export function AdSlot({ format, className = "", eager = false }: { format: AdFormat; className?: string; eager?: boolean }) {
   const enabled = useAdEnabled(format);
   if (!enabled) return null;
-  const isNative = format === "nativeBanner";
+  const isNative = format === "nativeBanner" || format === "nativeBannerMobile";
   const size = isNative ? null : AD_SIZES[format];
   return (
     <div className={`relative mx-auto ${isNative ? "w-full max-w-5xl" : "max-w-full"} ${className}`} style={size ? { width: size.width, height: size.height } : undefined} data-ad-format={format}>
@@ -43,7 +43,6 @@ export function AdSlot({ format, className = "", eager = false }: { format: AdFo
         loading={eager ? "eager" : "lazy"}
         scrolling="no"
         referrerPolicy="strict-origin-when-cross-origin"
-        sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox"
         className={`block border-0 ${isNative ? "absolute inset-0 h-full w-full" : ""}`}
       />
     </div>

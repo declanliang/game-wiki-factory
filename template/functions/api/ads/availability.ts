@@ -6,6 +6,7 @@ type Env = Record<string, string | undefined>;
 
 const ENV_KEYS = {
   nativeBanner: "AD_NATIVE_BANNER_B64",
+  nativeBannerMobile: "AD_NATIVE_BANNER_MOBILE_B64",
   banner728x90: "AD_BANNER_728X90_B64",
   banner300x250: "AD_BANNER_300X250_B64",
   banner468x60: "AD_BANNER_468X60_B64",

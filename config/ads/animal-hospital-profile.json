@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "profile": "animal-hospital-anomalies.wiki",
+  "customDomain": "bibleearthquake.com",
+  "placements": {
+    "nativeBanner": {
+      "placementId": "30368261",
+      "format": "native",
+      "layout": "4:1",
+      "env": "AD_NATIVE_BANNER_B64",
+      "snippet": "<script async=\"async\" data-cfasync=\"false\" src=\"https://bibleearthquake.com/5644a054d66cb50289b62eb195ec0a41/invoke.js\"></script>\n<div id=\"container-5644a054d66cb50289b62eb195ec0a41\"></div>"
+    },
+    "nativeBannerMobile": {
+      "placementId": "e0128edd35ab5cd83be7f955b4e0b66d",
+      "format": "native",
+      "layout": "1:1",
+      "env": "AD_NATIVE_BANNER_MOBILE_B64",
+      "snippet": "<script async=\"async\" data-cfasync=\"false\" src=\"https://bibleearthquake.com/e0128edd35ab5cd83be7f955b4e0b66d/invoke.js\"></script>\n<div id=\"container-e0128edd35ab5cd83be7f955b4e0b66d\"></div>"
+    },
+    "banner728x90": {
+      "placementId": "30368267",
+      "format": "banner",
+      "width": 728,
+      "height": 90,
+      "env": "AD_BANNER_728X90_B64",
+      "snippet": "<script>\n  atOptions = {\n    'key' : '3d3c878bfdd722ac812da3518ecdae25',\n    'format' : 'iframe',\n    'height' : 90,\n    'width' : 728,\n    'params' : {}\n  };\n</script>\n<script src=\"https://bibleearthquake.com/3d3c878bfdd722ac812da3518ecdae25/invoke.js\"></script>"
+    },
+    "banner300x250": {
+      "placementId": "30368263",
+      "format": "banner",
+      "width": 300,
+      "height": 250,
+      "env": "AD_BANNER_300X250_B64",
+      "snippet": "<script>\n  atOptions = {\n    'key' : '1f3eae9a1734fba212d6483d24aa4f99',\n    'format' : 'iframe',\n    'height' : 250,\n    'width' : 300,\n    'params' : {}\n  };\n</script>\n<script src=\"https://bibleearthquake.com/1f3eae9a1734fba212d6483d24aa4f99/invoke.js\"></script>"
+    },
+    "banner468x60": {
+      "placementId": "30368262",
+      "format": "banner",
+      "width": 468,
+      "height": 60,
+      "env": "AD_BANNER_468X60_B64",
+      "snippet": "<script>\n  atOptions = {\n    'key' : '2793662d08c123fd821f062348a20d48',\n    'format' : 'iframe',\n    'height' : 60,\n    'width' : 468,\n    'params' : {}\n  };\n</script>\n<script src=\"https://bibleearthquake.com/2793662d08c123fd821f062348a20d48/invoke.js\"></script>"
+    },
+    "sidebar160x600": {
+      "placementId": "30368264",
+      "format": "banner",
+      "width": 160,
+      "height": 600,
+      "env": "AD_SIDEBAR_160X600_B64",
+      "snippet": "<script>\n  atOptions = {\n    'key' : '7fb452c0dc540417b3ae91e33716f8f5',\n    'format' : 'iframe',\n    'height' : 600,\n    'width' : 160,\n    'params' : {}\n  };\n</script>\n<script src=\"https://bibleearthquake.com/7fb452c0dc540417b3ae91e33716f8f5/invoke.js\"></script>"
+    },
+    "sidebar160x300": {
+      "placementId": "30368265",
+      "format": "banner",
+      "width": 160,
+      "height": 300,
+      "env": "AD_SIDEBAR_160X300_B64",
+      "snippet": "<script>\n  atOptions = {\n    'key' : '80745702dc06dd20cc224371c4a7183c',\n    'format' : 'iframe',\n    'height' : 300,\n    'width' : 160,\n    'params' : {}\n  };\n</script>\n<script src=\"https://bibleearthquake.com/80745702dc06dd20cc224371c4a7183c/invoke.js\"></script>"
+    },
+    "mobile320x50": {
+      "placementId": "30368266",
+      "format": "banner",
+      "width": 320,
+      "height": 50,
+      "env": "AD_MOBILE_320X50_B64",
+      "snippet": "<script>\n  atOptions = {\n    'key' : 'e73d29d04f808cbeb0df36e9a476fac4',\n    'format' : 'iframe',\n    'height' : 50,\n    'width' : 320,\n    'params' : {}\n  };\n</script>\n<script src=\"https://bibleearthquake.com/e73d29d04f808cbeb0df36e9a476fac4/invoke.js\"></script>"
+    }
+  }
+}

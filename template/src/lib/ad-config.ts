@@ -13,6 +13,7 @@ function decodeSnippet(encoded: string | undefined): string | undefined {
 
 const snippets: Record<AdFormat, string | undefined> = {
   nativeBanner: decodeSnippet(process.env.AD_NATIVE_BANNER_B64),
+  nativeBannerMobile: decodeSnippet(process.env.AD_NATIVE_BANNER_MOBILE_B64),
   banner728x90: decodeSnippet(process.env.AD_BANNER_728X90_B64),
   banner300x250: decodeSnippet(process.env.AD_BANNER_300X250_B64),
   banner468x60: decodeSnippet(process.env.AD_BANNER_468X60_B64),

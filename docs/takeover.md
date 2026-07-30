@@ -10,7 +10,7 @@
 - 付费、可恢复状态在游戏根 `.gamewiki/`；最终可部署输入在 `intake/`。
 - 后台站点任务默认完成 Private GitHub、Git-integrated Pages、`NEXT_PUBLIC_SITE_URL` 和部署。运营者只负责自定义域名绑定/DNS；正式域名尚未可达时状态为 `awaiting_domain_configuration`。
 - 所有未来游戏都作为新项目从空 workspace 生产；不再接收 `operation: rebuild` 或旧 repo 覆盖输入。
-- Factory 只接受站点生产 Job；广告转换和托管环境变量由独立广告 Agent 按 `docs/advertising/adsterra-environment-contract.md` 处理。
+- Factory 只接受站点生产 Job；共享广告变量由发布器根据版本化 profile 自动配置，不接受 Job 内广告代码或自定义映射。
 
 ## 2. 接手顺序
 
