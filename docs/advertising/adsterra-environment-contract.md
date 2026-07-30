@@ -2,6 +2,8 @@
 
 Game Wiki Factory 为新建的 Cloudflare Pages 站点自动配置统一 Adsterra shared profile。当前 profile 来源为 `animal-hospital-anomalies.wiki`，声明文件位于 `config/ads/animal-hospital-profile.json`；广告 custom domain 及完整 snippet 以该文件为准，页面组件不得硬编码来源域名或 placement ID。
 
+Profile 中的 `adsterraPlacementId` 是 Adsterra 后台显示的数字广告位 ID；`invokeKey` 是 snippet 的 `invoke.js` URL（以及 Native 容器 ID）中的 32 位十六进制代码键。两者不是同一个标识。中央 JSON 尚未记录移动 Native 的数字广告位 ID，因此该项只声明已批准的 `invokeKey`，不会把代码键伪装成 placement ID。
+
 共享 snippet 允许提交到 Factory 仓库，但只能由发布器读取、规范化并转换为服务端环境变量。Cloudflare API token、账户 ID 之外的密钥和部署凭据仍必须来自根 `.env`、CI secret 或其他安全凭据存储，禁止提交、打印或复制到游戏仓库。
 
 ## 固定的 8 个变量
@@ -41,6 +43,10 @@ Factory 创建或续跑 Git-integrated Pages 项目时，在触发 Production Gi
 - 广告变量使用 server-only `secret_text`；
 - Preview 与 Production 独立配置；
 - 环境变量修改后必须触发新的对应环境部署才会生效。
+
+Cloudflare Pages 的项目 PATCH 对 `env_vars` 按变量名更新；只有显式把某个变量名提交为 `null` 才会删除该变量。Factory 的 PATCH 只包含自身管理的 8 个广告变量和 Production `NEXT_PUBLIC_SITE_URL`，不读取、重写或清空其他 Agent/运营者维护的变量。发布器会记录 PATCH 前已有的非受管变量名，随后重新读取项目并验证这些变量仍然存在；若 Cloudflare 返回结果违反该合同，发布事务会明确失败。
+
+新项目设置 `preview_deployment_setting: "none"` 是有意行为。Factory 的发布输入只使用已批准的 Private GitHub `main`，不会自动创建或推送临时分支，因此默认不为任意非 main commit 消耗 Preview 构建。首次上线验收使用本次 Production deployment 自身唯一的 `*.pages.dev` deployment URL；它在绑定自定义域名前即可访问，并用于首页、metadata、sitemap、robots 和广告 API 检查。Preview 环境仍预先配置完整 8 个变量，供维护者将项目设置改为 `all`/自定义分支并推送非 main 分支时使用；该人工 Preview 流程不属于普通 Factory Job。
 
 模板运行时提供：
 

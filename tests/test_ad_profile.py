@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import base64
+import json
 import unittest
 
-from ad_profile import AD_ENV_NAMES, load_shared_ad_environment
+from ad_profile import AD_ENV_NAMES, DEFAULT_PROFILE_PATH, load_shared_ad_environment
 
 
 class SharedAdProfileTests(unittest.TestCase):
@@ -24,6 +25,16 @@ class SharedAdProfileTests(unittest.TestCase):
         self.assertNotEqual(desktop, mobile)
         self.assertIn("5644a054d66cb50289b62eb195ec0a41", desktop)
         self.assertIn("e0128edd35ab5cd83be7f955b4e0b66d", mobile)
+
+    def test_profile_distinguishes_numeric_placement_ids_from_invoke_keys(self) -> None:
+        profile = json.loads(DEFAULT_PROFILE_PATH.read_text(encoding="utf-8"))
+        desktop = profile["placements"]["nativeBanner"]
+        mobile = profile["placements"]["nativeBannerMobile"]
+        self.assertEqual(desktop["adsterraPlacementId"], "30368261")
+        self.assertEqual(desktop["invokeKey"], "5644a054d66cb50289b62eb195ec0a41")
+        self.assertNotIn("placementId", desktop)
+        self.assertNotIn("adsterraPlacementId", mobile)
+        self.assertEqual(mobile["invokeKey"], "e0128edd35ab5cd83be7f955b4e0b66d")
 
 
 if __name__ == "__main__":

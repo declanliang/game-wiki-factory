@@ -164,6 +164,9 @@ def _cloudflare_git_project_payload(
                 "repo_name": repo_name,
                 "production_branch": "main",
                 "production_deployments_enabled": True,
+                # Factory publishes only the approved main branch. The unique
+                # Production deployment URL is used for pre-domain acceptance;
+                # arbitrary non-main commits must not trigger paid Preview builds.
                 "preview_deployment_setting": "none",
                 "pr_comments_enabled": False,
             },
@@ -299,6 +302,9 @@ def _cloudflare_environment_payload(
     }
     return {
         "deployment_configs": {
+            # Cloudflare's Pages PATCH contract updates env_vars by key. Existing
+            # keys are deleted only when that key is explicitly sent as null, so
+            # this payload intentionally contains managed keys only.
             "preview": {"env_vars": dict(shared_ads)},
             "production": {
                 "env_vars": {
@@ -313,13 +319,47 @@ def _cloudflare_environment_payload(
     }
 
 
+def _cloudflare_unmanaged_environment_names(project: dict) -> dict[str, set[str]]:
+    managed = {"NEXT_PUBLIC_SITE_URL", *AD_ENV_NAMES}
+    deployment_configs = project.get("deployment_configs") or {}
+    return {
+        environment: {
+            str(name)
+            for name in (
+                ((deployment_configs.get(environment) or {}).get("env_vars") or {})
+            )
+            if str(name) not in managed
+        }
+        for environment in ("preview", "production")
+    }
+
+
+def _verify_cloudflare_unmanaged_environment_names(
+    project: dict,
+    expected: dict[str, set[str]],
+) -> None:
+    deployment_configs = project.get("deployment_configs") or {}
+    for environment, names in expected.items():
+        current = set(
+            ((deployment_configs.get(environment) or {}).get("env_vars") or {})
+        )
+        missing = sorted(names - current)
+        if missing:
+            raise RuntimeError(
+                "Cloudflare Pages environment provisioning removed existing "
+                f"{environment} variables: {', '.join(missing)}"
+            )
+
+
 def _set_cloudflare_project_environment(
     account_id: str,
     token: str,
     project_name: str,
     origin: str,
     ad_environment: dict[str, str],
+    cloudflare_project: dict,
 ) -> tuple[str, ...]:
+    unmanaged = _cloudflare_unmanaged_environment_names(cloudflare_project)
     _cloudflare_request(
         "PATCH",
         account_id,
@@ -327,6 +367,15 @@ def _set_cloudflare_project_environment(
         f"pages/projects/{urllib.parse.quote(project_name)}",
         _cloudflare_environment_payload(origin, ad_environment),
     )
+    updated_project = _cloudflare_request(
+        "GET",
+        account_id,
+        token,
+        f"pages/projects/{urllib.parse.quote(project_name)}",
+    )
+    if not isinstance(updated_project, dict):
+        raise RuntimeError("Cloudflare Pages project verification response was not an object")
+    _verify_cloudflare_unmanaged_environment_names(updated_project, unmanaged)
     return ("NEXT_PUBLIC_SITE_URL", *AD_ENV_NAMES)
 
 
@@ -508,6 +557,7 @@ def _deploy_cloudflare_pages(
         project_name,
         canonical_origin,
         ad_environment,
+        cloudflare_project,
     )
     _append_cloudflare_log(
         log_path,

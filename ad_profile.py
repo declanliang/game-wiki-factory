@@ -44,8 +44,14 @@ def load_shared_ad_environment(path: Path = DEFAULT_PROFILE_PATH) -> dict[str, s
             raise RuntimeError(f"Invalid or duplicate ad environment mapping: {env_name!r}")
         if "<script" not in snippet.casefold() or "invoke.js" not in snippet.casefold():
             raise RuntimeError(f"Placement {name!r} does not contain a complete script snippet")
+        invoke_key = str(placement.get("invokeKey") or "").strip().casefold()
+        script_key = re.search(r"/([a-f0-9]{32})/invoke\.js", snippet, re.I)
+        if not script_key or invoke_key != script_key.group(1).casefold():
+            raise RuntimeError(f"Placement {name!r} invokeKey does not match its snippet")
+        placement_id = placement.get("adsterraPlacementId")
+        if placement_id is not None and not re.fullmatch(r"\d+", str(placement_id)):
+            raise RuntimeError(f"Placement {name!r} has an invalid Adsterra placement ID")
         if placement.get("format") == "native":
-            script_key = re.search(r"/([a-f0-9]{32})/invoke\.js", snippet, re.I)
             container_key = re.search(r'id=["\']container-([a-f0-9]{32})["\']', snippet, re.I)
             if not script_key or not container_key or script_key.group(1).casefold() != container_key.group(1).casefold():
                 raise RuntimeError(f"Native placement {name!r} has mismatched script/container IDs")

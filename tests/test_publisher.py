@@ -63,6 +63,9 @@ class PublisherValidationTests(unittest.TestCase):
                 "root_dir": "",
             },
             "deployment_configs": {
+                "preview": {
+                    "env_vars": {},
+                },
                 "production": {
                     "env_vars": {},
                 },
@@ -71,7 +74,7 @@ class PublisherValidationTests(unittest.TestCase):
         project.update(overrides)
         return project
 
-    def test_cloudflare_git_project_payload_is_buildable_and_main_only(self) -> None:
+    def test_cloudflare_git_project_payload_uses_production_deployment_for_acceptance(self) -> None:
         payload = _cloudflare_git_project_payload("game", "owner/game")
         self.assertEqual(payload["source"]["type"], "github")
         self.assertEqual(payload["source"]["config"]["owner"], "owner")
@@ -167,7 +170,7 @@ class PublisherValidationTests(unittest.TestCase):
             )
 
     @patch("publisher._cloudflare_request")
-    def test_cloudflare_environment_patch_sets_ads_in_preview_and_production(self, request) -> None:
+    def test_cloudflare_environment_patch_sets_ads_and_preserves_unrelated_variables(self, request) -> None:
         ads = {name: f"encoded-{index}" for index, name in enumerate((
             "AD_NATIVE_BANNER_B64",
             "AD_NATIVE_BANNER_MOBILE_B64",
@@ -178,14 +181,43 @@ class PublisherValidationTests(unittest.TestCase):
             "AD_SIDEBAR_160X300_B64",
             "AD_MOBILE_320X50_B64",
         ))}
+        project = self._git_project(deployment_configs={
+            "preview": {
+                "env_vars": {
+                    "EXISTING_PREVIEW_SECRET": {"type": "secret_text", "value": ""},
+                },
+            },
+            "production": {
+                "env_vars": {
+                    "EXISTING_ANALYTICS_ID": {
+                        "type": "plain_text",
+                        "value": "analytics-id",
+                    },
+                },
+            },
+        })
+
+        def cloudflare_request(method, _account, _token, _path, payload=None):
+            if method == "PATCH":
+                for environment, config in payload["deployment_configs"].items():
+                    project["deployment_configs"][environment]["env_vars"].update(
+                        config["env_vars"]
+                    )
+                return project
+            if method == "GET":
+                return project
+            self.fail(f"unexpected Cloudflare method {method}")
+
+        request.side_effect = cloudflare_request
         configured = _set_cloudflare_project_environment(
             "account",
             "token",
             "game",
             "https://game.example",
             ads,
+            project,
         )
-        payload = request.call_args.args[4]
+        payload = request.call_args_list[0].args[4]
         preview = payload["deployment_configs"]["preview"]["env_vars"]
         production = payload["deployment_configs"]["production"]["env_vars"]
         self.assertEqual(set(preview), set(ads))
@@ -197,6 +229,15 @@ class PublisherValidationTests(unittest.TestCase):
         )
         self.assertEqual(configured, ("NEXT_PUBLIC_SITE_URL", *ads))
         self.assertNotIn("token", json.dumps(payload).casefold())
+        self.assertIn(
+            "EXISTING_PREVIEW_SECRET",
+            project["deployment_configs"]["preview"]["env_vars"],
+        )
+        self.assertIn(
+            "EXISTING_ANALYTICS_ID",
+            project["deployment_configs"]["production"]["env_vars"],
+        )
+        self.assertEqual([call.args[0] for call in request.call_args_list], ["PATCH", "GET"])
 
     def test_cloudflare_environment_payload_requires_all_eight_ads(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "complete ordered 8-variable"):
@@ -245,6 +286,7 @@ class PublisherValidationTests(unittest.TestCase):
             "game",
             "https://game.example",
             load_ads.return_value,
+            resolve_project.return_value[1],
         )
         wait_deployment.assert_called_once()
         self.assertEqual(len(result["environmentVariables"]), 9)
