@@ -104,7 +104,10 @@ export async function SiteHeader({ locale }: { locale: string }) {
     </div>
   );
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-xl">
+    <header
+      className="sticky z-50 border-b border-border bg-background/90 backdrop-blur-xl"
+      style={{ top: "var(--top-ad-height, 0px)" }}
+    >
       <div className="mx-auto max-w-[1280px] px-5 py-3 sm:px-8 lg:px-10">
         {header}
       </div>

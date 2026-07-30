@@ -44,6 +44,11 @@ class AdTemplateContractTests(unittest.TestCase):
         self.assertNotIn("right:", rail)
         self.assertNotIn("Right advertisement", rail)
 
+    def test_sticky_navigation_reserves_the_top_ad_height(self) -> None:
+        content = (TEMPLATE / "src/components/site.tsx").read_text(encoding="utf-8")
+        self.assertIn('style={{ top: "var(--top-ad-height, 0px)" }}', content)
+        self.assertNotIn('className="sticky top-0', content)
+
 
 if __name__ == "__main__":
     unittest.main()
