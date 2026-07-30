@@ -47,7 +47,16 @@ class AdTemplateContractTests(unittest.TestCase):
     def test_sticky_navigation_reserves_the_top_ad_height(self) -> None:
         content = (TEMPLATE / "src/components/site.tsx").read_text(encoding="utf-8")
         self.assertIn('style={{ top: "var(--top-ad-height, 0px)" }}', content)
+        self.assertIn('className="sticky z-50 border-b border-border bg-background"', content)
+        self.assertNotIn("bg-background/90", content)
         self.assertNotIn('className="sticky top-0', content)
+
+    def test_top_ad_uses_the_same_opaque_background_as_navigation(self) -> None:
+        content = (TEMPLATE / "src/components/ad-placements.tsx").read_text(encoding="utf-8")
+        top_ad = content.split("export function TopStickyAd()", 1)[1].split(
+            "export function NativeFlowAd", 1
+        )[0]
+        self.assertIn("justify-center bg-background", top_ad)
 
 
 if __name__ == "__main__":

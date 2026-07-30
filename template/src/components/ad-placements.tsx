@@ -33,7 +33,7 @@ export function TopStickyAd() {
   const [dismissed, setDismissed] = useState(false);
   const enabled = useAdEnabled("mobile320x50");
   if (!enabled || dismissed) return null;
-  return <><style>{`:root{--top-ad-height:50px}`}</style><div className="h-[50px]" aria-hidden="true" /><div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex h-[50px] items-center justify-center" data-top-ad-visible><div className="pointer-events-auto relative h-[50px] w-[320px] max-w-full"><AdSlot format="mobile320x50" eager /><button type="button" aria-label="Close advertisement" onClick={() => setDismissed(true)} className="absolute right-1 top-1 z-10 grid h-6 w-6 place-items-center rounded-full border border-white/25 bg-black/80 text-white shadow-md transition hover:bg-black"><X className="h-3.5 w-3.5" /></button></div></div></>;
+  return <><style>{`:root{--top-ad-height:50px}`}</style><div className="h-[50px]" aria-hidden="true" /><div className="pointer-events-none fixed inset-x-0 top-0 z-[60] flex h-[50px] items-center justify-center bg-background" data-top-ad-visible><div className="pointer-events-auto relative h-[50px] w-[320px] max-w-full"><AdSlot format="mobile320x50" eager /><button type="button" aria-label="Close advertisement" onClick={() => setDismissed(true)} className="absolute right-1 top-1 z-10 grid h-6 w-6 place-items-center rounded-full border border-white/25 bg-black/80 text-white shadow-md transition hover:bg-black"><X className="h-3.5 w-3.5" /></button></div></div></>;
 }
 
 export function NativeFlowAd({ className = "" }: { className?: string }) {
