@@ -228,11 +228,11 @@ npm run verify:deploy
 
 后台站点任务会自动部署 Cloudflare Pages。若提供的 `siteUrl` 尚未绑定，运营者只需在现有 Pages 项目绑定该域名并配置 DNS；`NEXT_PUBLIC_SITE_URL` 和站点部署已经完成。域名可访问后执行同一 Job 的线上验收，或在项目根运行 `npm run verify:deploy`。`awaiting_domain_configuration` 不代表正式域名已上线。
 
-## 可选广告模板契约
+## 共享广告模板契约
 
-广告不是 Factory 主流程的一部分。Factory 不接收原始广告代码、不转换广告配置，也不修改任何托管平台的广告环境变量。模板只读取七个可选的 server-only `AD_*_B64` 变量：存在且可解码时通过同源沙箱 iframe 展示；未配置时不渲染 iframe、占位或空白。
+Factory 发布新 Cloudflare Pages 站点时，从 `config/ads/animal-hospital-profile.json` 读取统一 Adsterra shared profile，验证并转换为 8 个 server-only `AD_*_B64` 变量，同时写入 Preview 和 Production。模板通过同源、无 sandbox 的独立 iframe 展示广告；桌面 Native 与移动 Native 使用不同 placement，媒体查询确定前不创建 iframe。Job 不接收任意广告代码或变量覆盖，Cloudflare 凭据仍只来自根 `.env`/CI secret。
 
-独立广告 Agent 的输入校验、Base64 转换、变量名映射和部署后验证规则见 [Adsterra 环境变量转换契约](docs/advertising/adsterra-environment-contract.md)。
+完整映射、provisioning 和验收规则见 [Adsterra 共享 Profile 与环境变量合同](docs/advertising/adsterra-environment-contract.md)。
 
 失败后的同一任务重试自动复用 checkpoint，不会重复已经完成的付费阶段。不要为同一个失败任务创建替代 Job。
 

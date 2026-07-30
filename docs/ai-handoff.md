@@ -6,7 +6,7 @@
 
 如果本地或服务器不存在，先严格执行 `docs/bootstrap-from-github.md`，不要凭历史对话猜测目录、服务或密钥位置。
 
-业务目标是为具体 Roblox 或 Steam 游戏生成信息型 Wiki。Factory 的职责到站点生产与 Cloudflare Pages 发布为止，不处理广告代码或广告环境变量。模板保留可选广告运行时接口；未配置环境变量时必须零渲染、零占位。广告配置由独立 Agent 按 `docs/advertising/adsterra-environment-contract.md` 处理。
+业务目标是为具体 Roblox 或 Steam 游戏生成信息型 Wiki。Factory 发布器在创建 Cloudflare Pages 站点时自动注入统一 shared ad profile 的 8 个 server-only 变量；Job/OpenClaw 不接收任意广告代码或覆盖配置。模板未获得有效变量时必须零渲染、零占位。合同见 `docs/advertising/adsterra-environment-contract.md`。
 
 首页数据所有权：Basic Info 提供事实和深度文案；Guide Search 的缓存 YouTube 结果只可补一个严格匹配游戏的长视频；site-plan 决定可发布分类；现有文章提供具体内链和分类专题。模板不得反向发明事实、分类或文章。
 

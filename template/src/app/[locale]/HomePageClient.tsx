@@ -319,6 +319,8 @@ export default function HomePageClient({
   categories: Category[];
 }) {
   const nativeEnabled = useAdEnabled("nativeBanner");
+  const nativeMobileEnabled = useAdEnabled("nativeBannerMobile");
+  const anyNativeEnabled = nativeEnabled || nativeMobileEnabled;
   const banner728Enabled = useAdEnabled("banner728x90");
   const banner300Enabled = useAdEnabled("banner300x250");
   function renderSection(section: HomeSection) {
@@ -391,7 +393,7 @@ export default function HomePageClient({
         );
 
       case "ads":
-        return nativeEnabled ? <NativeFlowAd /> : null;
+        return anyNativeEnabled ? <NativeFlowAd /> : null;
 
       case "bottomAd":
         return banner728Enabled ? <DesktopBanner728 /> : null;
@@ -491,7 +493,7 @@ export default function HomePageClient({
                         {category.count === 1 ? "Article" : "Articles"}
                       </p>
                     </Link>
-                    {nativeEnabled && index === 3 && categories.length > 4 ? (
+                    {anyNativeEnabled && index === 3 && categories.length > 4 ? (
                       <div className="basis-full py-4">
                         <NativeFlowAd />
                       </div>

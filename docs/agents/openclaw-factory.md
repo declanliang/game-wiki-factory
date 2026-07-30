@@ -56,13 +56,13 @@ Prompt：
 
 ## 后续添加广告
 
-OpenClaw 不接收 Cloudflare Pages 广告任务，也不要让用户把原始代码粘贴进聊天正文。
+OpenClaw 不接收 Cloudflare Pages 广告任务，也不要让用户把原始代码粘贴进聊天正文；新站广告变量由 Factory 发布器自动配置。
 
 ```text
-Factory 和 OpenClaw 不接收 `taskType: ads` 或任何原始广告代码。广告由独立 Agent 按 `docs/advertising/adsterra-environment-contract.md` 转换并写入托管平台环境变量；不得打印或提交原始代码。
+Factory 和 OpenClaw 不接收 `taskType: ads` 或 Job 内原始广告代码。发布器只使用版本化 shared profile，并且不得打印 Base64 值。
 ```
 
-手工广告配置不重跑内容。缺少广告变量时站点不展示广告、不保留空白；配置后必须验证七个 `/api/ads/<format>` 路由的代码哈希。
+缺少广告变量时站点不展示广告、不保留空白；发布后必须验证 8 个 `/api/ads/<format>` 的 availability/API 状态。
 
 ## 生产版本认定
 
@@ -88,7 +88,7 @@ Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status
 1. job 为 `succeeded`，manifest 必需阶段完成；
 2. GitHub repo 为 Private；
 3. `publish.json` 中 `stages.hosting.provider=cloudflare-pages` 且 `status=complete` 或 `awaiting_domain_configuration`；后者只能表述为“Pages 已部署，等待域名绑定”；
-4. Factory 和 OpenClaw 不包含广告任务；收到广告请求时转交独立广告 Agent。
+4. Factory 和 OpenClaw 不包含手工广告任务；新站只使用发布器自动配置的 shared profile。
 
 完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Pages project/deployment URL、hosting 状态，以及是否只剩域名绑定/DNS。只有 `complete` 才能声称对应 origin 已线上验证。
 
@@ -157,4 +157,4 @@ Agent 发现疑似代码 bug 时只能报告证据并保持任务为 `needs_atte
 - 不因文章数量少就造 fallback。先读 `content-opportunity-report.json`：公开资料少可以接受；明显跨游戏内容必须删除。
 - Cloudflare Pages 显示部署成功、Git push 成功或本地 build 成功都不是最终成功；线上自动验证是发布事务的最后一步。
 - 同名目标目录或 repo 已存在时停止并升级，不得自动删除、覆盖或把它解释为旧站升级。
-- 不解释或执行广告标题/代码映射；统一转交独立广告 Agent。
+- 不接受广告标题/代码映射或任意 profile 覆盖；只检查自动 provisioning 状态。

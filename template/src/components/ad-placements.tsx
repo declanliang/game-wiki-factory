@@ -17,6 +17,18 @@ function useMediaQuery(query: string) {
   return matches;
 }
 
+function useResolvedMediaQuery(query: string) {
+  const [matches, setMatches] = useState<boolean | null>(null);
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setMatches(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [query]);
+  return matches;
+}
+
 export function TopStickyAd() {
   const [dismissed, setDismissed] = useState(false);
   const enabled = useAdEnabled("mobile320x50");
@@ -25,8 +37,14 @@ export function TopStickyAd() {
 }
 
 export function NativeFlowAd({ className = "" }: { className?: string }) {
-  const enabled = useAdEnabled("nativeBanner");
-  return enabled ? <AdSlot format="nativeBanner" className={`aspect-[4/1] min-h-[80px] ${className}`} /> : null;
+  const desktop = useResolvedMediaQuery("(min-width: 900px)");
+  const desktopEnabled = useAdEnabled("nativeBanner");
+  const mobileEnabled = useAdEnabled("nativeBannerMobile");
+  if (desktop === null) return null;
+  if (desktop) {
+    return desktopEnabled ? <AdSlot format="nativeBanner" className={`aspect-[4/1] min-h-[80px] ${className}`} /> : null;
+  }
+  return mobileEnabled ? <AdSlot format="nativeBannerMobile" className={`aspect-square w-full max-w-[300px] ${className}`} /> : null;
 }
 
 export function ResponsiveContentAd({ className = "" }: { className?: string }) {

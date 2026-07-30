@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
 
+from ad_profile import AD_ENV_NAMES, load_shared_ad_environment
 from orchestrate_wiki import build_subprocess_env, read_json, write_json
 
 
@@ -163,6 +164,9 @@ def _cloudflare_git_project_payload(
                 "repo_name": repo_name,
                 "production_branch": "main",
                 "production_deployments_enabled": True,
+                # Factory publishes only the approved main branch. The unique
+                # Production deployment URL is used for pre-domain acceptance;
+                # arbitrary non-main commits must not trigger paid Preview builds.
                 "preview_deployment_setting": "none",
                 "pr_comments_enabled": False,
             },
@@ -286,51 +290,93 @@ def _resolve_cloudflare_project(
         return fallback_name, project, created
 
 
-def _set_cloudflare_site_url(
+def _cloudflare_environment_payload(
+    origin: str,
+    ad_environment: dict[str, str],
+) -> dict:
+    if tuple(ad_environment) != AD_ENV_NAMES:
+        raise RuntimeError("Cloudflare ad provisioning requires the complete ordered 8-variable contract")
+    shared_ads = {
+        name: {"type": "secret_text", "value": ad_environment[name]}
+        for name in AD_ENV_NAMES
+    }
+    return {
+        "deployment_configs": {
+            # Cloudflare's Pages PATCH contract updates env_vars by key. Existing
+            # keys are deleted only when that key is explicitly sent as null, so
+            # this payload intentionally contains managed keys only.
+            "preview": {"env_vars": dict(shared_ads)},
+            "production": {
+                "env_vars": {
+                    "NEXT_PUBLIC_SITE_URL": {
+                        "type": "plain_text",
+                        "value": origin,
+                    },
+                    **shared_ads,
+                }
+            },
+        }
+    }
+
+
+def _cloudflare_unmanaged_environment_names(project: dict) -> dict[str, set[str]]:
+    managed = {"NEXT_PUBLIC_SITE_URL", *AD_ENV_NAMES}
+    deployment_configs = project.get("deployment_configs") or {}
+    return {
+        environment: {
+            str(name)
+            for name in (
+                ((deployment_configs.get(environment) or {}).get("env_vars") or {})
+            )
+            if str(name) not in managed
+        }
+        for environment in ("preview", "production")
+    }
+
+
+def _verify_cloudflare_unmanaged_environment_names(
+    project: dict,
+    expected: dict[str, set[str]],
+) -> None:
+    deployment_configs = project.get("deployment_configs") or {}
+    for environment, names in expected.items():
+        current = set(
+            ((deployment_configs.get(environment) or {}).get("env_vars") or {})
+        )
+        missing = sorted(names - current)
+        if missing:
+            raise RuntimeError(
+                "Cloudflare Pages environment provisioning removed existing "
+                f"{environment} variables: {', '.join(missing)}"
+            )
+
+
+def _set_cloudflare_project_environment(
     account_id: str,
     token: str,
     project_name: str,
     origin: str,
+    ad_environment: dict[str, str],
     cloudflare_project: dict,
-    *,
-    created: bool,
-) -> bool:
-    production = (
-        (cloudflare_project.get("deployment_configs") or {}).get("production") or {}
-    )
-    env_vars = production.get("env_vars") or {}
-    current = env_vars.get("NEXT_PUBLIC_SITE_URL") or {}
-    if (
-        str(current.get("type") or "") == "plain_text"
-        and str(current.get("value") or "").rstrip("/") == origin.rstrip("/")
-    ):
-        return False
-    unrelated = sorted(key for key in env_vars if key != "NEXT_PUBLIC_SITE_URL")
-    if unrelated and not created:
-        raise RuntimeError(
-            "Refusing to replace Cloudflare Pages Production env_vars while unrelated "
-            f"variables exist: {', '.join(unrelated)}. Update them with the dedicated "
-            "environment-variable Agent so encrypted values are preserved."
-        )
+) -> tuple[str, ...]:
+    unmanaged = _cloudflare_unmanaged_environment_names(cloudflare_project)
     _cloudflare_request(
         "PATCH",
         account_id,
         token,
         f"pages/projects/{urllib.parse.quote(project_name)}",
-        {
-            "deployment_configs": {
-                "production": {
-                    "env_vars": {
-                        "NEXT_PUBLIC_SITE_URL": {
-                            "type": "plain_text",
-                            "value": origin,
-                        }
-                    }
-                }
-            }
-        },
+        _cloudflare_environment_payload(origin, ad_environment),
     )
-    return True
+    updated_project = _cloudflare_request(
+        "GET",
+        account_id,
+        token,
+        f"pages/projects/{urllib.parse.quote(project_name)}",
+    )
+    if not isinstance(updated_project, dict):
+        raise RuntimeError("Cloudflare Pages project verification response was not an object")
+    _verify_cloudflare_unmanaged_environment_names(updated_project, unmanaged)
+    return ("NEXT_PUBLIC_SITE_URL", *AD_ENV_NAMES)
 
 
 def _append_cloudflare_log(log_path: Path, message: str) -> None:
@@ -504,17 +550,19 @@ def _deploy_cloudflare_pages(
         log_path,
         f"resolved Git-integrated project {project_name} for {full_repo}; created={created}",
     )
-    changed = _set_cloudflare_site_url(
+    ad_environment = load_shared_ad_environment()
+    configured_variables = _set_cloudflare_project_environment(
         account_id,
         token,
         project_name,
         canonical_origin,
+        ad_environment,
         cloudflare_project,
-        created=created,
     )
     _append_cloudflare_log(
         log_path,
-        f"Production NEXT_PUBLIC_SITE_URL {'updated' if changed else 'already matched'}",
+        "configured Preview/Production server-only variables: "
+        + ", ".join(configured_variables),
     )
     deployment = _cloudflare_create_git_deployment(
         account_id, token, project_name, "main"
@@ -545,7 +593,8 @@ def _deploy_cloudflare_pages(
         "deploymentUrl": deployment_url,
         "pagesOrigin": pages_origin,
         "siteUrl": canonical_origin,
-        "environmentVariables": ["NEXT_PUBLIC_SITE_URL"],
+        "environmentVariables": list(configured_variables),
+        "adProfile": "animal-hospital-anomalies.wiki",
         "deploymentMode": "git-integration",
         "source": {
             "type": "github",

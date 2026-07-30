@@ -81,9 +81,9 @@ npm run build
 
 ## Adsterra 广告
 
-广告是可选的模板运行时能力，不属于 Factory。独立广告 Agent 把已验证的完整 snippet 转成七个 server-only `AD_*_B64` 环境变量；变量名和转换规则见 Factory 的 `docs/advertising/adsterra-environment-contract.md`。
+Factory 发布器把统一 shared profile 转成 8 个 server-only `AD_*_B64` 环境变量，并分别写入 Cloudflare Pages Preview 和 Production；变量名和转换规则见 Factory 的 `docs/advertising/adsterra-environment-contract.md`。
 
-页面先调用 `/api/ads/availability` 获取运行时可用性，再按需挂载 `/api/ads/<format>` 同源沙箱 iframe。未配置或 Base64 无效时不会渲染 iframe、占位容器或空白间距。修改 Cloudflare Pages Production 变量后必须重新部署。
+页面先调用 `/api/ads/availability` 获取运行时可用性，再按需挂载 `/api/ads/<format>` 同源 iframe。广告 iframe 不设置 sandbox；桌面/移动 Native 在媒体查询确定后只加载各自 placement。未配置或 Base64 无效时不会渲染 iframe、占位容器或空白间距。修改 Pages 变量后必须重新部署对应环境。
 
 ## Cloudflare Pages 部署
 
