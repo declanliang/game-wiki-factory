@@ -45,7 +45,6 @@ class JobSystemTests(unittest.TestCase):
         self.assertEqual(config["publication"], {"skipCloudflare": False})
         command = _publish_command(config, "pages-game")
         self.assertNotIn("--skip-cloudflare", command)
-        self.assertNotIn("--skip-vercel", command)
         self.assertEqual(command[-2:], ["--site-url", "https://pages-game.example"])
 
     def test_cloudflare_publish_can_only_be_skipped_explicitly(self) -> None:

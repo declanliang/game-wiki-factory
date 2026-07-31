@@ -515,7 +515,7 @@ def render_project_readme(
 """
     return f"""# {game_name} Wiki
 
-这是由 `game-wiki-factory` 生成的独立 Next.js 游戏攻略站。本目录就是 GitHub/Vercel 项目根目录，不存在额外的 `site/` 子目录。
+这是由 `game-wiki-factory` 生成的独立 Next.js 游戏攻略站。本目录就是 GitHub 仓库和 Cloudflare Pages 项目根目录，不存在额外的 `site/` 子目录。
 
 ## 目录
 
@@ -552,6 +552,6 @@ cd ..\\game-wiki-factory
 
 ## 部署
 
-把本目录推送为一个独立 GitHub repo，在 Vercel 直接导入；Root Directory 留空。部署前设置 `NEXT_PUBLIC_SITE_URL=https://正式域名`（公开变量，无需 Sensitive；裸域名会自动补 HTTPS），并运行 `npm run verify:deploy`。
+Factory 会把本目录推送为一个独立 Private GitHub repo，并创建连接该 repo `main` 分支的 Cloudflare Pages 项目；Root Directory 留空，Build command 为 `npm run build`，Build output 为 `out`。发布器会设置 `NEXT_PUBLIC_SITE_URL=https://正式域名` 并运行线上验收；若正式域名仍在 DNS/验证 pending，按 Cloudflare 控制台提示完成后再运行 `npm run verify:deploy`。
 {platform_notes}
 """

@@ -66,6 +66,11 @@ class JobAgent2Tests(unittest.TestCase):
                 "model": "gpt-test",
                 "model_reasoning_effort": "medium",
                 "disable_response_storage": "true",
+                "CLOUDFLARE_API_TOKEN": "cloudflare-secret",
+                "FACTORY_GITHUB_TOKEN": "github-secret",
+                "TOAPIS_API_KEY": "toapis-secret",
+                "LLM_API_KEY_1": "llm-secret",
+                "GAMEWIKI_CONTROL_TOKEN": "control-secret",
             },
             clear=True,
         ):
@@ -81,6 +86,11 @@ class JobAgent2Tests(unittest.TestCase):
         self.assertIn("gpt-test", command)
         self.assertIn("model_reasoning_effort=\"medium\"", command)
         self.assertIn("disable_response_storage=true", command)
+        self.assertNotIn("CLOUDFLARE_API_TOKEN", env)
+        self.assertNotIn("FACTORY_GITHUB_TOKEN", env)
+        self.assertNotIn("TOAPIS_API_KEY", env)
+        self.assertNotIn("LLM_API_KEY_1", env)
+        self.assertNotIn("GAMEWIKI_CONTROL_TOKEN", env)
 
     def test_repaired_report_requeues_for_worker(self):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(

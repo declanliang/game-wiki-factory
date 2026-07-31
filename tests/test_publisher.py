@@ -252,11 +252,11 @@ class PublisherValidationTests(unittest.TestCase):
             "banner468x60", "sidebar160x600", "sidebar160x300", "mobile320x50",
         ]
         availability_headers = {
-            "content-type": "application/json", "cache-control": "no-store",
+            "content-type": "application/json", "cache-control": "private, no-store",
             "x-content-type-options": "nosniff",
         }
         html_headers = {
-            "content-type": "text/html; charset=utf-8", "cache-control": "no-store",
+            "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store",
             "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'",
             "referrer-policy": "strict-origin-when-cross-origin",
         }

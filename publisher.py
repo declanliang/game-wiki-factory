@@ -711,6 +711,14 @@ def _http_response(url: str) -> tuple[int, dict[str, str], str]:
         return response.status, headers, response.read().decode("utf-8", errors="replace")
 
 
+def _cache_control_has_no_store(value: str) -> bool:
+    return "no-store" in {
+        directive.strip().casefold()
+        for directive in value.split(",")
+        if directive.strip()
+    }
+
+
 def _verify_online_advertising(origin: str) -> tuple[str, ...]:
     """Validate only first-party wrapper responses; never fetch Adsterra itself."""
     base = origin.rstrip("/")
@@ -719,7 +727,7 @@ def _verify_online_advertising(origin: str) -> tuple[str, ...]:
         raise RuntimeError(f"advertising availability returned HTTP {status}")
     if "application/json" not in headers.get("content-type", "").casefold():
         raise RuntimeError("advertising availability did not return JSON")
-    if headers.get("cache-control", "").casefold() != "no-store":
+    if not _cache_control_has_no_store(headers.get("cache-control", "")):
         raise RuntimeError("advertising availability is missing Cache-Control: no-store")
     if headers.get("x-content-type-options", "").casefold() != "nosniff":
         raise RuntimeError("advertising availability is missing X-Content-Type-Options: nosniff")
@@ -736,10 +744,11 @@ def _verify_online_advertising(origin: str) -> tuple[str, ...]:
         if "text/html" not in headers.get("content-type", "").casefold():
             raise RuntimeError(f"advertising format {name} did not return HTML")
         required = {
-            "cache-control": "no-store",
             "referrer-policy": "strict-origin-when-cross-origin",
             "x-content-type-options": "nosniff",
         }
+        if not _cache_control_has_no_store(headers.get("cache-control", "")):
+            raise RuntimeError(f"advertising format {name} is missing cache-control")
         for header, expected in required.items():
             if headers.get(header, "").casefold() != expected:
                 raise RuntimeError(f"advertising format {name} is missing {header}")

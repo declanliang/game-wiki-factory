@@ -708,7 +708,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("game", help='Roblox or Steam game name, for example "Funnel Runners"')
     parser.add_argument("--platform", choices=["auto", "roblox", "steam"], default="auto")
     parser.add_argument("--official-url", help="Optional Roblox game or Steam app URL for deterministic identity selection.")
-    parser.add_argument("--site-url", help="Optional final site domain/URL; passed to Vercel when --publish is used.")
+    parser.add_argument("--site-url", help="Optional final site domain/URL; passed to Cloudflare Pages when --publish is used.")
     parser.add_argument(
         "--manual-keyword",
         action="append",
@@ -742,7 +742,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-articles", action="store_true", help="Reuse --articles-dir or an existing seo-scout project.")
     parser.add_argument("--skip-site", action="store_true", help="Prepare the complete intake package but do not create/build a site.")
     parser.add_argument("--skip-build", action="store_true", help="Run template ingestion and checks without the Next.js production build.")
-    parser.add_argument("--publish", action="store_true", help="Publish a verified site to GitHub and Vercel after generation.")
+    parser.add_argument("--publish", action="store_true", help="Publish a verified site to Private GitHub and Cloudflare Pages after generation.")
     parser.add_argument("--refresh-basic", action="store_true", help="Ignore auto-basic-info caches (may incur API cost).")
     parser.add_argument("--overwrite-articles", action="store_true", help="Regenerate existing seo-scout articles (may incur API cost).")
     return parser

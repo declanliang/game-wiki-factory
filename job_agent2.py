@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from job_system import _event, _now, connect, data_dir
-from orchestrate_wiki import build_subprocess_env, read_json, write_json
+from orchestrate_wiki import parse_dotenv, read_json, write_json
 
 
 ROOT = Path(__file__).resolve().parent
@@ -354,16 +354,109 @@ workspace state, or anything outside the rules.
 """.strip()
 
 
-def _codex_child_env() -> dict[str, str]:
-    env = build_subprocess_env(ROOT)
+SAFE_CODEX_CHILD_ENV_NAMES = {
+    "ALLUSERSPROFILE",
+    "APPDATA",
+    "CODEX_HOME",
+    "COMSPEC",
+    "HOME",
+    "HOMEDRIVE",
+    "HOMEPATH",
+    "LANG",
+    "LC_ALL",
+    "LOCALAPPDATA",
+    "LOGNAME",
+    "PATH",
+    "PATHEXT",
+    "PROGRAMDATA",
+    "PROGRAMFILES",
+    "PROGRAMFILES(X86)",
+    "PROGRAMW6432",
+    "SHELL",
+    "SYSTEMDRIVE",
+    "SYSTEMROOT",
+    "TEMP",
+    "TERM",
+    "TMP",
+    "USER",
+    "USERDOMAIN",
+    "USERNAME",
+    "USERPROFILE",
+    "WINDIR",
+    "XDG_CACHE_HOME",
+    "XDG_CONFIG_HOME",
+    "XDG_DATA_HOME",
+}
+
+AGENT2_CONFIG_NAMES = {
+    "GAMEWIKI_AGENT2_OPENAI_API_KEY",
+    "codex_cli_api_key",
+    "GAMEWIKI_AGENT2_OPENAI_BASE_URL",
+    "base_url",
+    "GAMEWIKI_AGENT2_CODEX_WIRE_API",
+    "GAMEWIKI_AGENT2_REQUIRES_OPENAI_AUTH",
+    "GAMEWIKI_AGENT2_CODEX_MODEL",
+    "model",
+    "GAMEWIKI_AGENT2_CODEX_REASONING_EFFORT",
+    "model_reasoning_effort",
+    "GAMEWIKI_AGENT2_DISABLE_RESPONSE_STORAGE",
+    "disable_response_storage",
+}
+
+
+def _agent2_config(base_env: dict[str, str] | None = None) -> dict[str, str]:
+    """Read only Agent2-specific settings without inheriting Factory secrets."""
+    source = dict(base_env if base_env is not None else os.environ)
+    config: dict[str, str] = {}
+    env_file = ROOT / ".env"
+    if env_file.is_file():
+        for key, value in parse_dotenv(env_file).items():
+            if key in AGENT2_CONFIG_NAMES:
+                config[key] = value
+    for key, value in source.items():
+        if key in AGENT2_CONFIG_NAMES:
+            config[key] = value
+    return config
+
+
+def _codex_child_env(base_env: dict[str, str] | None = None) -> dict[str, str]:
+    source = dict(base_env if base_env is not None else os.environ)
+    config = _agent2_config(source)
+    env = {
+        key: value
+        for key, value in source.items()
+        if key.upper() in SAFE_CODEX_CHILD_ENV_NAMES
+    }
     env.setdefault("PYTHONIOENCODING", "utf-8")
-    api_key = env.get("GAMEWIKI_AGENT2_OPENAI_API_KEY", "").strip() or env.get("codex_cli_api_key", "").strip()
+    api_key = (
+        config.get("GAMEWIKI_AGENT2_OPENAI_API_KEY", "").strip()
+        or config.get("codex_cli_api_key", "").strip()
+    )
     if api_key:
+        # This is the only secret intentionally given to Agent2.  Factory
+        # provider, GitHub, Cloudflare, notification, and control-plane
+        # credentials stay out of the child process environment.
         env["CODEX_API_KEY"] = api_key
         env["OPENAI_API_KEY"] = api_key
-    base_url = env.get("GAMEWIKI_AGENT2_OPENAI_BASE_URL", "").strip() or env.get("base_url", "").strip()
+    base_url = (
+        config.get("GAMEWIKI_AGENT2_OPENAI_BASE_URL", "").strip()
+        or config.get("base_url", "").strip()
+    )
     if base_url:
         env["OPENAI_BASE_URL"] = base_url
+        env["GAMEWIKI_AGENT2_OPENAI_BASE_URL"] = base_url
+    for key in (
+        "GAMEWIKI_AGENT2_CODEX_WIRE_API",
+        "GAMEWIKI_AGENT2_REQUIRES_OPENAI_AUTH",
+        "GAMEWIKI_AGENT2_CODEX_MODEL",
+        "model",
+        "GAMEWIKI_AGENT2_CODEX_REASONING_EFFORT",
+        "model_reasoning_effort",
+        "GAMEWIKI_AGENT2_DISABLE_RESPONSE_STORAGE",
+        "disable_response_storage",
+    ):
+        if config.get(key, "").strip():
+            env[key] = config[key]
     return env
 
 

@@ -19,6 +19,14 @@ class OpenClawDeploymentDocsTests(unittest.TestCase):
         self.assertIn("NEXT_PUBLIC_SITE_URL", text)
         self.assertNotIn("Vercel", text)
 
+    def test_server_wrapper_does_not_source_factory_env(self) -> None:
+        wrapper = (ROOT / "deploy" / "gamewiki-server").read_text(encoding="utf-8")
+        runner = (ROOT / "deploy" / "gamewiki-server-runner.py").read_text(encoding="utf-8")
+        self.assertNotIn("source /srv/game-wiki-factory/secrets/factory.env", wrapper)
+        self.assertIn("gamewiki-server-runner.py", wrapper)
+        self.assertIn("parse_dotenv", runner)
+        self.assertIn("os.execve", runner)
+
 
 if __name__ == "__main__":
     unittest.main()

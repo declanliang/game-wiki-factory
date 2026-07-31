@@ -261,8 +261,9 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized.get("manualKeywords")
     )
     publication: dict[str, Any] = {}
-    # New background jobs complete the Private GitHub and Cloudflare Pages
-    # Direct Upload transaction. Custom-domain DNS/binding remains operator-owned.
+    # New background jobs complete the Private GitHub and Git-integrated
+    # Cloudflare Pages transaction. Custom-domain DNS/binding remains
+    # operator-owned.
     publication.setdefault("skipCloudflare", False)
     normalized["publication"] = publication
     # Validate the fields shared with the foreground CLI.
