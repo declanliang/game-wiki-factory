@@ -70,8 +70,12 @@ class JobAgent2Tests(unittest.TestCase):
         ):
             env = _codex_child_env()
             command = _codex_command(Path("project"), Path("report.json"), env)
+        self.assertEqual(env["CODEX_API_KEY"], "test-key")
         self.assertEqual(env["OPENAI_API_KEY"], "test-key")
         self.assertEqual(env["OPENAI_BASE_URL"], "https://api.example.test/v1")
+        self.assertIn('model_provider="agent2_proxy"', command)
+        self.assertIn('model_providers.agent2_proxy.base_url="https://api.example.test/v1"', command)
+        self.assertIn('model_providers.agent2_proxy.env_key="CODEX_API_KEY"', command)
         self.assertIn("--model", command)
         self.assertIn("gpt-test", command)
         self.assertIn("model_reasoning_effort=\"medium\"", command)

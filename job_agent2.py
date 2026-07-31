@@ -359,6 +359,7 @@ def _codex_child_env() -> dict[str, str]:
     env.setdefault("PYTHONIOENCODING", "utf-8")
     api_key = env.get("GAMEWIKI_AGENT2_OPENAI_API_KEY", "").strip() or env.get("codex_cli_api_key", "").strip()
     if api_key:
+        env["CODEX_API_KEY"] = api_key
         env["OPENAI_API_KEY"] = api_key
     base_url = env.get("GAMEWIKI_AGENT2_OPENAI_BASE_URL", "").strip() or env.get("base_url", "").strip()
     if base_url:
@@ -399,6 +400,46 @@ def _codex_command(project: Path, report_path: Path, env: dict[str, str]) -> lis
         "--color",
         "never",
     ]
+    base_url = (
+        os.environ.get("GAMEWIKI_AGENT2_OPENAI_BASE_URL", "").strip()
+        or env.get("GAMEWIKI_AGENT2_OPENAI_BASE_URL", "").strip()
+        or env.get("base_url", "").strip()
+    )
+    if base_url:
+        provider = os.environ.get("GAMEWIKI_AGENT2_CODEX_PROVIDER", "").strip() or "agent2_proxy"
+        wire_api = (
+            os.environ.get("GAMEWIKI_AGENT2_CODEX_WIRE_API", "").strip()
+            or env.get("GAMEWIKI_AGENT2_CODEX_WIRE_API", "").strip()
+            or env.get("wire_api", "").strip()
+            or "responses"
+        )
+        command.extend(
+            [
+                "--config",
+                f"model_provider={_toml_string(provider)}",
+                "--config",
+                f"model_providers.{provider}.name={_toml_string('Agent2 configured provider')}",
+                "--config",
+                f"model_providers.{provider}.base_url={_toml_string(base_url)}",
+                "--config",
+                f"model_providers.{provider}.env_key={_toml_string('CODEX_API_KEY')}",
+                "--config",
+                f"model_providers.{provider}.wire_api={_toml_string(wire_api)}",
+            ]
+        )
+        requires_openai_auth = (
+            os.environ.get("GAMEWIKI_AGENT2_REQUIRES_OPENAI_AUTH", "").strip()
+            or env.get("GAMEWIKI_AGENT2_REQUIRES_OPENAI_AUTH", "").strip()
+            or env.get("requires_openai_auth", "").strip()
+        )
+        if requires_openai_auth:
+            command.extend(
+                [
+                    "--config",
+                    f"model_providers.{provider}.requires_openai_auth="
+                    f"{'true' if requires_openai_auth.casefold() in {'1', 'true', 'yes', 'on'} else 'false'}",
+                ]
+            )
     model = os.environ.get("GAMEWIKI_AGENT2_CODEX_MODEL", "").strip() or env.get("model", "").strip()
     if model:
         command.extend(["--model", model])
