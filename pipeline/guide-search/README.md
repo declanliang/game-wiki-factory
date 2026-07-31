@@ -256,7 +256,7 @@ ToAPIs 返回 token 用量但不返回美元金额，因此实际 LLM 费用以 
 |`get_search/llm_cluster.py`|ToAPIs 联网研究、结构化聚类和硬过滤|
 |`get_search/pipeline.py`|完整流程编排和产物写入|
 |`tests/`|单元测试|
-|`docs/architecture.md`|架构、字段和约束说明|
+|Factory `docs/HANDOFF.md`|跨阶段架构、字段所有权和约束说明|
 
 ## 测试
 

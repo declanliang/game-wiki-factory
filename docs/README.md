@@ -1,23 +1,20 @@
-# Game Wiki Factory 文档导航
+# Game Wiki Factory 文档入口
 
-本目录只保留当前生产契约、运维事实和版本说明。历史讨论不应被当成操作手册；需要追溯时使用 Git 历史。
+如果你刚接手，只读两个文件：
 
-## 接手必读
+1. 根目录 `README.md`
+2. `docs/HANDOFF.md`
 
-1. `../README.md`
-2. `architecture.md`
-3. `runbook.md`
-4. `ai-handoff.md`
-5. 全新环境再读 `bootstrap-from-github.md`
+其余文档只在需要查具体合同或 Agent 规则时再打开。
 
-## 当前文档分区
+## 当前保留文档
 
-- `contracts/`：输入、内容/SEO 和分批语言发布契约。
-- `operations/`：后台队列、服务器部署与故障处理。
-- `deployment/`：Git-integrated Cloudflare Pages 唯一发布方式。
-- `agents/`：OpenClaw Factory Agent 与飞书游戏管理员中的 Growth 专项职责。
-- `advertising/`：Factory shared ad profile、Pages provisioning 和模板运行时合同。
-- `releases/`：每个候选版本的验收边界。
-- `design/`：仍有参考价值的设计决策；它们不覆盖上面的生产契约。
+- `HANDOFF.md`：唯一接手主文档，包含项目边界、流水线、运维、恢复、服务器和 Agent2。
+- `operations/server-and-jobs.md`：生产服务器与后台队列命令速查。
+- `contracts/`：站点输入、内容/SEO、语言分批发布合同。
+- `deployment/cloudflare-pages.md`：Cloudflare Pages Git-integrated 发布合同。
+- `advertising/adsterra-environment-contract.md`：shared ad profile、Pages 环境变量和模板展示合同。
+- `agents/openclaw-factory.md`：OpenClaw operator 对话和状态汇报规则。
+- `agents/growth-agent.md`：上线后 GSC/GSA 增长专项职责。
 
-游戏产物不需要复制这些 Factory 文档。生成项目只保留运行站点必需的代码、`intake/` 契约文件和 `.gamewiki/` 审计产物。
+历史设计稿、旧版本验收记录、Vercel 迁移过程和临时审计文档不再保存在 `docs/`；需要追溯时查看 Git 历史。

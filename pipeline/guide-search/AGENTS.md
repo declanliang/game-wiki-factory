@@ -4,7 +4,7 @@
 
 ## 首次接手
 
-1. 完整阅读 `README.md` 和 `docs/architecture.md`。
+1. 完整阅读本模块 `README.md` 和 Factory 根目录 `docs/HANDOFF.md`。
 2. 运行离线检查：
 
 ```powershell

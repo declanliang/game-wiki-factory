@@ -2,7 +2,7 @@
 
 输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库和 Cloudflare Pages。Factory 自动创建连接该 Private repo 的 Git-integrated Pages 项目、设置 `NEXT_PUBLIC_SITE_URL` 并触发 Cloudflare 服务端构建；提供正式域名时还会自动创建或复用同名 Custom Domain，DNS/验证 pending 才交给站点运营者完成。历史站点继续保留原托管，不在新任务中重建或迁移。
 
-第一次接手先读 [文档导航](docs/README.md) 和 [立即接手指南](docs/takeover.md)。全新电脑或服务器仅凭 GitHub 恢复时，再按 [从零恢复手册](docs/bootstrap-from-github.md) 操作。
+第一次接手先读 [文档导航](docs/README.md) 和 [接手手册](docs/HANDOFF.md)。
 
 固定语言为英语、西班牙语、德语、法语和日语。生成的网站位于 factory 同级目录，例如 `Games/hellhole/`。
 
@@ -67,7 +67,7 @@ Copy-Item jobs\batch.example.json jobs\daily.json
 python gamewiki.py jobs submit-batch --config jobs\daily.json
 ```
 
-今后所有游戏都按新项目从空 workspace 开始生产，不再接受旧站 `rebuild` 输入。失败恢复只重试原 Job 并复用它自己的 checkpoint。完整状态机见 [后台任务系统](docs/operations/background-jobs.md)。
+今后所有游戏都按新项目从空 workspace 开始生产，不再接受旧站 `rebuild` 输入。失败恢复只重试原 Job并复用它自己的 checkpoint。完整状态机见 [接手手册](docs/HANDOFF.md) 与 [服务器速查](docs/operations/server-and-jobs.md)。
 
 成功、最终失败、取消和 `needs_attention` 会进入持久化通知 outbox；渠道成功送达后再用 `jobs notifications --ack ...` 确认。共享 API 余额不足时，Factory 会在首条告警中标明供应商、端点和凭据组，并把其余任务放入 `quota_wait`，不再逐任务告警；充值后重试首条 Job 即可统一续跑。Agent 只负责队列控制和 runbook 内的常规恢复，任何核心代码或生产逻辑问题必须升级给 Codex/基础设施维护者，禁止直接热修服务器工作树。
 
@@ -75,9 +75,9 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 服务器的 Supervisor 每分钟检查一次失败事件。只有文章生成/翻译明确保存了有效 checkpoint、且失败属于可继续的内容阶段时，才自动冷却并恢复同一个 Job；默认最多 6 轮。Supervisor 不能处理的单任务内容、MDX、metadata、slug/目录、checkpoint 投影和已知 transient publish 问题，会再交给 `gamewiki-agent2.timer` 调用 Codex CLI 做受限修复。Agent2 只修单个游戏产物和 checkpoint，不修改 Factory 源码、不读取 secrets、不推送 GitHub；修完后只把同一 Job 放回 `retry_wait`，最终续跑、Git push 和 Pages 发布仍由 Worker 执行。身份、密钥/余额、schema、核心代码、DNS、权限和账号问题仍通知用户和 Codex。这样批量任务不依赖 OpenClaw 对话持续在线。
 
-当前稳定生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。0730 版本的验收规则见 [docs/releases/v1_0730.md](docs/releases/v1_0730.md)。`v1_0728` 及更早版本继续作为历史认证记录，不因 Factory 升级而自动重建。
+当前稳定生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。当前生产边界见 [接手手册](docs/HANDOFF.md)。
 
-首页采用任务优先的信息架构，并支持有证据的 Codes/Update 等“当前无结果”状态页；网站本身即 Wiki，不生成 `/wiki/` 分类。设计与验收边界见 [docs/design/task-first-home-and-status-pages.md](docs/design/task-first-home-and-status-pages.md)。
+首页采用任务优先的信息架构，并支持有证据的 Codes/Update 等“当前无结果”状态页；网站本身即 Wiki，不生成 `/wiki/` 分类。
 
 Roblox 配置：
 
@@ -273,7 +273,7 @@ game-wiki-factory/
 └─ docs/
 ```
 
-跨模块约束和维护说明见 `AGENTS.md`、`docs/architecture.md`、`docs/runbook.md` 和 `docs/ai-handoff.md`。
+跨模块约束和维护说明见 `AGENTS.md` 和 `docs/HANDOFF.md`。
 
 ## 测试
 

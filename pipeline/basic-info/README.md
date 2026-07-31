@@ -265,7 +265,7 @@ python -m unittest discover -s tests -v
 
 - [文档总目录](docs/README.md)
 - [原始人工流程](docs/source/第四课、游戏首页、文章页建站数据准备%20副本.md)
-- [输出规范与任务拆分](docs/design/首页数据采集自动化-输出规范与任务拆分.md)
+- 当前跨阶段输出边界以 Factory 根目录 `docs/HANDOFF.md` 和 `docs/contracts/site-input.md` 为准。
 - [API 调研与方案](docs/research/游戏基础配置自动化-调研与方案.md)
 - [Prompt 契约](docs/prompts/Task-0至4-Prompt契约.md)
 - [Anime 网页版基准样本](docs/examples/Anime%20Expeditions%20GPT%20产出示例.md)

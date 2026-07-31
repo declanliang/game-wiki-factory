@@ -85,7 +85,7 @@ python -m gamewiki_automation "Anime Expeditions" "PursuitCore"
 
 - 面向普通使用者的变化写入 `README.md`。
 - 当前问题写入 `docs/KNOWN_ISSUES.md`。
-- 架构和字段决策写入 `docs/design/`。
+- 架构和字段决策优先写入 Factory 根目录 `docs/HANDOFF.md`；模块内部细节写入本模块 `docs/` 下的现有分类。
 - API 历史测试写入 `docs/research/`，不要塞回 README。
 - 样本和对比材料写入 `docs/examples/`。
 - 验收结果写入 `docs/testing/`。
