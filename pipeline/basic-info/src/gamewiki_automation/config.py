@@ -36,8 +36,8 @@ class Settings:
                 or os.getenv("perplexity_api_key")
                 or None
             ),
-            toapis_model=os.getenv("TOAPIS_MODEL", "gpt-5.3-codex-official"),
-            toapis_web_model=os.getenv("TOAPIS_WEB_MODEL", "gpt-5.3-codex-official"),
+            toapis_model=os.getenv("TOAPIS_MODEL", "gemini-2.0-flash-official"),
+            toapis_web_model=os.getenv("TOAPIS_WEB_MODEL", "gemini-2.0-flash-official"),
             toapis_reasoning_effort=os.getenv("TOAPIS_REASONING_EFFORT", "low"),
             perplexity_model=os.getenv("PERPLEXITY_MODEL", "sonar-pro"),
             output_dir=root / os.getenv("GAMEWIKI_OUTPUT_DIR", "output"),
