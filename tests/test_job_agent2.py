@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -87,9 +88,9 @@ class JobAgent2Tests(unittest.TestCase):
             {
                 "GAMEWIKI_DATA_DIR": str(Path(temporary) / "data"),
                 "GAMEWIKI_PROJECTS_ROOT": str(Path(temporary) / "projects"),
-                "GAMEWIKI_AGENT2_CODEX_BIN": "python",
+                "GAMEWIKI_AGENT2_CODEX_BIN": sys.executable,
                 "GAMEWIKI_AGENT2_CODEX_COMMAND_JSON": json.dumps([
-                    "python",
+                    sys.executable,
                     "-c",
                     "import json,sys; json.dump({'status':'repaired','summary':'fixed mdx','filesChanged':['content/en/a.mdx'],'verification':['local check passed']}, open(sys.argv[1], 'w', encoding='utf-8'))",
                     "{report}",
