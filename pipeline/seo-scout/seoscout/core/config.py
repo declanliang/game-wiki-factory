@@ -122,7 +122,7 @@ class Config:
     LLM_API_KEY = ""
     LLM_API_KEYS = []
     LLM_API_BASE_URL = "https://api.apifast.tech/v1"
-    LLM_MODEL = "gemini-2.5-flash"
+    LLM_MODEL = "gemini-2.5-flash-official"
     LLM_TEMPERATURE = 0.7
     LLM_MAX_TOKENS = 10000
     LLM_REASONING_EFFORT = "low"
@@ -261,7 +261,7 @@ class Config:
         keys = [value for _slot, value in sorted(numbered)]
         cls.LLM_API_KEYS = keys or ([cls.LLM_API_KEY] if cls.LLM_API_KEY else [])
         cls.LLM_API_BASE_URL = llm_cfg.get("base_url", "https://api.apifast.tech/v1")
-        cls.LLM_MODEL = llm_cfg.get("model", "gemini-2.5-flash")
+        cls.LLM_MODEL = llm_cfg.get("model", "gemini-2.5-flash-official")
         cls.LLM_TEMPERATURE = float(llm_cfg.get("temperature", 0.7))
         cls.LLM_MAX_TOKENS = int(llm_cfg.get("max_tokens", 10000))
         cls.LLM_REASONING_EFFORT = str(llm_cfg.get("reasoning_effort", "low")).strip()
