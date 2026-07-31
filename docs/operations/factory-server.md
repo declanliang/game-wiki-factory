@@ -22,7 +22,7 @@
 sudo systemctl status gamewiki-worker gamewiki-control
 sudo systemctl restart gamewiki-worker gamewiki-control
 sudo journalctl -u gamewiki-worker -n 200 --no-pager
-sudo systemctl list-timers gamewiki-cleanup.timer
+sudo systemctl list-timers 'gamewiki-*'
 ```
 
 - `gamewiki-worker`：默认并发领取两个游戏任务，同一时刻只允许一个 npm production build。
@@ -30,6 +30,7 @@ sudo systemctl list-timers gamewiki-cleanup.timer
 - `gamewiki-cleanup.timer`：按保留策略清理已经发布的临时工作区。
 - `gamewiki-notifier.timer`：每2分钟消费持久化通知 outbox；不调用 LLM Agent。
 - `gamewiki-supervisor.timer`：每分钟检查 checkpoint-safe 内容失败并冷却续跑；不调用 LLM Agent。
+- `gamewiki-agent2.timer`：每5分钟调用 Codex CLI 处理受限的单任务内容/MDX/metadata/checkpoint 投影异常；修完后交回 Worker 续跑和发布。
 - 服务崩溃或服务器重启后，过期 lease 会被回收；流水线从磁盘 checkpoint 继续。
 
 通知渠道配置完成后安装 timer：
@@ -37,13 +38,14 @@ sudo systemctl list-timers gamewiki-cleanup.timer
 ```bash
 sudo cp deploy/systemd/gamewiki-notifier.service deploy/systemd/gamewiki-notifier.timer /etc/systemd/system/
 sudo cp deploy/systemd/gamewiki-supervisor.service deploy/systemd/gamewiki-supervisor.timer /etc/systemd/system/
+sudo cp deploy/systemd/gamewiki-agent2.service deploy/systemd/gamewiki-agent2.timer /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable --now gamewiki-notifier.timer gamewiki-supervisor.timer
+sudo systemctl enable --now gamewiki-notifier.timer gamewiki-supervisor.timer gamewiki-agent2.timer
 ```
 
 发送失败时消息保持 pending 并退避，下一次 timer 继续尝试。
 
-Supervisor 只执行 `docs/operations/background-jobs.md` 中的确定性白名单策略。它不读取或修改密钥，不运行 Git 维护，不热改代码。自动恢复预算耗尽后，Notifier 才把异常交给用户/Codex。
+Supervisor 只执行 `docs/operations/background-jobs.md` 中的确定性白名单策略。Agent2 是第二层、受限的 Codex CLI 恢复器，只能修单个游戏 workspace，并且不负责 GitHub push 或 Pages 发布。二者都不读取或修改密钥，不运行 Factory Git 维护，不热改 Factory 源码。自动恢复预算耗尽或 Agent2 判定越界后，Notifier 才把异常交给用户/Codex。
 
 成功发布后会立即删除可重建的 `node_modules/` 和 `.next/`，但保留源码、intake、调研 checkpoint 和日志到成功任务保留期结束。可用 `GAMEWIKI_PRUNE_SUCCESS_BUILD_ARTIFACTS=0` 临时关闭这一行为。
 
@@ -161,6 +163,7 @@ sudo systemctl --no-pager --full status gamewiki-worker gamewiki-control
 sudo systemctl list-timers 'gamewiki-*'
 git rev-parse HEAD
 /usr/local/bin/gamewiki jobs list --json
+/usr/local/bin/gamewiki agent2 --dry-run --once
 ```
 
 OpenClaw 的 workspace 指令如果变化，还要把 `deploy/openclaw/AGENTS.md`、`SOUL.md`、`TOOLS.md` 同步到 `/home/ubuntu/.openclaw/workspace-game-wiki-operator/`；仅更新 Factory Git checkout 不会自动更新这个独立 workspace。

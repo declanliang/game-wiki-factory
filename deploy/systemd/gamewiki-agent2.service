@@ -1,0 +1,15 @@
+[Unit]
+Description=Recover bounded Game Wiki Factory failures with Codex Agent2
+After=network-online.target gamewiki-worker.service gamewiki-supervisor.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/srv/game-wiki-factory/app
+EnvironmentFile=/srv/game-wiki-factory/secrets/factory.env
+Environment=HOME=/home/ubuntu
+Environment=PATH=/srv/game-wiki-factory/venv/bin:/home/ubuntu/.local/bin:/home/ubuntu/.local/share/pnpm:/home/ubuntu/.nvm/versions/node/v22.22.3/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/srv/game-wiki-factory/venv/bin/python gamewiki.py agent2 --once --limit 2
+NoNewPrivileges=true
+PrivateTmp=true

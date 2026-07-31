@@ -85,7 +85,7 @@ def _handler(token: str):
                         if action == "retry":
                             result = retry_job(db, row)
                         else:
-                            db.execute("UPDATE jobs SET cancel_requested=1,status=CASE WHEN status IN ('queued','retry_wait','quota_wait','needs_attention') THEN 'cancelled' ELSE status END,updated_at=? WHERE id=?", (_now(), job_id))
+                            db.execute("UPDATE jobs SET cancel_requested=1,status=CASE WHEN status IN ('queued','retry_wait','quota_wait','needs_attention','agent_repair') THEN 'cancelled' ELSE status END,updated_at=? WHERE id=?", (_now(), job_id))
                             cancelled = db.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()
                             _event(
                                 db,

@@ -79,3 +79,4 @@ C:\Users\liang\Documents\Games\<game-slug>，保留 intake 和 `.gamewiki` check
 5. 修改跨模块契约时同步更新 schema、模板和测试。
 6. 完成后报告验证证据，不只说“代码已改”。
 7. 服务器/OpenClaw 接手时优先阅读 `docs/agents/openclaw-factory.md`，只通过后台队列控制长任务。
+8. 服务器 Agent2 只修单个游戏产物和 checkpoint，不修 Factory 源码、不读取 secrets、不推送 GitHub；成功后由 Worker 续跑和发布。

@@ -110,7 +110,7 @@ Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status
 
 OpenClaw cron 建议每2分钟执行一次 `/usr/local/bin/gamewiki notifier --once`。这是确定性 dispatcher，不调用 LLM；它将 `succeeded`、`failed`、`cancelled` 或 `needs_attention` 送到配置渠道，只有发送命令成功后才确认 notification ID。对话断线、Agent 重启和重复轮询都不会丢消息；未确认消息会退避重试。每日汇总可以另设 Agent cron，但不能代替终态通知。
 
-服务器还运行每分钟一次的确定性 Supervisor。文章生成或翻译已保存部分 checkpoint、但 ToAPIs/网络在有界 Worker 重试后仍失败时，Supervisor 会自动恢复同一 Job；OpenClaw 不需要询问用户，也不得创建替代 Job。身份、凭据、余额、schema、代码、构建和发布安全问题不会被 Supervisor 接管，仍按 `needs_attention` 汇报。
+服务器还运行每分钟一次的确定性 Supervisor。文章生成或翻译已保存部分 checkpoint、但 ToAPIs/网络在有界 Worker 重试后仍失败时，Supervisor 会自动恢复同一 Job；OpenClaw 不需要询问用户，也不得创建替代 Job。Supervisor 之后还有 `gamewiki-agent2.timer`：它调用 Codex CLI 修复受限的单任务内容、MDX、metadata、slug/checkpoint 投影和已知 transient publish 问题。Agent2 不推送 GitHub、不运行 Cloudflare 发布、不修改 Factory 源码；修复后只把原 Job 交回 Worker 续跑。身份、凭据、余额、schema、核心代码、DNS、权限和账号问题仍按 `needs_attention` 汇报。
 
 批量生产时，用户只需发送一个 `siteBatch` JSON 并要求提交后台队列：
 
@@ -141,7 +141,7 @@ OpenClaw cron 建议每2分钟执行一次 `/usr/local/bin/gamewiki notifier --o
 标准 Prompt：
 
 ```text
-请验证并使用 jobs submit-batch 提交附件中的 Game Wiki 批量 JSON。返回每个 Job ID 后结束本轮，不要在对话进程运行流水线。后台 Worker、Supervisor 和 Notifier 会负责执行、checkpoint-safe 恢复和终态通知。只有收到最终 needs_attention 时才汇报根因并升级，不要创建重复 Job。
+请验证并使用 jobs submit-batch 提交附件中的 Game Wiki 批量 JSON。返回每个 Job ID 后结束本轮，不要在对话进程运行流水线。后台 Worker、Supervisor、Agent2 和 Notifier 会负责执行、checkpoint-safe/单任务受限恢复和终态通知。只有收到最终 needs_attention 时才汇报根因并升级，不要创建重复 Job。
 ```
 
 在尚未绑定具体聊天渠道前，只部署 outbox，不得假装已经具备主动送达能力。渠道绑定完成后，应做一次“生成测试事件 → 收到消息 → acknowledge → 再次查询为空”的端到端验收。
@@ -149,7 +149,9 @@ OpenClaw cron 建议每2分钟执行一次 `/usr/local/bin/gamewiki notifier --o
 ## 故障处理权限
 
 - **Worker 自动处理**：429、常见 5xx、SSL/网络超时等已分类的瞬时错误；使用有界重试和 checkpoint。
-- **Agent 可以处理**：查询、读日志、按现有 runbook 重试/取消，以及权威官网 URL 明确消除歧义后的输入修正。Agent 不得扩大 API 重试次数。
+- **Supervisor 自动处理**：明确 checkpoint-safe 的文章/翻译临时失败。
+- **Agent2 自动处理**：受限的单任务内容、MDX、metadata、slug/checkpoint 投影和已知 transient publish 问题；修完后交回 Worker。
+- **OpenClaw 可以处理**：查询、读日志、按现有 runbook 重试/取消，以及权威官网 URL 明确消除歧义后的输入修正。OpenClaw 不得扩大 API 重试次数，也不得抢 Agent2 的工作。
 - **必须升级给 Codex/基础设施维护者**：任何源代码、测试、数据库、任务状态机、Basic Info、关键词、内容/QA、GitHub/Cloudflare 发布或成本控制逻辑问题。
 
 Agent 发现疑似代码 bug 时只能报告证据并保持任务为 `needs_attention`。禁止直接修改服务器工作树、提交 Git、拉取代码或重启服务。正式修复必须在 Factory 本地完成回归测试、提交 GitHub，再在无运行任务的维护窗口部署。

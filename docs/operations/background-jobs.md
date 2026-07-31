@@ -47,6 +47,7 @@ gamewiki.py jobs submit/status/logs/retry/cancel
 - `retry_wait`：可重试错误，等待 `available_at`。
 - `needs_attention`：身份歧义、配置、余额、权限、schema/代码等不能安全自动处理的问题。
 - `quota_wait`：某个共享 API 已触发额度熔断；任务保留原 Job ID 和 checkpoint，等待运营者恢复凭据后统一续跑。
+- `agent_repair`：Agent2 已领取该失败 Job 做受限修复；Worker 不会同时领取，修复成功后回到 `retry_wait`。
 
 API quota/credit/balance 耗尽会记录为 `quota_exhausted`，并按供应商打开全局额度熔断。首条通知必须明确 API 名称、非敏感凭据组（例如 `LLM_API_KEY_1..N`）和安全端点域名；队列中尚未开始或等待重试的任务统一进入 `quota_wait`，同一熔断下不再逐任务告警。已经并发运行的任务若随后遇到相同额度错误，也归入该熔断而不生成第二条通知。充值或更换对应凭据后，只重试首条通知中的原 Job ID；CLI 会关闭该供应商熔断并统一恢复暂停任务，所有任务继续复用已经落盘的 checkpoint。
 
@@ -73,6 +74,31 @@ API quota/credit/balance 耗尽会记录为 `quota_exhausted`，并按供应商�
 - `GAMEWIKI_DISK_PAUSE_PERCENT=90`
 
 Supervisor 在磁盘达到暂停阈值时不会恢复任务。
+
+`gamewiki-agent2.timer` 是第二层恢复器。它在 Supervisor 无法继续时，每 5 分钟检查仍处于 `needs_attention`/`failed` 的站点 Job；只有错误文本命中单任务、低风险、可由 Codex 判断的模式时才领取。Agent2 使用 Codex CLI，但权限边界比 OpenClaw 更窄：
+
+- 可以读该游戏目录的 `.gamewiki/manifest.json`、checkpoint、`intake/`、`content/` 和本地日志；可以修复 MDX/metadata/title/description 重复、翻译格式化不完整、slug/目录投影不一致、可由现有 manifest/intake 推导的缺失文件，以及明确可重试的 transient publish 状态。
+- 不可以读取或打印 `.env`/`factory.env`，不可以修改 Factory 源码、测试、数据库 schema、systemd、密钥或服务器 Git 工作树。
+- 不可以执行 `git push`、Cloudflare/GitHub 发布命令或 `gamewiki.py jobs retry`。Agent2 成功后只把原 Job 设为 `retry_wait`，Worker 继续从 checkpoint 运行并完成最终 GitHub/Pages 发布。
+- 不可以使用 `refresh`、`recluster`、`overwrite` 等会重复付费阶段的参数。
+- 身份歧义、账号权限、API 余额/key、DNS/custom domain、schema、核心模板或发布器 bug 必须升级给 Agent1/基础设施维护者。
+
+Agent2 每个 Job 默认最多运行 2 次。每次运行写入 `data/agent2/<job-id>/run-N.log`、`run-N-input.json` 和 `run-N-report.json`，并在 SQLite 写入 `job.agent2_claimed`、`job.agent2_requeued` 或 `job.agent2_escalated` 事件。领取后会抑制旧的临时终态通知；如果 Agent2 也无法处理，会重新产生需要人工处理的通知。
+
+```bash
+/usr/local/bin/gamewiki agent2 --once
+/usr/local/bin/gamewiki agent2 --dry-run --once
+```
+
+相关环境变量：
+
+- `GAMEWIKI_AGENT2_ENABLED=1`
+- `GAMEWIKI_AGENT2_MAX_RUNS=2`
+- `GAMEWIKI_AGENT2_CODEX_BIN=codex`
+- `GAMEWIKI_AGENT2_CODEX_MODEL=`（可选）
+- `GAMEWIKI_AGENT2_CODEX_TIMEOUT_SECONDS=2700`
+- `GAMEWIKI_AGENT2_STALE_SECONDS=5400`
+- `GAMEWIKI_AGENT2_CODEX_COMMAND_JSON=`（可选，高级覆盖；JSON 字符串数组，支持 `{project}`、`{report}`、`{schema}` 占位）
 
 ## Checkpoint 保留边界
 

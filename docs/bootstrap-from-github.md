@@ -80,7 +80,7 @@ sudo chmod 755 /usr/local/bin/gamewiki
 sudo cp /srv/game-wiki-factory/app/deploy/systemd/gamewiki-* /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now gamewiki-worker gamewiki-control
-sudo systemctl enable --now gamewiki-notifier.timer gamewiki-supervisor.timer gamewiki-cleanup.timer
+sudo systemctl enable --now gamewiki-notifier.timer gamewiki-supervisor.timer gamewiki-agent2.timer gamewiki-cleanup.timer
 ```
 
 如果 Node 安装路径不同，先修改 `/usr/local/bin/gamewiki` 的 `PATH`。systemd 单元以 `ubuntu` 运行，因此 `data/`、`workspaces/` 和应用读取权限必须与之匹配。
@@ -89,7 +89,7 @@ sudo systemctl enable --now gamewiki-notifier.timer gamewiki-supervisor.timer ga
 
 创建专用 `game-wiki-operator` Agent 和 workspace，把 `deploy/openclaw/AGENTS.md`、`SOUL.md`、`TOOLS.md` 放入该 workspace。Agent 只能提交、查询、取消和按 runbook 重试任务；不能读取 secrets、修改 Factory 源码或在聊天进程运行长任务。
 
-配置通知渠道时，将私有 argv JSON 写入 `GAMEWIKI_NOTIFICATION_COMMAND_JSON`，且恰有一个 `{message}` 占位符。Notifier 返回成功后才确认 outbox。API 额度/余额不足会为具体供应商打开额度熔断：首个 Job 进入 `needs_attention` 并明确 API、端点和非敏感凭据组，其余任务进入无独立告警的 `quota_wait`。Supervisor 不会绕过熔断；凭据恢复后重试首条 Job 会统一续跑暂停任务。
+配置通知渠道时，将私有 argv JSON 写入 `GAMEWIKI_NOTIFICATION_COMMAND_JSON`，且恰有一个 `{message}` 占位符。Notifier 返回成功后才确认 outbox。API 额度/余额不足会为具体供应商打开额度熔断：首个 Job 进入 `needs_attention` 并明确 API、端点和非敏感凭据组，其余任务进入无独立告警的 `quota_wait`。Supervisor 不会绕过熔断；凭据恢复后重试首条 Job 会统一续跑暂停任务。Codex CLI Agent2 的认证变量同样只放私有 `factory.env`；它只处理单任务内容/checkpoint 修复，不能读取或打印 secrets。
 
 ## 健康检查与冒烟验收
 
@@ -97,6 +97,7 @@ sudo systemctl enable --now gamewiki-notifier.timer gamewiki-supervisor.timer ga
 /usr/local/bin/gamewiki jobs list --json
 /usr/local/bin/gamewiki notifier --dry-run
 /usr/local/bin/gamewiki supervisor --dry-run
+/usr/local/bin/gamewiki agent2 --dry-run --once
 sudo systemctl --no-pager --full status gamewiki-worker gamewiki-control
 sudo systemctl list-timers 'gamewiki-*'
 df -h / /srv/game-wiki-factory

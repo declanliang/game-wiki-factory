@@ -21,6 +21,9 @@ if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "supervisor":
         from job_supervisor import supervisor_cli
         raise SystemExit(supervisor_cli(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "agent2":
+        from job_agent2 import agent2_cli
+        raise SystemExit(agent2_cli(sys.argv[2:]))
     if len(sys.argv) > 2 and sys.argv[1] == "--config":
         from factory_cli import dispatch
         raise SystemExit(dispatch("run-config", sys.argv[2:]))

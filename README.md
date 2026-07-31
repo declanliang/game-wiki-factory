@@ -54,6 +54,7 @@ python gamewiki.py jobs list
 python gamewiki.py jobs notifications --json
 python gamewiki.py notifier --once
 python gamewiki.py supervisor --once
+python gamewiki.py agent2 --once
 python gamewiki.py jobs status <job-id>
 python gamewiki.py jobs logs <job-id> --tail 200
 python gamewiki.py jobs retry <job-id>
@@ -72,7 +73,7 @@ python gamewiki.py jobs submit-batch --config jobs\daily.json
 
 服务器可通过 `GAMEWIKI_NOTIFICATION_COMMAND_JSON` 配置渠道发送命令，并定时执行 `gamewiki.py notifier --once`。Dispatcher 只在发送命令返回成功后确认消息；发送失败会保留并指数退避，不需要让聊天 Agent 常驻或反复消耗 LLM。
 
-服务器的 Supervisor 每分钟检查一次失败事件。只有文章生成/翻译明确保存了有效 checkpoint、且失败属于可继续的内容阶段时，才自动冷却并恢复同一个 Job；默认最多 6 轮。身份、密钥/余额、schema、代码、构建、GitHub/Cloudflare 安全问题不会自动处理，最终才通知用户和 Codex。这样批量任务不依赖 OpenClaw 对话持续在线。
+服务器的 Supervisor 每分钟检查一次失败事件。只有文章生成/翻译明确保存了有效 checkpoint、且失败属于可继续的内容阶段时，才自动冷却并恢复同一个 Job；默认最多 6 轮。Supervisor 不能处理的单任务内容、MDX、metadata、slug/目录、checkpoint 投影和已知 transient publish 问题，会再交给 `gamewiki-agent2.timer` 调用 Codex CLI 做受限修复。Agent2 只修单个游戏产物和 checkpoint，不修改 Factory 源码、不读取 secrets、不推送 GitHub；修完后只把同一 Job 放回 `retry_wait`，最终续跑、Git push 和 Pages 发布仍由 Worker 执行。身份、密钥/余额、schema、核心代码、DNS、权限和账号问题仍通知用户和 Codex。这样批量任务不依赖 OpenClaw 对话持续在线。
 
 当前稳定生产版本由根目录 `release.json` 固定，普通 Git commit 不改变版本。0730 版本的验收规则见 [docs/releases/v1_0730.md](docs/releases/v1_0730.md)。`v1_0728` 及更早版本继续作为历史认证记录，不因 Factory 升级而自动重建。
 

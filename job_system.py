@@ -1174,7 +1174,7 @@ def jobs_cli(argv: list[str]) -> int:
             if result["quotaProvider"]:
                 print(json.dumps(result, ensure_ascii=False))
         elif args.command == "cancel":
-            db.execute("UPDATE jobs SET cancel_requested=1,status=CASE WHEN status IN ('queued','retry_wait','quota_wait','needs_attention') THEN 'cancelled' ELSE status END,updated_at=? WHERE id=?", (_now(), args.job_id))
+            db.execute("UPDATE jobs SET cancel_requested=1,status=CASE WHEN status IN ('queued','retry_wait','quota_wait','needs_attention','agent_repair') THEN 'cancelled' ELSE status END,updated_at=? WHERE id=?", (_now(), args.job_id))
             cancelled = db.execute("SELECT status FROM jobs WHERE id=?", (args.job_id,)).fetchone()
             _event(
                 db,
