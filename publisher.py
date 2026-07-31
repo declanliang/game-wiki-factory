@@ -878,6 +878,40 @@ def _ensure_private_github_repo(full_repo: str, project: Path, env: dict[str, st
         raise RuntimeError(f"GitHub repository visibility must be PRIVATE: {full_repo}")
 
 
+def _github_repo_from_remote_url(url: str) -> str:
+    value = url.strip()
+    if value.startswith("git@github.com:"):
+        path = value.split(":", 1)[1]
+    else:
+        parsed = urllib.parse.urlparse(value)
+        if (parsed.hostname or "").casefold() != "github.com":
+            return ""
+        path = parsed.path.lstrip("/")
+    if path.endswith(".git"):
+        path = path[:-4]
+    parts = [part for part in path.split("/") if part]
+    if len(parts) != 2:
+        return ""
+    return f"{parts[0]}/{parts[1]}".casefold()
+
+
+def _ensure_origin_remote(project: Path, full_repo: str, env: dict[str, str]) -> None:
+    expected_url = f"https://github.com/{full_repo}.git"
+    expected_repo = full_repo.casefold()
+    remotes = _run(["git", "remote"], project).splitlines()
+    if "origin" not in remotes:
+        _run(["git", "remote", "add", "origin", expected_url], project)
+        return
+    current_repo = _github_repo_from_remote_url(
+        _run(["git", "remote", "get-url", "origin"], project)
+    )
+    if current_repo != expected_repo:
+        raise RuntimeError(
+            "Existing git origin remote does not match the target Private "
+            f"GitHub repository {full_repo}; refusing to push"
+        )
+
+
 def _resolve_git_author(project: Path, env: dict[str, str]) -> tuple[str, str]:
     """Return a GitHub-recognizable author without exposing the GitHub token."""
     name = env.get("FACTORY_GIT_AUTHOR_NAME", "").strip()
@@ -964,9 +998,7 @@ def publish(argv: list[str]) -> int:
         _run(["gh", "repo", "create", full_repo, "--private", "--source", ".", "--remote", "origin", "--push"], project, env)
     else:
         _ensure_private_github_repo(full_repo, project, env)
-        remotes = _run(["git", "remote"], project).splitlines()
-        if "origin" not in remotes:
-            _run(["git", "remote", "add", "origin", f"https://github.com/{full_repo}.git"], project)
+        _ensure_origin_remote(project, full_repo, env)
         _run(["gh", "auth", "setup-git"], project, env)
         _run(["git", "add", "--all"], project)
         if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project).returncode != 0:

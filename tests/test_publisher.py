@@ -13,7 +13,9 @@ from publisher import (
     _cloudflare_git_project_payload,
     _deploy_cloudflare_pages,
     _ensure_cloudflare_project,
+    _ensure_origin_remote,
     _ensure_private_github_repo,
+    _github_repo_from_remote_url,
     _resolve_cloudflare_project,
     _resolve_git_author,
     _set_cloudflare_project_environment,
@@ -473,6 +475,35 @@ class PublisherValidationTests(unittest.TestCase):
     def test_private_visibility_is_a_required_postcondition(self, _run) -> None:
         with self.assertRaisesRegex(RuntimeError, "must be PRIVATE"):
             _ensure_private_github_repo("owner/game", Path("C:/game"), {})
+
+    def test_github_remote_url_normalization_accepts_https_and_ssh(self) -> None:
+        self.assertEqual(
+            _github_repo_from_remote_url("https://github.com/Owner/Game.git"),
+            "owner/game",
+        )
+        self.assertEqual(
+            _github_repo_from_remote_url("git@github.com:Owner/Game.git"),
+            "owner/game",
+        )
+        self.assertEqual(
+            _github_repo_from_remote_url("https://token@github.com/Owner/Game"),
+            "owner/game",
+        )
+
+    @patch("publisher._run")
+    def test_origin_remote_must_match_target_repo(self, run) -> None:
+        run.side_effect = ["origin\n", "https://github.com/other/game.git"]
+        with self.assertRaisesRegex(RuntimeError, "origin remote does not match"):
+            _ensure_origin_remote(Path("C:/game"), "owner/game", {})
+
+    @patch("publisher._run")
+    def test_missing_origin_remote_is_added_for_target_repo(self, run) -> None:
+        run.return_value = "backup\n"
+        _ensure_origin_remote(Path("C:/game"), "owner/game", {})
+        self.assertEqual(
+            run.call_args_list[-1].args[0],
+            ["git", "remote", "add", "origin", "https://github.com/owner/game.git"],
+        )
 
     @patch("publisher._run", return_value="declanliang\t130889021")
     def test_git_author_uses_authenticated_github_noreply_identity(self, run) -> None:
