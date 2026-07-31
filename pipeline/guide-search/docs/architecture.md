@@ -73,7 +73,7 @@ input/<游戏slug>/
 ### 游戏背景研究
 
 - 接口：ToAPIs `/v1/responses`
-- 默认模型：`gemini-2.0-flash-official`
+- 默认模型：`gpt-5.3-codex-official`
 - 工具：`web_search_preview`
 - 必须在响应中检测到 `web_search_call`
 - 输出：游戏类型、发布状态、实体、术语、来源和警告

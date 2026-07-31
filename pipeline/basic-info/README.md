@@ -177,8 +177,8 @@ Schema + 业务规则验证
 |---|---|---|
 |`TOAPIS_API_KEY`|无|默认流程必需|
 |`PERPLEXITY_API_KEY`|无|联网研究失败时的备用 Key|
-|`TOAPIS_MODEL`|`gemini-2.0-flash-official`|非联网生成模型，必须支持 Responses API|
-|`TOAPIS_WEB_MODEL`|`gemini-2.0-flash-official`|联网模型，必须支持 `web_search_preview`|
+|`TOAPIS_MODEL`|`gpt-5.3-codex-official`|非联网生成模型，必须支持 Responses API|
+|`TOAPIS_WEB_MODEL`|`gpt-5.3-codex-official`|联网模型，必须支持 `web_search_preview`|
 |`TOAPIS_REASONING_EFFORT`|`low`|Responses API 推理力度|
 |`PERPLEXITY_MODEL`|`sonar-pro`|备用模型|
 |`GAMEWIKI_OUTPUT_DIR`|`output`|输出目录|

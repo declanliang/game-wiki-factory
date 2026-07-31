@@ -17,8 +17,8 @@ from .classifier import Candidate, canonical, page_type_for_category
 TOAPIS_CHAT_URL = "https://toapis.com/v1/chat/completions"
 TOAPIS_RESPONSES_URL = "https://toapis.com/v1/responses"
 TOAPIS_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) get-search/1.0"
-DEFAULT_CONTEXT_MODEL = "gemini-2.0-flash-official"
-DEFAULT_CLUSTER_MODEL = "gemini-2.0-flash-official"
+DEFAULT_CONTEXT_MODEL = "gpt-5.3-codex-official"
+DEFAULT_CLUSTER_MODEL = "gpt-5.6-terra"
 LOW_CONFIDENCE_THRESHOLD = 0.55
 CLUSTER_POLICY_VERSION = 5
 CONTEXT_POLICY_VERSION = 4
