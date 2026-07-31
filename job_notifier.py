@@ -9,6 +9,7 @@ import subprocess
 import time
 from typing import Any
 
+from job_agent2 import should_defer_operator_notification
 from job_system import acknowledge_notifications, defer_notification, pending_notifications
 
 
@@ -107,7 +108,11 @@ def dispatch_once(*, dry_run: bool = False, limit: int = 20) -> int:
     cancelled = [item for item in items if item["event_status"] == "cancelled"]
     if cancelled:
         groups.append(cancelled)
-    groups.extend([[item] for item in items if item["event_status"] != "cancelled"])
+    groups.extend([
+        [item] for item in items
+        if item["event_status"] != "cancelled"
+        and not _defer_for_agent2(item)
+    ])
     for group in groups:
         message = cancelled_batch_message(group) if len(group) > 1 else notification_message(group[0])
         if dry_run:
@@ -137,6 +142,21 @@ def dispatch_once(*, dry_run: bool = False, limit: int = 20) -> int:
                 file=__import__("sys").stderr,
             )
     return 1 if failures else 0
+
+
+def _defer_for_agent2(item: dict[str, Any]) -> bool:
+    if item.get("event_status") not in {"needs_attention", "failed"}:
+        return False
+    try:
+        return should_defer_operator_notification(str(item["job_id"]), str(item.get("event") or ""))
+    except Exception as exc:
+        # Notifier must never hide a human escalation merely because Agent2
+        # eligibility checks failed.
+        print(
+            f"agent2 notification deferral check failed for {item.get('job_id')}: {exc}",
+            file=__import__("sys").stderr,
+        )
+        return False
 
 
 def notifier_cli(argv: list[str]) -> int:

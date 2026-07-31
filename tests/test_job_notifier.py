@@ -130,6 +130,78 @@ class JobNotifierTests(unittest.TestCase):
                 self.assertEqual(row["attempts"], 1)
                 self.assertIsNone(row["delivered_at"])
 
+    def test_agent2_eligible_attempt_failure_is_not_sent_before_repair(self) -> None:
+        env = {
+            "GAMEWIKI_DATA_DIR": "",
+            "GAMEWIKI_PROJECTS_ROOT": "",
+            "GAMEWIKI_NOTIFICATION_COMMAND_JSON": json.dumps(
+                ["sender", "--message", "{message}"]
+            ),
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            env["GAMEWIKI_DATA_DIR"] = str(Path(temporary) / "data")
+            env["GAMEWIKI_PROJECTS_ROOT"] = str(Path(temporary) / "projects")
+            project = Path(env["GAMEWIKI_PROJECTS_ROOT"]) / "notify-game"
+            (project / ".gamewiki").mkdir(parents=True)
+            with patch.dict(os.environ, env), patch(
+                "job_notifier.subprocess.run",
+                return_value=subprocess.CompletedProcess([], 0, "ok", ""),
+            ) as run:
+                config = Path(temporary) / "game.json"
+                config.write_text(json.dumps({"game": "Notify Game"}), encoding="utf-8")
+                job_id = submit(config)
+                with connect() as db:
+                    db.execute(
+                        """UPDATE jobs SET status='failed',current_stage='pipeline',
+                                  attempts=4,last_error='ToAPIs returned HTTP 524'
+                           WHERE id=?""",
+                        (job_id,),
+                    )
+                    _event(db, job_id, "attempt.finished", notify=True, status="failed")
+                self.assertEqual(dispatch_once(), 0)
+                self.assertEqual(run.call_count, 0)
+                self.assertEqual(len(pending_notifications()), 1)
+
+    def test_agent2_escalation_is_still_sent(self) -> None:
+        env = {
+            "GAMEWIKI_DATA_DIR": "",
+            "GAMEWIKI_PROJECTS_ROOT": "",
+            "GAMEWIKI_NOTIFICATION_COMMAND_JSON": json.dumps(
+                ["sender", "--message", "{message}"]
+            ),
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            env["GAMEWIKI_DATA_DIR"] = str(Path(temporary) / "data")
+            env["GAMEWIKI_PROJECTS_ROOT"] = str(Path(temporary) / "projects")
+            project = Path(env["GAMEWIKI_PROJECTS_ROOT"]) / "notify-game"
+            (project / ".gamewiki").mkdir(parents=True)
+            with patch.dict(os.environ, env), patch(
+                "job_notifier.subprocess.run",
+                return_value=subprocess.CompletedProcess([], 0, "ok", ""),
+            ) as run:
+                config = Path(temporary) / "game.json"
+                config.write_text(json.dumps({"game": "Notify Game"}), encoding="utf-8")
+                job_id = submit(config)
+                with connect() as db:
+                    db.execute(
+                        """UPDATE jobs SET status='failed',current_stage='pipeline',
+                                  attempts=4,last_error='ToAPIs returned HTTP 524'
+                           WHERE id=?""",
+                        (job_id,),
+                    )
+                    _event(
+                        db,
+                        job_id,
+                        "job.agent2_escalated",
+                        notify=True,
+                        status="failed",
+                        action="codex_failed",
+                        escalationReason="Codex CLI did not write a report",
+                    )
+                self.assertEqual(dispatch_once(), 0)
+                self.assertEqual(run.call_count, 1)
+                self.assertEqual(pending_notifications(), [])
+
     def test_cancelled_jobs_are_delivered_as_one_batch_message(self) -> None:
         env = {
             "GAMEWIKI_DATA_DIR": "",

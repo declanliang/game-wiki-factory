@@ -137,7 +137,7 @@ def _read_tail(path: str | None, limit: int = 20000) -> str:
 def _run_count(db: sqlite3.Connection, job_id: str) -> int:
     return int(
         db.execute(
-            "SELECT COUNT(*) FROM agent2_runs WHERE job_id=?",
+            "SELECT COUNT(*) FROM agent2_runs WHERE job_id=? AND status<>'stale'",
             (job_id,),
         ).fetchone()[0]
     )
@@ -675,6 +675,37 @@ def _dry_run(limit: int) -> list[dict[str, Any]]:
             if len(results) >= limit:
                 break
     return results
+
+
+def should_defer_operator_notification(job_id: str, event: str) -> bool:
+    """Let Agent2 try bounded worker failures before notifying the operator.
+
+    Only the worker's raw attempt failure notification is deferred. Agent2's
+    own escalation notification must still be delivered, otherwise a failed
+    repair attempt would become silent.
+    """
+    if event != "attempt.finished":
+        return False
+    if os.environ.get("GAMEWIKI_AGENT2_ENABLED", "1").strip().casefold() in {"0", "false", "no", "off"}:
+        return False
+    max_runs = max(0, int(os.environ.get("GAMEWIKI_AGENT2_MAX_RUNS", "2")))
+    if max_runs <= 0:
+        return False
+    with connect() as db:
+        _ensure_schema(db)
+        row = db.execute(
+            "SELECT * FROM jobs WHERE id=? AND status IN ('needs_attention','failed') AND cancel_requested=0",
+            (job_id,),
+        ).fetchone()
+        if not row:
+            return False
+        eligible, _reason = _is_eligible(row)
+        if not eligible:
+            return False
+        if _run_count(db, job_id) >= max_runs:
+            return False
+        slug = row["slug"]
+    return _safe_project_dir(slug) is not None
 
 
 def recover_once(*, dry_run: bool = False, limit: int = 3) -> list[dict[str, Any]]:

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_agent2 import _codex_child_env, _codex_command, recover_once
+from job_agent2 import _codex_child_env, _codex_command, _ensure_schema, recover_once
 from job_system import _event, connect, submit
 from orchestrate_wiki import write_json
 
@@ -43,6 +43,26 @@ class JobAgent2Tests(unittest.TestCase):
                 status = db.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
         self.assertEqual([item["jobId"] for item in result], [job_id])
         self.assertEqual(status, "needs_attention")
+
+    def test_stale_agent2_run_does_not_consume_retry_budget(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ,
+            {
+                "GAMEWIKI_DATA_DIR": str(Path(temporary) / "data"),
+                "GAMEWIKI_PROJECTS_ROOT": str(Path(temporary) / "projects"),
+                "GAMEWIKI_AGENT2_MAX_RUNS": "1",
+            },
+        ):
+            job_id, _project = self._job(temporary, "ToAPIs returned HTTP 524", stage="pipeline")
+            with connect() as db:
+                _ensure_schema(db)
+                db.execute(
+                    """INSERT INTO agent2_runs(job_id,number,original_status,status,started_at)
+                       VALUES(?,?,?,?,?)""",
+                    (job_id, 1, "failed", "stale", "2020-01-01T00:00:00+00:00"),
+                )
+            result = recover_once(dry_run=True)
+        self.assertEqual([item["jobId"] for item in result], [job_id])
 
     def test_skips_quota_and_permission_failures(self):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
