@@ -1,6 +1,6 @@
 # Game Wiki Factory
 
-输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库和 Cloudflare Pages。Factory 自动创建连接该 Private repo 的 Git-integrated Pages 项目、设置 `NEXT_PUBLIC_SITE_URL` 并触发 Cloudflare 服务端构建；提供正式域名时还会自动创建或复用同名 Custom Domain，DNS/验证 pending 才交给站点运营者完成。历史站点继续保留原托管，不在新任务中重建或迁移。
+输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库和 Cloudflare Pages。Factory 自动创建连接该 Private repo 的 Git-integrated Pages 项目、设置 `NEXT_PUBLIC_SITE_URL` 并触发 Cloudflare 服务端构建；提供正式域名时会先安全检查 Cloudflare DNS，只有能确认或创建指向 Pages 的 CNAME 时才请求同名 Custom Domain，否则以 `awaiting_domain_configuration` 明确交给运营者/域名 Agent。历史站点继续保留原托管，不在新任务中重建或迁移。
 
 第一次接手先读 [文档导航](docs/README.md) 和 [接手手册](docs/HANDOFF.md)。
 
@@ -31,7 +31,7 @@ Basic Info、Guide Search、SEO Scout 和发布器都会从这里读取配置。
 gh auth login
 ```
 
-无人值守或 GitHub Actions 使用 `.env`/Secrets 中的 `FACTORY_GITHUB_TOKEN`；本地没有 token 时自动复用上述 GitHub CLI 登录会话。Pages 自动发布还需要 `CLOUDFLARE_ACCOUNT_ID` 和具有 Cloudflare Pages Edit 权限的 `CLOUDFLARE_API_TOKEN`。
+无人值守或 GitHub Actions 使用 `.env`/Secrets 中的 `FACTORY_GITHUB_TOKEN`；本地没有 token 时自动复用上述 GitHub CLI 登录会话。Pages 自动发布还需要 `CLOUDFLARE_ACCOUNT_ID` 和具有 Cloudflare Pages Edit 权限的 `CLOUDFLARE_API_TOKEN`。如果希望 Factory 自动把新域名 CNAME 指向 Pages，这个 token 还需要对应 zone 的 DNS Read/Edit；没有 DNS 权限时不会打印密钥或强行绑定，只会进入域名交接状态。
 
 ## 推荐执行方式：JSON 配置
 
@@ -117,7 +117,7 @@ python gamewiki.py --config jobs\my-game.json
 - `platform` 只能是 `roblox`、`steam` 或 `auto`。
 - `siteUrl` 可以是裸域名或完整 HTTPS URL；已知正式域名时填写。
 - `manualKeywords` 是可选字符串数组，最多 200 项；系统会清理空白、按大小写去重，并作为 `user_provided` 来源进入 Guide Search。它们仍受风险过滤、证据门和 Basic Info 分类边界约束。
-- `publish: true` 会创建新的 Private GitHub 仓库和 Git-integrated Pages 项目，自动设置 Production `NEXT_PUBLIC_SITE_URL`，让 Cloudflare 从 `main` 执行 `npm run build`、发布 `out` 并轮询成功状态。填写 `siteUrl` 时还会自动创建或复用同名 Custom Domain；Cloudflare 显示 DNS/验证 pending 时返回 `hosting.status=awaiting_domain_configuration`，按控制台指示完成后重试同一 Job。未填写 `siteUrl` 时使用 `<slug>.pages.dev` 并自动验收。
+- `publish: true` 会创建新的 Private GitHub 仓库和 Git-integrated Pages 项目，自动设置 Production `NEXT_PUBLIC_SITE_URL`，让 Cloudflare 从 `main` 执行 `npm run build`、发布 `out` 并轮询成功状态。填写 `siteUrl` 时，Factory 会先查找该 hostname 所在 Cloudflare zone：没有 DNS 记录时创建 CNAME 到 `<project>.pages.dev`，已有 CNAME 指向 Pages 时复用；若找不到 zone、zone 未激活、DNS API 无权限或已有记录指向别处，则不会新建 Pages Custom Domain，只返回 `hosting.status=awaiting_domain_configuration`，交给运营者/域名 Agent 处理。未填写 `siteUrl` 时使用 `<slug>.pages.dev` 并自动验收。
 - 日常配置不需要 GitHub repo 或托管平台项目名。每个游戏都创建新的 Private GitHub repo。
 - `refresh` 默认全部为 `false`。普通续跑不要开启，防止重复 API 成本。
 - 配置中的多余换行和连续空格会在执行前规范化，未知字段和拼写错误会直接报错。

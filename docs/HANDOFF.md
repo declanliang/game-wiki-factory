@@ -126,10 +126,12 @@ API key、余额、模型路由、DNS、权限、schema 和核心代码问题必
 - 触发 Cloudflare 服务端 `npm run build`，输出 `out`；
 - 自动验证部署。
 
+提供 `siteUrl` 时，发布器会先安全处理 DNS：只在 Cloudflare active zone 中没有现有记录时创建 CNAME 指向 `<project>.pages.dev`，或复用已经指向该 Pages origin 的 CNAME；已有记录指向别处、找不到 zone、zone 未激活或 DNS API 无权限时，不覆盖、不删除，也不新建 Pages Custom Domain，改为在 `customDomain.dns.nextAction` 中交接。
+
 `result.hosting.status`：
 
 - `complete`：目标 origin 已通过线上首页、metadata、canonical、robots、sitemap、hreflang、广告 API 验收。
-- `awaiting_domain_configuration`：Pages、GitHub、环境变量和部署已完成，但正式域名仍需运营者绑定/DNS/验证；不能说正式域名已上线。
+- `awaiting_domain_configuration`：Pages、GitHub、环境变量和部署已完成，但正式域名仍需运营者/域名 Agent 完成绑定、DNS 或验证；不能说正式域名已上线。
 
 Pages 控制台显示成功不等于 Factory 验收完成。必须验证 `/` 301 到 `/en`，且 sitemap 内所有 loc/hreflang 直接 200。
 
@@ -269,4 +271,3 @@ Growth 职责由飞书账号 `cli_aad59e06a3fa5bee` 绑定的现有游戏管理�
 
 - `docs/agents/openclaw-factory.md`
 - `docs/agents/growth-agent.md`
-

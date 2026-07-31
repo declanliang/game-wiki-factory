@@ -20,6 +20,7 @@ from publisher import (
     _resolve_git_author,
     _set_cloudflare_project_environment,
     _ensure_cloudflare_custom_domain,
+    _ensure_cloudflare_dns_cname,
     _validate_cloudflare_git_project,
     _validate_project,
     _verify_online_deployment,
@@ -324,23 +325,54 @@ class PublisherValidationTests(unittest.TestCase):
         wait_deployment.assert_called_once()
         self.assertEqual(len(result["environmentVariables"]), 9)
         self.assertEqual(result["adProfile"], "animal-hospital-anomalies.wiki")
-        self.assertEqual(result["customDomain"], {"name": "game.example", "status": "active"})
+        self.assertEqual(result["customDomain"], {"name": "game.example", "status": "active", "dns": None})
 
     @patch("publisher.time.sleep")
+    @patch("publisher._cloudflare_global_request")
     @patch("publisher._cloudflare_request")
-    def test_cloudflare_custom_domain_is_created_then_polled_to_active(self, request, _sleep) -> None:
+    def test_cloudflare_custom_domain_is_created_then_polled_to_active(self, request, global_request, _sleep) -> None:
         request.side_effect = [
             RuntimeError("HTTP 404 from domain"),
             {"name": "game.example", "status": "pending"},
             {"name": "game.example", "status": "active"},
         ]
+        global_request.side_effect = [
+            [{"id": "zone-id", "name": "example", "status": "active"}],
+            [],
+            {"id": "record-id"},
+        ]
         result = _ensure_cloudflare_custom_domain(
-            "account", "token", "game", "https://game.example", attempts=2, interval_seconds=0,
+            "account", "token", "game", "https://game.example", "https://game.pages.dev", attempts=2, interval_seconds=0,
         )
         self.assertEqual(result["status"], "active")
         self.assertEqual(request.call_args_list[1].args[0], "POST")
         self.assertEqual(request.call_args_list[1].args[3], "pages/projects/game/domains")
         self.assertEqual(request.call_args_list[1].args[4], {"name": "game.example"})
+        self.assertEqual(result["dns"]["status"], "created")
+        self.assertEqual(global_request.call_args_list[2].args[0], "POST")
+        self.assertEqual(global_request.call_args_list[2].args[3]["content"], "game.pages.dev")
+
+    @patch("publisher._cloudflare_request")
+    @patch("publisher._cloudflare_global_request")
+    def test_cloudflare_custom_domain_skips_pages_binding_when_dns_is_not_ready(self, global_request, request) -> None:
+        request.side_effect = [RuntimeError("HTTP 404 from domain")]
+        global_request.return_value = []
+        result = _ensure_cloudflare_custom_domain(
+            "account", "token", "game", "https://game.example", "https://game.pages.dev", attempts=1, interval_seconds=0,
+        )
+        self.assertEqual(result["status"], "not_requested")
+        self.assertEqual(result["dns"]["status"], "missing_zone")
+        self.assertEqual(len(request.call_args_list), 1)
+
+    @patch("publisher._cloudflare_global_request")
+    def test_cloudflare_dns_cname_does_not_overwrite_existing_records(self, global_request) -> None:
+        global_request.side_effect = [
+            [{"id": "zone-id", "name": "example", "status": "active"}],
+            [{"id": "dns-id", "type": "CNAME", "content": "old.example.net"}],
+        ]
+        result = _ensure_cloudflare_dns_cname("account", "token", "game.example", "game.pages.dev")
+        self.assertEqual(result["status"], "blocked_existing_record")
+        self.assertEqual(global_request.call_count, 2)
 
     @patch("publisher.time.sleep")
     @patch("publisher._cloudflare_request")

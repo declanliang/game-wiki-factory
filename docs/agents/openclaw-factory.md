@@ -19,7 +19,7 @@
 
 - `platform`：`roblox`、`steam` 或 `auto`。
 - Steam 的 `officialUrl` 必须是 Steam Store App URL。
-- `siteUrl` 可省略；省略时 Factory 使用项目的 `pages.dev` origin。提供时 Factory 自动设置匹配的 `NEXT_PUBLIC_SITE_URL` 并部署，运营者只负责自定义域名绑定和 DNS。
+- `siteUrl` 可省略；省略时 Factory 使用项目的 `pages.dev` origin。提供时 Factory 自动设置匹配的 `NEXT_PUBLIC_SITE_URL` 并部署；若 Cloudflare DNS 中没有记录且 token 有 DNS 权限，Factory 会创建 CNAME 并请求 Pages Custom Domain。找不到 active zone、无 DNS 权限或已有记录指向别处时，Factory 不会强行绑定，运营者/域名 Agent 负责后续域名处理。
 - 单站的 `schemaVersion`、`taskType: site` 和默认 operation 由系统自动补齐，用户无需填写。
 - `manualKeywords` 可选，最多 200 项。它们会作为 `user_provided` 来源进入 Guide Search，但仍受风险、证据和分类边界约束。
 - 不填写 `operation`；失败续跑只重试原 Job。
@@ -92,7 +92,7 @@ Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status
 
 1. job 为 `succeeded`，manifest 必需阶段完成；
 2. GitHub repo 为 Private；
-3. `publish.json` 中 `stages.hosting.provider=cloudflare-pages` 且 `status=complete` 或 `awaiting_domain_configuration`；后者只能表述为“Pages 已部署，等待域名绑定”；
+3. `publish.json` 中 `stages.hosting.provider=cloudflare-pages` 且 `status=complete` 或 `awaiting_domain_configuration`；后者只能表述为“Pages 已部署，等待域名绑定/DNS”，并应查看 `customDomain.dns.nextAction` 是否需要运营者或域名 Agent 操作；
 4. Factory 和 OpenClaw 不包含手工广告任务；新站只使用发布器自动配置的 shared profile。
 
 完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Pages project/deployment URL、hosting 状态，以及是否只剩域名绑定/DNS。只有 `complete` 才能声称对应 origin 已线上验证。

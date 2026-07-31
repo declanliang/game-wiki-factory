@@ -106,6 +106,25 @@ def _cloudflare_request(
     return envelope.get("result")
 
 
+def _cloudflare_global_request(
+    method: str,
+    token: str,
+    path: str,
+    payload: dict | None = None,
+) -> object:
+    envelope = _request(
+        method,
+        f"https://api.cloudflare.com/client/v4/{path.lstrip('/')}",
+        token,
+        payload,
+    )
+    if not envelope.get("success", False):
+        errors = envelope.get("errors") or []
+        summary = "; ".join(str(item.get("message") or item.get("code") or "unknown error") for item in errors[:3])
+        raise RuntimeError(f"Cloudflare API request failed: {summary or 'unknown error'}")
+    return envelope.get("result")
+
+
 def _cloudflare_create_git_deployment(
     account_id: str,
     token: str,
@@ -398,11 +417,144 @@ def _custom_domain_status(domain: object) -> str:
     return str(domain.get("status") or "unknown").casefold()
 
 
+def _zone_candidates(hostname: str) -> list[str]:
+    labels = [label for label in hostname.strip(".").casefold().split(".") if label]
+    return [".".join(labels[index:]) for index in range(0, max(0, len(labels) - 1))]
+
+
+def _find_cloudflare_zone(
+    account_id: str,
+    token: str,
+    hostname: str,
+) -> dict | None:
+    for candidate in _zone_candidates(hostname):
+        query = urllib.parse.urlencode({"name": candidate, "account.id": account_id})
+        zones = _cloudflare_global_request("GET", token, f"zones?{query}")
+        if isinstance(zones, list) and zones:
+            zone = zones[0]
+            if isinstance(zone, dict):
+                return zone
+    return None
+
+
+def _ensure_cloudflare_dns_cname(
+    account_id: str,
+    token: str,
+    hostname: str,
+    pages_hostname: str,
+    *,
+    log_path: Path | None = None,
+) -> dict:
+    """Prepare DNS for a Pages Custom Domain without overwriting traffic.
+
+    Factory may create a CNAME only when the hostname has no DNS records in an
+    active Cloudflare zone.  Existing records are treated as an operator
+    handoff, because replacing them could move real traffic unexpectedly.
+    """
+    try:
+        zone = _find_cloudflare_zone(account_id, token, hostname)
+        if not zone:
+            result = {
+                "status": "missing_zone",
+                "hostname": hostname,
+                "target": pages_hostname,
+                "nextAction": "Add the domain zone to Cloudflare, then bind this Pages custom domain.",
+            }
+            if log_path is not None:
+                _append_cloudflare_log(log_path, f"custom domain DNS {hostname}: missing Cloudflare zone")
+            return result
+        zone_id = str(zone.get("id") or "")
+        zone_name = str(zone.get("name") or "")
+        zone_status = str(zone.get("status") or "").casefold()
+        if not zone_id:
+            raise RuntimeError("Cloudflare zone response did not include an id")
+        if zone_status and zone_status != "active":
+            result = {
+                "status": "zone_not_active",
+                "hostname": hostname,
+                "target": pages_hostname,
+                "zone": zone_name,
+                "zoneStatus": zone_status,
+                "nextAction": "Complete Cloudflare nameserver activation before binding this Pages custom domain.",
+            }
+            if log_path is not None:
+                _append_cloudflare_log(log_path, f"custom domain DNS {hostname}: zone {zone_name} is {zone_status}")
+            return result
+        records_path = (
+            f"zones/{urllib.parse.quote(zone_id)}/dns_records?"
+            + urllib.parse.urlencode({"name": hostname})
+        )
+        records = _cloudflare_global_request("GET", token, records_path)
+        existing = records if isinstance(records, list) else []
+        pages_target = pages_hostname.rstrip(".").casefold()
+        for record in existing:
+            if not isinstance(record, dict):
+                continue
+            record_type = str(record.get("type") or "").upper()
+            record_content = str(record.get("content") or "").rstrip(".").casefold()
+            if record_type == "CNAME" and record_content == pages_target:
+                result = {
+                    "status": "already_points_to_pages",
+                    "hostname": hostname,
+                    "target": pages_hostname,
+                    "zone": zone_name,
+                }
+                if log_path is not None:
+                    _append_cloudflare_log(log_path, f"custom domain DNS {hostname}: CNAME already points to {pages_hostname}")
+                return result
+        if existing:
+            types = sorted({str(record.get("type") or "unknown").upper() for record in existing if isinstance(record, dict)})
+            result = {
+                "status": "blocked_existing_record",
+                "hostname": hostname,
+                "target": pages_hostname,
+                "zone": zone_name,
+                "recordTypes": types,
+                "nextAction": "Review the existing DNS record before switching this hostname to Cloudflare Pages.",
+            }
+            if log_path is not None:
+                _append_cloudflare_log(log_path, f"custom domain DNS {hostname}: existing DNS record blocks automatic CNAME creation")
+            return result
+        created = _cloudflare_global_request(
+            "POST",
+            token,
+            f"zones/{urllib.parse.quote(zone_id)}/dns_records",
+            {
+                "type": "CNAME",
+                "name": hostname,
+                "content": pages_hostname,
+                "proxied": True,
+            },
+        )
+        result = {
+            "status": "created",
+            "hostname": hostname,
+            "target": pages_hostname,
+            "zone": zone_name,
+            "recordId": created.get("id") if isinstance(created, dict) else None,
+        }
+        if log_path is not None:
+            _append_cloudflare_log(log_path, f"custom domain DNS {hostname}: created CNAME to {pages_hostname}")
+        return result
+    except RuntimeError as exc:
+        result = {
+            "status": "dns_api_error",
+            "hostname": hostname,
+            "target": pages_hostname,
+            "error": str(exc),
+            "nextAction": "Grant Cloudflare DNS read/edit permission or configure the CNAME manually before binding.",
+        }
+        if log_path is not None:
+            _append_cloudflare_log(log_path, f"custom domain DNS {hostname}: {exc}")
+        return result
+
+
 def _ensure_cloudflare_custom_domain(
     account_id: str,
     token: str,
     project_name: str,
     origin: str,
+    pages_origin: str,
     *,
     attempts: int = 60,
     interval_seconds: int = 5,
@@ -417,8 +569,12 @@ def _ensure_cloudflare_custom_domain(
     hostname = urllib.parse.urlparse(origin).hostname
     if not hostname:
         raise RuntimeError("Custom domain provisioning requires a hostname")
+    pages_hostname = urllib.parse.urlparse(pages_origin).hostname
+    if not pages_hostname:
+        raise RuntimeError("Custom domain provisioning requires a Pages hostname")
     encoded_project = urllib.parse.quote(project_name)
     encoded_domain = urllib.parse.quote(hostname, safe="")
+    domain: object | None = None
     try:
         domain = _cloudflare_request(
             "GET", account_id, token,
@@ -427,6 +583,19 @@ def _ensure_cloudflare_custom_domain(
     except RuntimeError as exc:
         if "HTTP 404" not in str(exc):
             raise
+    if isinstance(domain, dict) and _custom_domain_status(domain) == "active":
+        return domain
+
+    dns = _ensure_cloudflare_dns_cname(
+        account_id, token, hostname, pages_hostname, log_path=log_path,
+    )
+    if dns.get("status") not in {"created", "already_points_to_pages"}:
+        if isinstance(domain, dict):
+            domain["dns"] = dns
+            return domain
+        return {"name": hostname, "status": "not_requested", "dns": dns}
+
+    if domain is None:
         try:
             domain = _cloudflare_request(
                 "POST", account_id, token,
@@ -444,6 +613,7 @@ def _ensure_cloudflare_custom_domain(
             )
     if not isinstance(domain, dict):
         raise RuntimeError("Cloudflare Pages Custom Domain response was not an object")
+    domain["dns"] = dns
 
     for attempt in range(1, attempts + 1):
         status = _custom_domain_status(domain)
@@ -463,6 +633,7 @@ def _ensure_cloudflare_custom_domain(
             )
             if not isinstance(domain, dict):
                 raise RuntimeError("Cloudflare Pages Custom Domain response was not an object")
+            domain["dns"] = dns
     return domain
 
 
@@ -666,7 +837,7 @@ def _deploy_cloudflare_pages(
     custom_domain = None
     if canonical_origin != pages_origin:
         custom_domain = _ensure_cloudflare_custom_domain(
-            account_id, token, project_name, canonical_origin, log_path=log_path,
+            account_id, token, project_name, canonical_origin, pages_origin, log_path=log_path,
         )
     deployment_url = str(deployment.get("url") or "").rstrip("/")
     return {
@@ -683,6 +854,7 @@ def _deploy_cloudflare_pages(
             {
                 "name": urllib.parse.urlparse(canonical_origin).hostname,
                 "status": _custom_domain_status(custom_domain),
+                "dns": custom_domain.get("dns") if isinstance(custom_domain, dict) else None,
             }
             if custom_domain is not None else None
         ),
