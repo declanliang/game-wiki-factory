@@ -33,7 +33,10 @@ export const onRequestGet: PagesFunction<Env> = async (context) => {
   );
   return Response.json(availability, {
     headers: {
-      "Cache-Control": "private, no-store",
+      "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
+      "CDN-Cache-Control": "no-store",
+      "Cloudflare-CDN-Cache-Control": "no-store",
+      "Vary": "Accept",
       "X-Content-Type-Options": "nosniff",
     },
   });

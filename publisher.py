@@ -1216,8 +1216,15 @@ def _deploy_cloudflare_workers_static_assets(
     }
 
 
-def _http_response(url: str) -> tuple[int, dict[str, str], str]:
-    request = urllib.request.Request(url, headers={"User-Agent": "GameWikiFactory/1.0"})
+def _http_response(
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+) -> tuple[int, dict[str, str], str]:
+    request_headers = {"User-Agent": "GameWikiFactory/1.0"}
+    if headers:
+        request_headers.update(headers)
+    request = urllib.request.Request(url, headers=request_headers)
     with urllib.request.urlopen(request, timeout=30) as response:
         headers = {key.casefold(): value for key, value in response.headers.items()}
         return response.status, headers, response.read().decode("utf-8", errors="replace")
@@ -1249,8 +1256,25 @@ def _verify_online_advertising(origin: str) -> tuple[str, ...]:
         raise RuntimeError("advertising availability returned invalid JSON") from exc
     if not isinstance(availability, dict) or set(availability) != set(AD_FORMATS) or any(availability.get(name) is not True for name in AD_FORMATS):
         raise RuntimeError("advertising availability does not contain exactly eight enabled formats")
+    iframe_headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/138.0.0.0 Safari/537.36"
+        ),
+        "Accept": (
+            "text/html,application/xhtml+xml,application/xml;"
+            "q=0.9,image/avif,image/webp,*/*;q=0.8"
+        ),
+        "Sec-Fetch-Dest": "iframe",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+    }
     for name in AD_FORMATS:
-        status, headers, body = _http_response(f"{base}/api/ads/{name}")
+        status, headers, body = _http_response(
+            f"{base}/api/ads/render/{name}",
+            headers=iframe_headers,
+        )
         if status != 200:
             raise RuntimeError(f"advertising format {name} returned HTTP {status}")
         if "text/html" not in headers.get("content-type", "").casefold():
@@ -1264,6 +1288,8 @@ def _verify_online_advertising(origin: str) -> tuple[str, ...]:
         for header, expected in required.items():
             if headers.get(header, "").casefold() != expected:
                 raise RuntimeError(f"advertising format {name} is missing {header}")
+        if "accept" not in headers.get("vary", "").casefold():
+            raise RuntimeError(f"advertising format {name} is missing Vary: Accept")
         if not headers.get("content-security-policy"):
             raise RuntimeError(f"advertising format {name} is missing content-security-policy")
         if "gamewiki-ad-start" not in body or "invoke.js" not in body:

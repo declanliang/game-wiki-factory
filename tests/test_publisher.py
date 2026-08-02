@@ -264,7 +264,7 @@ class PublisherValidationTests(unittest.TestCase):
         html_headers = {
             "content-type": "text/html; charset=utf-8", "cache-control": "private, no-store",
             "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'",
-            "referrer-policy": "strict-origin-when-cross-origin",
+            "referrer-policy": "strict-origin-when-cross-origin", "vary": "Accept",
         }
         response.side_effect = [
             (200, availability_headers, json.dumps({name: True for name in formats})),

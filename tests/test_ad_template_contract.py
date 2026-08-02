@@ -24,8 +24,18 @@ class AdTemplateContractTests(unittest.TestCase):
     def test_ad_iframe_has_no_sandbox_and_keeps_isolation_route(self) -> None:
         content = (TEMPLATE / "src/components/ad-slot.tsx").read_text(encoding="utf-8")
         self.assertNotIn("sandbox=", content)
-        self.assertIn('src={`/api/ads/${format}`}', content)
+        self.assertIn('src={`${AD_RENDER_ROUTE}/${format}`}', content)
+        self.assertIn('const AD_RENDER_ROUTE = "/api/ads/render"', content)
         self.assertIn('referrerPolicy="strict-origin-when-cross-origin"', content)
+
+    def test_worker_ad_routes_defeat_browser_html_cache_variants(self) -> None:
+        content = (TEMPLATE / "src/worker.ts").read_text(encoding="utf-8")
+        self.assertIn('"/api/ads/availability"', content)
+        self.assertIn(r"/^\/api\/ads\/(?:render\/)?([^/]+)\/?$/", content)
+        self.assertIn('"CDN-Cache-Control": "no-store"', content)
+        self.assertIn('"Cloudflare-CDN-Cache-Control": "no-store"', content)
+        self.assertIn('Vary: "Accept"', content)
+        self.assertIn('request.method === "HEAD"', content)
 
     def test_native_flow_waits_for_viewport_and_selects_one_format(self) -> None:
         content = (TEMPLATE / "src/components/ad-placements.tsx").read_text(encoding="utf-8")

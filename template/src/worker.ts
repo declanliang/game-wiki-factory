@@ -53,51 +53,64 @@ function hasValidBase64(value: string | undefined): boolean {
   return Boolean(decodeSnippet(value));
 }
 
+function noStoreHeaders(): Record<string, string> {
+  return {
+    "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
+    "CDN-Cache-Control": "no-store",
+    "Cloudflare-CDN-Cache-Control": "no-store",
+    Vary: "Accept",
+    "X-Content-Type-Options": "nosniff",
+  };
+}
+
 function availability(env: Env): Response {
   return Response.json(
     Object.fromEntries(
       AD_FORMATS.map((format) => [format, hasValidBase64(env[ENV_KEY[format]] as string | undefined)]),
     ),
     {
-      headers: {
-        "Cache-Control": "private, no-store",
-        "X-Content-Type-Options": "nosniff",
-      },
+      headers: noStoreHeaders(),
     },
   );
 }
 
-function adResponse(format: AdFormat, env: Env): Response {
+function adResponse(format: AdFormat, env: Env, method: string): Response {
   const snippet = decodeSnippet(env[ENV_KEY[format]] as string | undefined);
-  if (!snippet) return new Response("Not found", { status: 404 });
+  if (!snippet) return new Response(method === "HEAD" ? null : "Not found", { status: 404, headers: noStoreHeaders() });
 
   const native = format === "nativeBanner" || format === "nativeBannerMobile";
   const normalizedSnippet = snippet.replace(/(<script\b[^>]*\bsrc=["'])\/\//gi, "$1https://");
   const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}body{display:${native ? "block" : "flex"};align-items:center;justify-content:center}body>div{max-width:100%}</style></head><body><!--gamewiki-ad-start-->${normalizedSnippet}<!--gamewiki-ad-end--></body></html>`;
 
-  return new Response(html, {
+  return new Response(method === "HEAD" ? null : html, {
     headers: {
+      ...noStoreHeaders(),
       "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "private, no-store",
       "Content-Security-Policy": "default-src 'none'; script-src 'unsafe-inline' https: http:; style-src 'unsafe-inline'; img-src https: http: data:; frame-src https: http:; connect-src https: http:; font-src https: data:; base-uri 'none'; form-action https: http:; frame-ancestors 'self'",
       "Referrer-Policy": "strict-origin-when-cross-origin",
-      "X-Content-Type-Options": "nosniff",
     },
+    status: 200,
   });
 }
 
 export default {
   fetch(request, env) {
     const url = new URL(request.url);
-    if (request.method === "GET" && url.pathname === "/api/ads/availability") {
+    if ((request.method === "GET" || request.method === "HEAD") && url.pathname === "/api/ads/availability") {
+      if (request.method === "HEAD") {
+        const response = availability(env);
+        return new Response(null, { status: response.status, headers: response.headers });
+      }
       return availability(env);
     }
 
-    if (request.method === "GET") {
-      const match = url.pathname.match(/^\/api\/ads\/([^/]+)\/?$/);
+    if (request.method === "GET" || request.method === "HEAD") {
+      const match = url.pathname.match(/^\/api\/ads\/(?:render\/)?([^/]+)\/?$/);
       if (match) {
         const format = match[1];
-        return isAdFormat(format) ? adResponse(format, env) : new Response("Not found", { status: 404 });
+        return isAdFormat(format)
+          ? adResponse(format, env, request.method)
+          : new Response(request.method === "HEAD" ? null : "Not found", { status: 404, headers: noStoreHeaders() });
       }
     }
 

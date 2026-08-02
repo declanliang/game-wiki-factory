@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { AD_SIZES, type AdAvailability, type AdFormat } from "@/lib/ad-types";
 
 const AdContext = createContext<AdAvailability | null>(null);
+const AD_RENDER_ROUTE = "/api/ads/render";
 
 export function AdProvider({ availability, children }: { availability: AdAvailability; children: React.ReactNode }) {
   const [runtimeAvailability, setRuntimeAvailability] = useState(availability);
@@ -35,7 +36,7 @@ export function AdSlot({ format, className = "", eager = false }: { format: AdFo
     <div className={`relative mx-auto ${isNative ? "w-full max-w-5xl" : "max-w-full"} ${className}`} style={size ? { width: size.width, height: size.height } : undefined} data-ad-format={format}>
       <span className="sr-only">Advertisement</span>
       <iframe
-        src={`/api/ads/${format}`}
+        src={`${AD_RENDER_ROUTE}/${format}`}
         title="Advertisement"
         aria-label="Advertisement"
         width={size?.width ?? "100%"}
