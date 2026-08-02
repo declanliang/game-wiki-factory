@@ -8,11 +8,12 @@ Cloudflare Pages 项目额度已满后，新任务默认发布到 Cloudflare Wor
 2. 发布器生成本地 `wrangler.jsonc`，该文件被 `.gitignore` 忽略，不提交 Git；
 3. `wrangler.jsonc` 使用 `main = "./src/worker.ts"`，`assets.directory = "./out"`，`assets.binding = "ASSETS"`；
 4. `assets.not_found_handling = "404-page"`，因为模板是 Next 静态导出，不是 SPA；
-5. 发布器用最终 origin 设置 `NEXT_PUBLIC_SITE_URL`，在服务器本地执行 `npm run build`；
-6. 发布器使用 `npx wrangler deploy --config wrangler.jsonc` 上传 Worker 和静态资产；
-7. 发布后必须执行线上首页、metadata、canonical、sitemap、robots、广告 API 和全部 loc/hreflang 直接 200 验证。
+5. `assets.run_worker_first = ["/api/*"]`，让 API 请求先进入 Worker，不被静态导出的 404 页面接管；
+6. 发布器用最终 origin 设置 `NEXT_PUBLIC_SITE_URL`，在服务器本地执行 `npm run build`；
+7. 发布器使用 `npx wrangler deploy --config wrangler.jsonc` 上传 Worker 和静态资产；
+8. 发布后必须执行线上首页、metadata、canonical、sitemap、robots、广告 API 和全部 loc/hreflang 直接 200 验证。
 
-广告 API 不是纯静态文件。模板的 `src/worker.ts` 接管 `/api/ads/availability` 和 `/api/ads/<format>`，从 Worker vars 读取 8 个 `AD_*_B64`，其他请求交给 `env.ASSETS.fetch(request)`。
+广告 API 不是纯静态文件。模板的 `src/worker.ts` 接管 `/api/ads/availability` 和 `/api/ads/render/<format>`，从 Worker vars 读取 8 个 `AD_*_B64`，其他请求交给 `env.ASSETS.fetch(request)`。旧的 `/api/ads/<format>` 仍保留兼容匹配，但新前端只使用 `render` 路径，以避开历史静态 404 缓存。API 响应使用 `private, no-store`、`Vary: Accept` 和 CDN no-store 头；线上验收必须用浏览器 iframe 请求头检查格式路由，而不能只用默认 `curl`。
 
 未提供 `siteUrl` 时，Factory 读取 Cloudflare account 的 workers.dev subdomain，使用 `https://<worker>.<subdomain>.workers.dev` 作为 `NEXT_PUBLIC_SITE_URL` 并自动验收。
 

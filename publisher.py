@@ -488,6 +488,7 @@ def _workers_static_assets_config(
             "binding": "ASSETS",
             "html_handling": "auto-trailing-slash",
             "not_found_handling": "404-page",
+            "run_worker_first": ["/api/*"],
         },
         "vars": {
             "NEXT_PUBLIC_SITE_URL": origin,

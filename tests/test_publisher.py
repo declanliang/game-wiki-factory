@@ -352,6 +352,7 @@ class PublisherValidationTests(unittest.TestCase):
         self.assertEqual(config["assets"]["binding"], "ASSETS")
         self.assertEqual(config["assets"]["html_handling"], "auto-trailing-slash")
         self.assertEqual(config["assets"]["not_found_handling"], "404-page")
+        self.assertEqual(config["assets"]["run_worker_first"], ["/api/*"])
         self.assertEqual(config["vars"]["NEXT_PUBLIC_SITE_URL"], "https://game.example")
         self.assertEqual(config["vars"]["AD_MOBILE_320X50_B64"], ads["AD_MOBILE_320X50_B64"])
 
