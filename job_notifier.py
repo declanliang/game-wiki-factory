@@ -41,11 +41,11 @@ def notification_message(item: dict[str, Any]) -> str:
             lines.append(f"线上：{origin}")
         hosting = result.get("hosting") or {}
         if hosting.get("status") == "awaiting_domain_configuration":
-            lines.append("发布：Private GitHub 和 Cloudflare Pages 部署已完成，NEXT_PUBLIC_SITE_URL 已设置；请绑定自定义域名后执行最终线上验收。")
+            lines.append("发布：Private GitHub 和 Cloudflare Workers Static Assets 部署已完成，NEXT_PUBLIC_SITE_URL 已设置；请绑定 Worker 自定义域名/路由后执行最终线上验收。")
         elif hosting.get("status") == "complete":
-            lines.append("发布：Cloudflare Pages 部署与线上验收已完成。")
+            lines.append("发布：Cloudflare Workers Static Assets 部署与线上验收已完成。")
         elif hosting.get("status") == "manual_action_required":
-            lines.append("发布：Cloudflare 自动发布被显式跳过，需要运营者手工完成 Pages 部署。")
+            lines.append("发布：Cloudflare 自动发布被显式跳过，需要运营者手工完成 Workers Static Assets 部署。")
     elif status in {"needs_attention", "failed"}:
         error_class = str((item.get("detail") or {}).get("errorClass") or "")
         if error_class == "quota_exhausted":

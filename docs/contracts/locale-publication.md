@@ -4,7 +4,7 @@ Factory 新站一次只生成 `en/es`，公开路由按以下顺序增加：
 
 `en → es`
 
-英语在建站当天公开，西班牙语在第三个自然日于 Asia/Shanghai 10:00 发布。SQLite 子任务 `localeRelease` 修改 `intake/publication-plan.json`，提交 Private GitHub `main`，再由 Git-integrated Cloudflare Pages 自动构建。该计划持久化在服务器数据库中，不依赖原始建站 Job 的租约或临时 workspace。
+英语在建站当天公开，西班牙语在第三个自然日于 Asia/Shanghai 10:00 发布。SQLite 子任务 `localeRelease` 修改 `intake/publication-plan.json`，提交 Private GitHub `main`，再临时 clone 该 commit 并通过 `wrangler deploy` 重新发布同一个 Workers Static Assets 站点。该计划持久化在服务器数据库中，不依赖原始建站 Job 的租约或临时 workspace。
 
 约束：
 

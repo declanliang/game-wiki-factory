@@ -1,4 +1,4 @@
-# Cloudflare Pages branch: localePrefix is "always" (see src/i18n/routing.ts) —
+# Static export branch: localePrefix is "always" (see src/i18n/routing.ts) —
 # static export has no middleware to rewrite bare "/" to "/en" at request
 # time, so every locale including English is prefixed. These 301s exist so
 # that accidental unprefixed links still resolve instead of 404ing.

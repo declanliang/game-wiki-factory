@@ -81,11 +81,11 @@ class JobNotifierTests(unittest.TestCase):
             "max_attempts": 4,
             "result": {
                 "articles": {"english": 8, "allLanguages": 40},
-                "hosting": {"provider": "cloudflare-pages", "status": "awaiting_domain_configuration"},
+                "hosting": {"provider": "cloudflare-workers-static-assets", "status": "awaiting_domain_configuration"},
             },
         }
         message = notification_message(item)
-        self.assertIn("Cloudflare Pages 部署已完成", message)
+        self.assertIn("Cloudflare Workers Static Assets 部署已完成", message)
         self.assertIn("NEXT_PUBLIC_SITE_URL 已设置", message)
 
     def test_successful_delivery_acknowledges_outbox_row(self) -> None:

@@ -1,4 +1,4 @@
-"""Idempotently publish a completed generated project to GitHub and Cloudflare Pages."""
+"""Idempotently publish a completed generated project to GitHub and Cloudflare."""
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ def _cloudflare_credentials(env: dict[str, str]) -> tuple[str, str]:
     )
     if not account_id or not token:
         raise RuntimeError(
-            "Cloudflare Pages publishing requires CLOUDFLARE_ACCOUNT_ID and "
+            "Cloudflare publishing requires CLOUDFLARE_ACCOUNT_ID and "
             "CLOUDFLARE_API_TOKEN (legacy cf_accountid/cf_pages_api_key are also accepted)"
         )
     return account_id, token
@@ -409,6 +409,148 @@ def _append_cloudflare_log(log_path: Path, message: str) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log:
         log.write(f"[{_now()}] {message.rstrip()}\n")
+
+
+def _npm_binary(name: str) -> str:
+    return shutil.which(f"{name}.cmd") or shutil.which(name) or name
+
+
+def _run_logged(
+    command: list[str],
+    cwd: Path,
+    env: dict[str, str],
+    log_path: Path,
+    label: str,
+) -> str:
+    result = subprocess.run(
+        command,
+        cwd=cwd,
+        env=env,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        capture_output=True,
+    )
+    output = (result.stdout or "") + (result.stderr or "")
+    _append_cloudflare_log(
+        log_path,
+        f"{label}: exit={result.returncode}\n$ {' '.join(command)}\n{output[-6000:]}",
+    )
+    if result.returncode:
+        raise RuntimeError(
+            f"{label} failed with exit code {result.returncode}; see {log_path}: "
+            f"{output[-1200:].strip()}"
+        )
+    return output
+
+
+def _cloudflare_workers_dev_origin(
+    account_id: str,
+    token: str,
+    project_name: str,
+    env: dict[str, str],
+) -> str:
+    subdomain = (
+        env.get("CLOUDFLARE_WORKERS_SUBDOMAIN", "").strip()
+        or env.get("CF_WORKERS_SUBDOMAIN", "").strip()
+    )
+    if not subdomain:
+        result = _cloudflare_request("GET", account_id, token, "workers/subdomain")
+        if not isinstance(result, dict):
+            raise RuntimeError("Cloudflare Workers subdomain response was not an object")
+        subdomain = str(result.get("subdomain") or "").strip()
+    if not subdomain:
+        raise RuntimeError("Cloudflare Workers subdomain is not configured for this account")
+    return _normalize_origin(f"https://{project_name}.{subdomain}.workers.dev")
+
+
+def _workers_static_assets_config(
+    account_id: str,
+    project_name: str,
+    origin: str,
+    ad_environment: dict[str, str],
+) -> dict:
+    expected = list(AD_ENV_NAMES)
+    if list(ad_environment.keys()) != expected:
+        raise RuntimeError(
+            "Cloudflare Workers Static Assets requires a complete ordered "
+            "8-variable shared ad environment"
+        )
+    return {
+        "$schema": "node_modules/wrangler/config-schema.json",
+        "name": project_name,
+        "account_id": account_id,
+        "main": "./src/worker.ts",
+        "compatibility_date": datetime.now(timezone.utc).date().isoformat(),
+        "workers_dev": True,
+        "assets": {
+            "directory": "./out",
+            "binding": "ASSETS",
+            "html_handling": "auto-trailing-slash",
+            "not_found_handling": "404-page",
+        },
+        "vars": {
+            "NEXT_PUBLIC_SITE_URL": origin,
+            **ad_environment,
+        },
+    }
+
+
+def _write_workers_static_assets_config(
+    project: Path,
+    account_id: str,
+    project_name: str,
+    origin: str,
+    ad_environment: dict[str, str],
+) -> Path:
+    config = _workers_static_assets_config(
+        account_id,
+        project_name,
+        origin,
+        ad_environment,
+    )
+    path = project / "wrangler.jsonc"
+    path.write_text(
+        json.dumps(config, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+def _parse_workers_deploy_url(output: str) -> str:
+    matches = re.findall(
+        r"https://[a-z0-9][a-z0-9-]*\.[a-z0-9-]+\.workers\.dev",
+        output,
+        flags=re.I,
+    )
+    return matches[-1].rstrip("/") if matches else ""
+
+
+def _ensure_workers_static_assets_runtime(project: Path) -> tuple[str, ...]:
+    """Inject the Worker runtime needed by existing pre-migration workspaces."""
+    changed: list[str] = []
+    source = ROOT / "template" / "src" / "worker.ts"
+    target = project / "src" / "worker.ts"
+    if source.is_file():
+        target.parent.mkdir(parents=True, exist_ok=True)
+        content = source.read_text(encoding="utf-8")
+        if not target.is_file() or target.read_text(encoding="utf-8") != content:
+            target.write_text(content, encoding="utf-8")
+            changed.append("src/worker.ts")
+    gitignore = project / ".gitignore"
+    marker = "/wrangler.jsonc"
+    existing = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
+    if marker not in {line.strip() for line in existing.splitlines()}:
+        suffix = "\n" if existing and not existing.endswith("\n") else ""
+        gitignore.write_text(
+            existing
+            + suffix
+            + "\n# Generated at publish time for Cloudflare Workers Static Assets.\n"
+            + "/wrangler.jsonc\n",
+            encoding="utf-8",
+        )
+        changed.append(".gitignore")
+    return tuple(changed)
 
 
 def _custom_domain_status(domain: object) -> str:
@@ -876,6 +1018,99 @@ def _deploy_cloudflare_pages(
     }
 
 
+def _deploy_cloudflare_workers_static_assets(
+    project: Path,
+    project_name: str,
+    full_repo: str,
+    site_url: str,
+    commit_sha: str,
+    env: dict[str, str],
+) -> dict:
+    account_id, token = _cloudflare_credentials(env)
+    log_path = project / ".gamewiki" / "logs" / "cloudflare-workers-publish.log"
+    workers_origin = _cloudflare_workers_dev_origin(account_id, token, project_name, env)
+    canonical_origin = _normalize_origin(site_url) if site_url.strip() else workers_origin
+    ad_environment = load_shared_ad_environment()
+    config_path = _write_workers_static_assets_config(
+        project,
+        account_id,
+        project_name,
+        canonical_origin,
+        ad_environment,
+    )
+    _append_cloudflare_log(
+        log_path,
+        f"prepared Workers Static Assets config {config_path.name} for {full_repo}; "
+        f"canonical={canonical_origin}; workersDev={workers_origin}",
+    )
+
+    build_env = dict(env)
+    build_env["NEXT_PUBLIC_SITE_URL"] = canonical_origin
+    build_env["CF_WORKERS"] = "1"
+    build_env.update(ad_environment)
+    _run_logged(
+        [_npm_binary("npm"), "run", "build"],
+        project,
+        build_env,
+        log_path,
+        "workers static assets build",
+    )
+    deploy_env = dict(env)
+    deploy_env.setdefault("CLOUDFLARE_ACCOUNT_ID", account_id)
+    deploy_env.setdefault("CLOUDFLARE_API_TOKEN", token)
+    output = _run_logged(
+        [_npm_binary("npx"), "wrangler", "deploy", "--config", str(config_path.name)],
+        project,
+        deploy_env,
+        log_path,
+        "wrangler deploy",
+    )
+    deployment_url = _parse_workers_deploy_url(output) or workers_origin
+    return {
+        "provider": "cloudflare-workers-static-assets",
+        "status": "deployed",
+        "projectName": project_name,
+        "workerName": project_name,
+        "productionBranch": "main",
+        "deploymentId": None,
+        "deploymentUrl": deployment_url,
+        "workersDevOrigin": workers_origin,
+        "siteUrl": canonical_origin,
+        "customDomain": (
+            {
+                "name": urllib.parse.urlparse(canonical_origin).hostname,
+                "status": "not_requested",
+                "dns": {
+                    "status": "manual_action_required",
+                    "target": workers_origin,
+                    "nextAction": (
+                        "Bind this hostname as a Cloudflare Workers custom domain or route, "
+                        "then retry the Job for final online verification."
+                    ),
+                },
+            }
+            if canonical_origin != workers_origin else None
+        ),
+        "environmentVariables": ["NEXT_PUBLIC_SITE_URL", *AD_ENV_NAMES],
+        "adProfile": "animal-hospital-anomalies.wiki",
+        "deploymentMode": "wrangler-static-assets",
+        "source": {
+            "type": "github",
+            "repo": full_repo,
+            "productionBranch": "main",
+            "commit": commit_sha,
+        },
+        "buildConfig": {
+            "command": "npm run build",
+            "destination": "out",
+            "root": "",
+            "wranglerConfig": "wrangler.jsonc",
+        },
+        "log": str(log_path),
+        "updatedAt": _now(),
+    }
+
+
 def _http_response(url: str) -> tuple[int, dict[str, str], str]:
     request = urllib.request.Request(url, headers={"User-Agent": "GameWikiFactory/1.0"})
     with urllib.request.urlopen(request, timeout=30) as response:
@@ -1139,11 +1374,12 @@ def publish(argv: list[str]) -> int:
     parser.add_argument("--owner", default=runtime_env.get("FACTORY_GITHUB_OWNER") or "declanliang")
     parser.add_argument("--repo")
     parser.add_argument("--project-dir", type=Path)
-    parser.add_argument("--site-url", help="Optional final canonical domain/URL for Cloudflare Pages.")
+    parser.add_argument("--site-url", help="Optional final canonical domain/URL for Cloudflare hosting.")
     parser.add_argument("--skip-cloudflare", action="store_true")
     args = parser.parse_args(argv)
     project = (args.project_dir or (PROJECTS_ROOT / args.slug)).expanduser().resolve()
     _validate_project(project)
+    _ensure_workers_static_assets_runtime(project)
     repo = args.repo or args.slug
     receipt_path = project / ".gamewiki" / "publish.json"
     receipt = read_json(receipt_path) if receipt_path.is_file() else {"schemaVersion": 1, "slug": args.slug, "createdAt": _now(), "stages": {}}
@@ -1189,9 +1425,9 @@ def publish(argv: list[str]) -> int:
 
     if args.skip_cloudflare:
         receipt["stages"]["hosting"] = {
-            "provider": "cloudflare-pages",
+            "provider": "cloudflare-workers-static-assets",
             "status": "manual_action_required",
-            "nextAction": "Create a Cloudflare Pages project, set NEXT_PUBLIC_SITE_URL, deploy, and run npm run verify:deploy.",
+            "nextAction": "Run npm run build with NEXT_PUBLIC_SITE_URL, deploy with wrangler deploy, and run npm run verify:deploy.",
             "dashboardUrl": "https://dash.cloudflare.com/",
             "updatedAt": _now(),
         }
@@ -1199,7 +1435,7 @@ def publish(argv: list[str]) -> int:
         write_json(receipt_path, receipt)
     else:
         project_name = re.sub(r"[^a-z0-9-]+", "-", repo.casefold()).strip("-")[:58]
-        hosting = _deploy_cloudflare_pages(
+        hosting = _deploy_cloudflare_workers_static_assets(
             project,
             project_name,
             full_repo,
@@ -1222,7 +1458,7 @@ def publish(argv: list[str]) -> int:
         write_json(receipt_path, receipt)
 
         custom_domain_pending = (
-            hosting["siteUrl"] != hosting["pagesOrigin"]
+            hosting["siteUrl"] != hosting.get("workersDevOrigin")
             and (hosting.get("customDomain") or {}).get("status") != "active"
         )
         if custom_domain_pending:
@@ -1230,12 +1466,12 @@ def publish(argv: list[str]) -> int:
                 "status": "awaiting_domain_configuration",
                 "origin": hosting["siteUrl"],
                 "deploymentUrl": hosting["deploymentUrl"],
-                "nextAction": "Cloudflare Pages added the custom domain. Complete the pending DNS/validation action in Cloudflare, then retry this Job for final verification.",
+                "nextAction": "Workers Static Assets deployed to workers.dev. Bind the custom domain/route in Cloudflare, then retry this Job for final verification.",
                 "updatedAt": _now(),
             }
             receipt["stages"]["hosting"].update({
                 "status": "awaiting_domain_configuration",
-                "nextAction": "Pages deployment is complete and the custom domain was requested. Complete the pending DNS/validation action in Cloudflare; NEXT_PUBLIC_SITE_URL is already configured.",
+                "nextAction": "Workers Static Assets deployment is complete. Complete the custom domain/route binding in Cloudflare; NEXT_PUBLIC_SITE_URL is already configured.",
                 "updatedAt": _now(),
             })
         else:
@@ -1243,7 +1479,7 @@ def publish(argv: list[str]) -> int:
             receipt["stages"]["onlineVerification"] = verification
             receipt["stages"]["hosting"].update({
                 "status": "complete",
-                "nextAction": "Cloudflare Pages production deployment and online verification are complete.",
+                "nextAction": "Cloudflare Workers Static Assets deployment and online verification are complete.",
                 "updatedAt": _now(),
             })
         write_json(receipt_path, receipt)

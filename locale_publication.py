@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -21,8 +22,11 @@ from orchestrate_wiki import ROOT, build_subprocess_env, read_json, write_json
 from publication_plan import next_locale, validate_publication_plan
 from publisher import (
     _cloudflare_credentials,
+    _deploy_cloudflare_workers_static_assets,
+    _ensure_workers_static_assets_runtime,
     _normalize_origin,
-    _wait_cloudflare_commit_deployment,
+    _npm_binary,
+    _run_logged,
 )
 
 
@@ -144,6 +148,40 @@ def publish_locale_in_github(token: str, repo: str, locale: str) -> tuple[dict, 
     if not commit_sha:
         raise RuntimeError("GitHub locale release response omitted commit sha")
     return plan, commit_sha, True
+
+
+def _clone_locale_release_workspace(
+    repo: str,
+    commit_sha: str,
+    env: dict[str, str],
+    parent: Path,
+) -> Path:
+    project = parent / repo.rsplit("/", 1)[-1]
+    clone_log_path = parent / "locale-release-workers-clone.log"
+    _run_logged(
+        ["gh", "repo", "clone", repo, str(project), "--", "--branch", "main"],
+        ROOT,
+        env,
+        clone_log_path,
+        "clone locale release repository",
+    )
+    log_path = project / ".gamewiki" / "logs" / "locale-release-workers.log"
+    _run_logged(
+        ["git", "checkout", commit_sha],
+        project,
+        env,
+        log_path,
+        "checkout locale release commit",
+    )
+    _ensure_workers_static_assets_runtime(project)
+    _run_logged(
+        [_npm_binary("npm"), "ci"],
+        project,
+        env,
+        log_path,
+        "install locale release dependencies",
+    )
+    return project
 
 
 class _MetadataParser(HTMLParser):
@@ -271,26 +309,41 @@ def release_locale(argv: list[str]) -> int:
         raise RuntimeError("release-locale requires an internal localeRelease config")
     locale = str(config.get("locale") or "").strip().casefold()
     repo = str(config.get("githubRepo") or "").strip()
-    project_name = str(config.get("cloudflareProject") or "").strip()
+    project_name = str(config.get("workerName") or config.get("cloudflareProject") or "").strip()
     canonical_origin = str(config.get("siteUrl") or "").strip()
     if locale not in {"es", "de", "fr", "ja"}:
         raise RuntimeError(f"Unsupported scheduled locale: {locale or '<missing>'}")
     if not re.fullmatch(r"[^/]+/[^/]+", repo):
         raise RuntimeError("localeRelease githubRepo must be owner/repository")
     if not project_name or not canonical_origin:
-        raise RuntimeError("localeRelease requires Cloudflare project and canonical site URL")
+        raise RuntimeError("localeRelease requires Cloudflare Worker name and canonical site URL")
 
     env = build_subprocess_env(ROOT)
     token = _github_token(env)
+    env.setdefault("GH_TOKEN", token)
     plan, commit_sha, changed = publish_locale_in_github(token, repo, locale)
-    account_id, cloudflare_token = _cloudflare_credentials(env)
-    deployment = _wait_cloudflare_commit_deployment(
-        account_id,
-        cloudflare_token,
-        project_name,
-        commit_sha,
+    _cloudflare_credentials(env)
+    with tempfile.TemporaryDirectory(prefix="gamewiki-locale-release-") as temporary:
+        project = _clone_locale_release_workspace(
+            repo,
+            commit_sha,
+            env,
+            Path(temporary),
+        )
+        hosting = _deploy_cloudflare_workers_static_assets(
+            project,
+            project_name,
+            repo,
+            canonical_origin,
+            commit_sha,
+            env,
+        )
+    deployment_origin = str(
+        hosting.get("deploymentUrl")
+        or hosting.get("workersDevOrigin")
+        or config.get("workersDevOrigin")
+        or ""
     )
-    deployment_origin = str(deployment.get("url") or config.get("pagesOrigin") or "")
     verification = verify_locale_deployment(
         deployment_origin,
         canonical_origin,
@@ -306,13 +359,18 @@ def release_locale(argv: list[str]) -> int:
             "changed": changed,
         },
         "hosting": {
-            "provider": "cloudflare-pages",
+            "provider": "cloudflare-workers-static-assets",
             "projectName": project_name,
-            "deploymentId": deployment.get("id"),
+            "workerName": project_name,
+            "deploymentId": hosting.get("deploymentId"),
             "deploymentUrl": deployment_origin,
-            "pagesOrigin": str(config.get("pagesOrigin") or deployment_origin),
+            "workersDevOrigin": str(
+                hosting.get("workersDevOrigin")
+                or config.get("workersDevOrigin")
+                or deployment_origin
+            ),
             "siteUrl": canonical_origin,
-            "deploymentMode": "git-integration",
+            "deploymentMode": "wrangler-static-assets",
         },
         "onlineVerification": verification,
         "completedAt": _now(),

@@ -261,9 +261,8 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
         normalized.get("manualKeywords")
     )
     publication: dict[str, Any] = {}
-    # New background jobs complete the Private GitHub and Git-integrated
-    # Cloudflare Pages transaction. Custom-domain DNS/binding remains
-    # operator-owned.
+    # New background jobs complete the Private GitHub and Cloudflare Workers
+    # Static Assets transaction. Custom-domain DNS/binding remains operator-owned.
     publication.setdefault("skipCloudflare", False)
     normalized["publication"] = publication
     # Validate the fields shared with the foreground CLI.
@@ -325,17 +324,17 @@ def _schedule_next_locale_release(
     github = completion_result.get("github") or {}
     hosting = completion_result.get("hosting") or {}
     repo = str(github.get("repo") or "").strip()
-    project_name = str(hosting.get("projectName") or "").strip()
+    project_name = str(hosting.get("workerName") or hosting.get("projectName") or "").strip()
     site_url = str(hosting.get("siteUrl") or source_config.get("siteUrl") or "").strip()
-    pages_origin = str(
-        hosting.get("pagesOrigin") or source_config.get("pagesOrigin") or ""
+    workers_dev_origin = str(
+        hosting.get("workersDevOrigin") or source_config.get("workersDevOrigin") or ""
     ).strip()
     if (
-        str(hosting.get("provider") or "") != "cloudflare-pages"
+        str(hosting.get("provider") or "") != "cloudflare-workers-static-assets"
         or not repo
         or not project_name
         or not site_url
-        or not pages_origin
+        or not workers_dev_origin
     ):
         return None
     root_job_id = str(source_config.get("rootJobId") or source_job["id"])
@@ -352,9 +351,9 @@ def _schedule_next_locale_release(
         "slug": source_job["slug"],
         "locale": locale,
         "githubRepo": repo,
-        "cloudflareProject": project_name,
+        "workerName": project_name,
         "siteUrl": site_url,
-        "pagesOrigin": pages_origin,
+        "workersDevOrigin": workers_dev_origin,
     }
     changed = db.execute(
         """INSERT OR IGNORE INTO jobs(

@@ -160,9 +160,8 @@ export function buildSiteGraph(messages: Pick<Messages, "site">, locale: string)
 }
 
 /**
- * Git-integrated Cloudflare Pages exposes CF_PAGES_BRANCH. Only the production
- * branch may be indexed; local static builds remain indexable so verification
- * can assert the exact production metadata.
+ * Git-integrated Cloudflare Pages used CF_PAGES_BRANCH. Workers Static Assets
+ * builds are run by Factory for production, so no branch variable means indexable.
  */
 export function shouldIndex(): boolean {
   const branch = process.env.CF_PAGES_BRANCH;

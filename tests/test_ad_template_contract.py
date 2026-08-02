@@ -13,6 +13,7 @@ class AdTemplateContractTests(unittest.TestCase):
         expected = "AD_NATIVE_BANNER_MOBILE_B64"
         for relative in (
             "src/lib/ad-config.ts",
+            "src/worker.ts",
             "functions/api/ads/availability.ts",
             "functions/api/ads/[format].ts",
             ".env.example",

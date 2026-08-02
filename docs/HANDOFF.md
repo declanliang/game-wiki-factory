@@ -11,7 +11,7 @@
 - Factory 源码只在本仓库；真实游戏产物写入 Factory 同级的 `../<slug>/`，游戏目录本身就是 Next.js 根。
 - 最终部署输入在游戏根 `intake/`；调研、cache、manifest 和日志在游戏根 `.gamewiki/`。
 - 新站默认只生成 `en/es`；首发只公开 `en`，第三个自然日自动公开 `es`。`de/fr/ja` 只由 Growth 专项根据真实搜索需求和用户批准扩展；不生成韩语。
-- 默认发布到 Git-integrated Cloudflare Pages，不再新增 Vercel 项目。
+- 默认发布到 Cloudflare Workers Static Assets，不再新增 Cloudflare Pages 或 Vercel 项目。
 - 每个游戏创建自己的 Private GitHub repo。禁止创建或改成 Public。
 - Factory 只负责站点生产和发布；广告代码采集/转换不属于主流程。发布器只从 `config/ads/animal-hospital-profile.json` 自动配置固定 shared ad profile。
 
@@ -25,7 +25,7 @@ site/job JSON
   → SEO Scout：搜索、采集、英文文章、QA、西语翻译
   → intake/content：物化网站输入和文章树
   → template：Next.js 静态站点、metadata、sitemap、hreflang、广告 API
-  → publisher：Private GitHub + Git-integrated Cloudflare Pages + 线上验收
+  → publisher：Private GitHub + Workers Static Assets + 线上验收
 ```
 
 `site-plan.json` 是语言、分类和发布页面的唯一声明源。Basic Info 的 `game-profile.json` 定义分类候选边界；Guide Search 不能越界发明分类。资料少的游戏允许页面少；资料丰富的游戏应拆成多个不同玩家意图或实体页，不为凑数量合成 fallback 主题。
@@ -61,9 +61,9 @@ site/job JSON
 
 - `platform` 只能是 `roblox`、`steam` 或 `auto`。
 - `officialUrl` 已知时必须填写，避免身份歧义；Steam 用 Store App URL，Roblox 用 Experience URL。
-- `siteUrl` 可省略；省略时使用 `pages.dev` 并自动验收。
+- `siteUrl` 可省略；省略时使用 `workers.dev` 并自动验收。
 - `manualKeywords` 最多 200 项，是补充发现源，仍受风险过滤、证据门、Basic Info profile 和最终编辑门约束。
-- 不填写 GitHub repo、Cloudflare Pages project、广告变量或旧 rebuild 参数。
+- 不填写 GitHub repo、Cloudflare Pages/Workers project、广告变量或旧 rebuild 参数。
 
 ## 4. 失败恢复
 
@@ -120,20 +120,20 @@ API key、余额、模型路由、DNS、权限、schema 和核心代码问题必
 发布器默认完成：
 
 - 创建或复用 Private GitHub repo；
-- 创建连接该 repo `main` 的 Git-integrated Cloudflare Pages 项目；
-- 设置 Production `NEXT_PUBLIC_SITE_URL`；
-- 写入 shared ad profile 的 8 个 server-only `AD_*_B64` 变量；
-- 触发 Cloudflare 服务端 `npm run build`，输出 `out`；
+- 使用 Private GitHub repo 保存站点源码；
+- 生成本地 `wrangler.jsonc`，设置 `NEXT_PUBLIC_SITE_URL` 和 shared ad profile 的 8 个 server-only `AD_*_B64` Worker vars；
+- 在服务器本地用最终 origin 执行 `npm run build`，输出 `out`；
+- 使用 `wrangler deploy` 发布 Workers Static Assets；
 - 自动验证部署。
 
-提供 `siteUrl` 时，发布器会先安全处理 DNS：只在 Cloudflare active zone 中没有现有记录时创建 CNAME 指向 `<project>.pages.dev`，或复用已经指向该 Pages origin 的 CNAME；已有记录指向别处、找不到 zone、zone 未激活或 DNS API 无权限时，不覆盖、不删除，也不新建 Pages Custom Domain，改为在 `customDomain.dns.nextAction` 中交接。
+提供 `siteUrl` 时，发布器会用该正式域名构建 canonical/sitemap，并先部署到 `workers.dev`。当前 Workers custom domain/route 由运营者或域名 Agent 在 Cloudflare 绑定；绑定前 Job 以 `awaiting_domain_configuration` 明确交接，不能声称正式域名已上线。
 
 `result.hosting.status`：
 
 - `complete`：目标 origin 已通过线上首页、metadata、canonical、robots、sitemap、hreflang、广告 API 验收。
-- `awaiting_domain_configuration`：Pages、GitHub、环境变量和部署已完成，但正式域名仍需运营者/域名 Agent 完成绑定、DNS 或验证；不能说正式域名已上线。
+- `awaiting_domain_configuration`：Workers Static Assets、GitHub、Worker vars 和部署已完成，但正式域名仍需运营者/域名 Agent 完成 Worker custom domain/route、DNS 或验证；不能说正式域名已上线。
 
-Pages 控制台显示成功不等于 Factory 验收完成。必须验证 `/` 301 到 `/en`，且 sitemap 内所有 loc/hreflang 直接 200。
+Workers 控制台显示成功不等于 Factory 验收完成。必须验证 `/` 301 到 `/en`、广告 API，且 sitemap 内所有 loc/hreflang 直接 200。
 
 ## 7. 本地开发与验证
 

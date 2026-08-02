@@ -3,12 +3,12 @@
 站点上线后的 Growth 职责由飞书账号 `cli_aad59e06a3fa5bee` 绑定的现有
 `agent-ff5e1a69`（游戏管理员）承担，不再维护独立 `game-wiki-growth` Agent：
 
-- `game-wiki-operator`：输入游戏信息，创建新站并交付 Cloudflare Pages。
+- `game-wiki-operator`：输入游戏信息，创建新站并交付 Cloudflare Workers Static Assets。
 - `agent-ff5e1a69` 的 Growth 专项：读取 GSC 数据，给一个已上线站点制定关键词/页面优化方案；用户批准后才修改该游戏自己的 Private repo。
 
 它不修改 Factory、不接触广告、不修改 Cloudflare 环境变量或域名。
 
-Factory 新站默认只生成英语和西班牙语，英语立即公开，西班牙语第三个自然日公开。德语、法语、日语等后续语言由 Growth Agent 根据 GSC/GSA 的“查询语言 + 国家 + 当前排名页面”共同判断；国家流量本身不构成翻译依据。用户批准后，它只扩展现有 Private repo，不重建站点、repo、Pages 项目或域名。
+Factory 新站默认只生成英语和西班牙语，英语立即公开，西班牙语第三个自然日公开。德语、法语、日语等后续语言由 Growth Agent 根据 GSC/GSA 的“查询语言 + 国家 + 当前排名页面”共同判断；国家流量本身不构成翻译依据。用户批准后，它只扩展现有 Private repo，不重建站点、repo、Worker 或域名。
 
 ## 服务器部署
 

@@ -8,7 +8,7 @@ export function normalizePathname(pathname = "/") {
 }
 
 export function localizedPathname(pathname, locale) {
-  // Cloudflare Pages: every locale (including the default) is prefixed —
+  // Static export: every locale (including the default) is prefixed —
   // static export has no middleware to rewrite "/" to "/en" at request time.
   const normalized = normalizePathname(pathname);
   if (!locale) return normalized;

@@ -43,8 +43,9 @@ decision without becoming unfocused.
 
 ## 6. Verify and measure
 
-Run local checks and production build, commit intentionally, push `main`, wait
-for the Git-integrated Cloudflare Pages deployment, and verify live output.
+Run local checks and production build, commit intentionally, push `main`, then
+redeploy the existing Cloudflare Workers Static Assets Worker with Wrangler and
+verify live output.
 Choose a follow-up date at least 14 days later; compare like-for-like GSC
 windows and do not declare success from same-day rank movement.
 

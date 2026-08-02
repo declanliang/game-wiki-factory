@@ -4,7 +4,7 @@
 
 ## 用户应该提供什么
 
-新站只要求游戏名；已知信息应尽量填写，避免身份歧义。不要填写 GitHub repo、Cloudflare Pages project 或任何密钥。所有未来游戏都按新项目处理，不接受 rebuild/旧 repo 覆盖输入。
+新站只要求游戏名；已知信息应尽量填写，避免身份歧义。不要填写 GitHub repo、Cloudflare Pages/Workers project 或任何密钥。所有未来游戏都按新项目处理，不接受 rebuild/旧 repo 覆盖输入。
 
 ```json
 {
@@ -19,7 +19,7 @@
 
 - `platform`：`roblox`、`steam` 或 `auto`。
 - Steam 的 `officialUrl` 必须是 Steam Store App URL。
-- `siteUrl` 可省略；省略时 Factory 使用项目的 `pages.dev` origin。提供时 Factory 自动设置匹配的 `NEXT_PUBLIC_SITE_URL` 并部署；若 Cloudflare DNS 中没有记录且 token 有 DNS 权限，Factory 会创建 CNAME 并请求 Pages Custom Domain。找不到 active zone、无 DNS 权限或已有记录指向别处时，Factory 不会强行绑定，运营者/域名 Agent 负责后续域名处理。
+- `siteUrl` 可省略；省略时 Factory 使用项目的 `workers.dev` origin 并自动验收。提供时 Factory 自动设置匹配的 `NEXT_PUBLIC_SITE_URL` 并部署到 Workers Static Assets；正式域名尚未绑定 Worker custom domain/route 时，运营者/域名 Agent 负责后续域名处理。
 - 单站的 `schemaVersion`、`taskType: site` 和默认 operation 由系统自动补齐，用户无需填写。
 - `manualKeywords` 可选，最多 200 项。它们会作为 `user_provided` 来源进入 Guide Search，但仍受风险、证据和分类边界约束。
 - 不填写 `operation`；失败续跑只重试原 Job。
@@ -28,7 +28,7 @@
 
 ```text
 请按照附件 game.json 提交 Game Wiki 后台任务。先验证 JSON，再返回 job ID。
-不要在聊天进程运行流水线，不要向我索要 repo/Cloudflare Pages 项目名称，不要打印密钥。
+不要在聊天进程运行流水线，不要向我索要 repo/Cloudflare 项目名称，不要打印密钥。
 以后查询时以后台数据库和日志为准；只有线上验收完成后才能告诉我成功。
 ```
 
@@ -56,7 +56,7 @@ Prompt：
 
 ## 后续添加广告
 
-OpenClaw 不接收 Cloudflare Pages 广告任务，也不要让用户把原始代码粘贴进聊天正文；新站广告变量由 Factory 发布器自动配置。
+OpenClaw 不接收 Cloudflare 广告任务，也不要让用户把原始代码粘贴进聊天正文；新站广告变量由 Factory 发布器自动配置。
 
 ```text
 Factory 和 OpenClaw 不接收 `taskType: ads` 或 Job 内原始广告代码。发布器只使用版本化 shared profile，并且不得打印 Base64 值。
@@ -66,12 +66,12 @@ Factory 和 OpenClaw 不接收 `taskType: ads` 或 Job 内原始广告代码。�
 
 ## 生产版本认定
 
-当前稳定版本读取根目录 `release.json`。普通 Git commit 不改变产品版本。OpenClaw 不得按日期、外观或文章数量推断版本；必须检查任务结果中的 `factoryRelease` 和站点的 `intake/factory-release.json`。线上认证还必须由运营者完成 Cloudflare Pages 验收并登记到 release 站点清单。
+当前稳定版本读取根目录 `release.json`。普通 Git commit 不改变产品版本。OpenClaw 不得按日期、外观或文章数量推断版本；必须检查任务结果中的 `factoryRelease` 和站点的 `intake/factory-release.json`。线上认证还必须完成 Cloudflare Workers Static Assets 验收并登记到 release 站点清单。
 
 从 `v1_0728` 开始，Factory 新站只生成英语和西班牙语，但第一次部署只公开英文。Worker
 会在 SQLite 中创建一个内部 `localeRelease` Job，在第三个后续自然日发布
-`es`。该 Job 只修改 Private GitHub 中的发布计划并由 Cloudflare Pages Git
-集成构建，不重复调用生成/翻译 API，也不修改 Pages 环境变量。`de/fr/ja`
+`es`。该 Job 只修改 Private GitHub 中的发布计划并由 Worker 通过 `wrangler deploy`
+重新发布，不重复调用生成/翻译 API，也不修改广告变量。`de/fr/ja`
 只能由 Growth 专项根据真实搜索需求和用户批准扩展。OpenClaw 查询队列时应把
 `localeRelease` 标明为“定时西班牙语发布”，不得误报成重复建站。
 
@@ -88,14 +88,14 @@ profile 的 8 个 `AD_*_B64` 变量。OpenClaw 不得要求用户为 0730 新增
 不要根据之前聊天记忆回答。
 ```
 
-Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status JOB_ID --json`。成功任务的 `result` 是清理 workspace 后仍保留的非敏感摘要，包含文章数、分类、Private GitHub、Pages project/deployment 和域名交接状态；不要绕过 CLI 直接读取 secrets。只有下列条件全部满足才能报告发布完成：
+Agent 每次必须先执行 `jobs list --json`，再对目标执行 `jobs status JOB_ID --json`。成功任务的 `result` 是清理 workspace 后仍保留的非敏感摘要，包含文章数、分类、Private GitHub、Workers Static Assets deployment 和域名交接状态；不要绕过 CLI 直接读取 secrets。只有下列条件全部满足才能报告发布完成：
 
 1. job 为 `succeeded`，manifest 必需阶段完成；
 2. GitHub repo 为 Private；
-3. `publish.json` 中 `stages.hosting.provider=cloudflare-pages` 且 `status=complete` 或 `awaiting_domain_configuration`；后者只能表述为“Pages 已部署，等待域名绑定/DNS”，并应查看 `customDomain.dns.nextAction` 是否需要运营者或域名 Agent 操作；
+3. `publish.json` 中 `stages.hosting.provider=cloudflare-workers-static-assets` 且 `status=complete` 或 `awaiting_domain_configuration`；后者只能表述为“Workers Static Assets 已部署到 workers.dev，等待 Worker custom domain/route 绑定”，并应查看 `customDomain.dns.nextAction` 是否需要运营者或域名 Agent 操作；
 4. Factory 和 OpenClaw 不包含手工广告任务；新站只使用发布器自动配置的 shared profile。
 
-完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Pages project/deployment URL、hosting 状态，以及是否只剩域名绑定/DNS。只有 `complete` 才能声称对应 origin 已线上验证。
+完成汇报固定包含：游戏、job ID、英文/全部语言文章数、分类数、内容机会报告路径、Private repo、Worker/deployment URL、hosting 状态，以及是否只剩域名绑定/DNS。只有 `complete` 才能声称对应 origin 已线上验证。
 
 `needs_attention` 固定汇报：第一个失败阶段、根因、日志路径、是否需要用户动作、是否会重复 API 成本。额度告警还必须逐字保留 Factory 返回的 API 名称、凭据组、端点和熔断暂停数量，不能笼统改写成“某个 API”。同一供应商熔断只通知一次，`quota_wait` 任务不单独上报。用户充值或更换对应凭据后，重试首条告警的原 Job；Factory 会关闭熔断、统一恢复暂停任务并复用 checkpoint。网络/429/5xx 由 Worker 有界重试；不要创建第二个同游戏任务。
 
@@ -162,6 +162,6 @@ Agent 发现疑似代码 bug 时只能报告证据并保持任务为 `needs_atte
 - 不读取、显示或复制 `factory.env`；不把真实任务 JSON、广告代码、日志或 `.gamewiki` 提交 Git。
 - GitHub 只能是 Private；拒绝 Public 请求。
 - 不因文章数量少就造 fallback。先读 `content-opportunity-report.json`：公开资料少可以接受；明显跨游戏内容必须删除。
-- Cloudflare Pages 显示部署成功、Git push 成功或本地 build 成功都不是最终成功；线上自动验证是发布事务的最后一步。
+- Cloudflare Workers Static Assets 显示部署成功、Git push 成功或本地 build 成功都不是最终成功；线上自动验证是发布事务的最后一步。
 - 同名目标目录或 repo 已存在时停止并升级，不得自动删除、覆盖或把它解释为旧站升级。
 - 不接受广告标题/代码映射或任意 profile 覆盖；只检查自动 provisioning 状态。

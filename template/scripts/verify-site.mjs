@@ -540,7 +540,7 @@ if (args.includes("--deploy")) {
       const hreflangs = [...live["/en"].matchAll(/rel="alternate"\s+hreflang="([^"]+)"/gi)].map((match) => match[1]);
       verifyRequiredHreflangs(hreflangs, "线上首页");
       if (!metadata.title || !metadata.ogUrl) {
-        fail("线上首页虽然返回 200，但 metadata 不完整；请检查 NEXT_PUBLIC_SITE_URL 和 Cloudflare Pages 构建日志");
+        fail("线上首页虽然返回 200，但 metadata 不完整；请检查 NEXT_PUBLIC_SITE_URL 和 Cloudflare Workers 构建日志");
       }
     }
     if (live["/sitemap.xml"]) {

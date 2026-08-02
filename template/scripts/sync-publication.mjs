@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Projects all generated translations into only the locale routes currently
-// released. Cloudflare Pages runs this in prebuild, so a scheduled Git commit
-// changing publication-plan.json is sufficient to publish the next wave.
+// released. Factory runs this before Workers Static Assets builds, so a
+// scheduled Git commit changing publication-plan.json is sufficient to publish
+// the next wave.
 
 import fs from "node:fs";
 import path from "node:path";

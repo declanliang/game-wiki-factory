@@ -1,6 +1,6 @@
 # Game Wiki 站点模板
 
-这是 `game-wiki-factory` 内置的干净 Next.js Wiki 模板。编排器把模板同步到 `Games/<game-slug>/` 根目录；该目录本身就是可推送 GitHub、可部署 Cloudflare Pages 的网站项目。
+这是 `game-wiki-factory` 内置的干净 Next.js Wiki 模板。编排器把模板同步到 `Games/<game-slug>/` 根目录；该目录本身就是可推送 GitHub、可部署 Cloudflare Workers Static Assets 的网站项目。
 
 模板同时支持 Roblox 与 Steam。平台差异已经由上游 Basic Info 转换为统一 intake 契约；模板不调用 Roblox/Steam API，也不根据平台自行猜测事实。
 
@@ -22,7 +22,7 @@ Steam 数据注意事项：
 - `full controller support` 不代表 Steam Deck Verified 或 Playable；没有官方等级时只能表述为未确认。
 - Windows 系统要求不能自动推导 Linux/SteamOS 兼容性或具体帧率。
 - Steam 官方 trailer、截图和 header 可作为媒体来源；第三方 YouTube 视频不得冒充官方频道。
-- 网站部署只消费 `intake/`，Cloudflare Pages 不需要 Steam、搜索或 LLM API key。
+- 网站部署只消费 `intake/`，Cloudflare Workers Static Assets 不需要 Steam、搜索或 LLM API key。
 
 ## 唯一输入契约
 
@@ -81,13 +81,13 @@ npm run build
 
 ## Adsterra 广告
 
-Factory 发布器把统一 shared profile 转成 8 个 server-only `AD_*_B64` 环境变量，并分别写入 Cloudflare Pages Preview 和 Production；变量名和转换规则见 Factory 的 `docs/advertising/adsterra-environment-contract.md`。
+Factory 发布器把统一 shared profile 转成 8 个 server-only `AD_*_B64` Worker vars，并写入发布时生成的本地 `wrangler.jsonc`；变量名和转换规则见 Factory 的 `docs/advertising/adsterra-environment-contract.md`。
 
-页面先调用 `/api/ads/availability` 获取运行时可用性，再按需挂载 `/api/ads/<format>` 同源 iframe。广告 iframe 不设置 sandbox；桌面/移动 Native 在媒体查询确定后只加载各自 placement。未配置或 Base64 无效时不会渲染 iframe、占位容器或空白间距。修改 Pages 变量后必须重新部署对应环境。
+页面先调用 `/api/ads/availability` 获取运行时可用性，再按需挂载 `/api/ads/<format>` 同源 iframe。广告 iframe 不设置 sandbox；桌面/移动 Native 在媒体查询确定后只加载各自 placement。未配置或 Base64 无效时不会渲染 iframe、占位容器或空白间距。修改 Worker vars 后必须重新 `wrangler deploy`。
 
-## Cloudflare Pages 部署
+## Cloudflare Workers Static Assets 部署
 
-Factory 会通过 Pages API 创建连接 Private GitHub `main` 的项目，Root directory 留空，Build command 为 `npm run build`，Build output directory 为 `out`。Production 环境必须设置最终公开域名对应的 `NEXT_PUBLIC_SITE_URL`。部署后运行 `npm run verify:deploy`；根路径应 301 到 `/en`，而 sitemap 中的所有 loc/hreflang 必须直接返回 200。发布契约只维护在 Factory 的 `docs/deployment/cloudflare-pages.md`，不会复制进每个游戏仓库。
+Factory 会创建或复用 Private GitHub `main` 仓库，但托管发布由服务器本地执行：先用最终公开域名对应的 `NEXT_PUBLIC_SITE_URL` 运行 `npm run build`，再生成被 Git 忽略的 `wrangler.jsonc`，通过 `npx wrangler deploy --config wrangler.jsonc` 发布 Worker + `out` 静态资产。部署后运行 `npm run verify:deploy`；根路径应 301 到 `/en`，而 sitemap 中的所有 loc/hreflang 必须直接返回 200。发布契约只维护在 Factory 的 `docs/deployment/cloudflare-workers-static-assets.md`，不会复制进每个游戏仓库。
 
 ## 设计边界
 

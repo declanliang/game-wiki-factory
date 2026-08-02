@@ -12,7 +12,9 @@ from publisher import (
     _cloudflare_environment_payload,
     _cloudflare_git_project_payload,
     _deploy_cloudflare_pages,
+    _deploy_cloudflare_workers_static_assets,
     _ensure_cloudflare_project,
+    _ensure_workers_static_assets_runtime,
     _ensure_origin_remote,
     _ensure_private_github_repo,
     _github_repo_from_remote_url,
@@ -27,6 +29,7 @@ from publisher import (
     _verify_online_advertising,
     _wait_cloudflare_deployment,
     _wait_cloudflare_commit_deployment,
+    _workers_static_assets_config,
 )
 
 
@@ -326,6 +329,89 @@ class PublisherValidationTests(unittest.TestCase):
         self.assertEqual(len(result["environmentVariables"]), 9)
         self.assertEqual(result["adProfile"], "animal-hospital-anomalies.wiki")
         self.assertEqual(result["customDomain"], {"name": "game.example", "status": "active", "dns": None})
+
+    def test_workers_static_assets_config_uses_worker_script_and_asset_binding(self) -> None:
+        ads = {name: f"encoded-{index}" for index, name in enumerate((
+            "AD_NATIVE_BANNER_B64",
+            "AD_NATIVE_BANNER_MOBILE_B64",
+            "AD_BANNER_728X90_B64",
+            "AD_BANNER_300X250_B64",
+            "AD_BANNER_468X60_B64",
+            "AD_SIDEBAR_160X600_B64",
+            "AD_SIDEBAR_160X300_B64",
+            "AD_MOBILE_320X50_B64",
+        ))}
+        config = _workers_static_assets_config(
+            "account",
+            "game",
+            "https://game.example",
+            ads,
+        )
+        self.assertEqual(config["main"], "./src/worker.ts")
+        self.assertEqual(config["assets"]["directory"], "./out")
+        self.assertEqual(config["assets"]["binding"], "ASSETS")
+        self.assertEqual(config["assets"]["html_handling"], "auto-trailing-slash")
+        self.assertEqual(config["assets"]["not_found_handling"], "404-page")
+        self.assertEqual(config["vars"]["NEXT_PUBLIC_SITE_URL"], "https://game.example")
+        self.assertEqual(config["vars"]["AD_MOBILE_320X50_B64"], ads["AD_MOBILE_320X50_B64"])
+
+    def test_workers_static_assets_runtime_is_injected_for_existing_workspace(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "src").mkdir()
+            (project / ".gitignore").write_text("node_modules\n", encoding="utf-8")
+
+            changed = _ensure_workers_static_assets_runtime(project)
+
+            self.assertIn("src/worker.ts", changed)
+            self.assertIn(".gitignore", changed)
+            self.assertTrue((project / "src" / "worker.ts").is_file())
+            self.assertIn("/wrangler.jsonc", (project / ".gitignore").read_text(encoding="utf-8"))
+
+    @patch("publisher._run_logged")
+    @patch("publisher._write_workers_static_assets_config")
+    @patch("publisher.load_shared_ad_environment")
+    @patch("publisher._cloudflare_workers_dev_origin")
+    def test_workers_static_assets_deploy_uses_wrangler(
+        self, workers_origin, load_ads, write_config, run_logged
+    ) -> None:
+        workers_origin.return_value = "https://game.acct.workers.dev"
+        load_ads.return_value = {name: "encoded" for name in (
+            "AD_NATIVE_BANNER_B64", "AD_NATIVE_BANNER_MOBILE_B64",
+            "AD_BANNER_728X90_B64", "AD_BANNER_300X250_B64",
+            "AD_BANNER_468X60_B64", "AD_SIDEBAR_160X600_B64",
+            "AD_SIDEBAR_160X300_B64", "AD_MOBILE_320X50_B64",
+        )}
+        write_config.return_value = Path("wrangler.jsonc")
+        run_logged.side_effect = [
+            "build ok",
+            "Uploaded assets\nhttps://game.acct.workers.dev",
+        ]
+        result = _deploy_cloudflare_workers_static_assets(
+            Path("C:/game"),
+            "game",
+            "owner/game",
+            "",
+            "abc123",
+            {"cf_accountid": "account", "cf_pages_api_key": "hidden-token"},
+        )
+        self.assertEqual(result["provider"], "cloudflare-workers-static-assets")
+        self.assertEqual(result["deploymentMode"], "wrangler-static-assets")
+        self.assertEqual(result["siteUrl"], "https://game.acct.workers.dev")
+        self.assertEqual(result["deploymentUrl"], "https://game.acct.workers.dev")
+        self.assertIsNone(result["customDomain"])
+        self.assertEqual(len(result["environmentVariables"]), 9)
+        self.assertEqual(run_logged.call_args_list[0].args[0][1:], ["run", "build"])
+        build_env = run_logged.call_args_list[0].args[2]
+        self.assertEqual(build_env["NEXT_PUBLIC_SITE_URL"], "https://game.acct.workers.dev")
+        self.assertEqual(build_env["CF_WORKERS"], "1")
+        self.assertEqual(
+            run_logged.call_args_list[1].args[0][-3:],
+            ["deploy", "--config", "wrangler.jsonc"],
+        )
+        deploy_env = run_logged.call_args_list[1].args[2]
+        self.assertEqual(deploy_env["CLOUDFLARE_ACCOUNT_ID"], "account")
+        self.assertEqual(deploy_env["CLOUDFLARE_API_TOKEN"], "hidden-token")
 
     @patch("publisher.time.sleep")
     @patch("publisher._cloudflare_global_request")

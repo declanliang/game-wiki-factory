@@ -253,10 +253,11 @@ class JobSystemTests(unittest.TestCase):
                         "localePublication": {"publishedLocales": ["en"]},
                         "github": {"repo": "owner/wave-game"},
                         "hosting": {
-                            "provider": "cloudflare-pages",
+                            "provider": "cloudflare-workers-static-assets",
                             "projectName": "wave-game",
+                            "workerName": "wave-game",
                             "siteUrl": "https://wave.example",
-                            "pagesOrigin": "https://wave-game.pages.dev",
+                            "workersDevOrigin": "https://wave-game.account.workers.dev",
                         },
                     },
                 )
@@ -271,6 +272,8 @@ class JobSystemTests(unittest.TestCase):
             self.assertEqual(release_config["taskType"], "localeRelease")
             self.assertEqual(release_config["locale"], "es")
             self.assertEqual(release_config["githubRepo"], "owner/wave-game")
+            self.assertEqual(release_config["workerName"], "wave-game")
+            self.assertEqual(release_config["workersDevOrigin"], "https://wave-game.account.workers.dev")
 
     def test_quota_circuit_does_not_pause_scheduled_locale_releases(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
@@ -289,10 +292,11 @@ class JobSystemTests(unittest.TestCase):
                         "localePublication": {"publishedLocales": ["en"]},
                         "github": {"repo": "owner/quota-source"},
                         "hosting": {
-                            "provider": "cloudflare-pages",
+                            "provider": "cloudflare-workers-static-assets",
                             "projectName": "quota-source",
+                            "workerName": "quota-source",
                             "siteUrl": "https://quota.example",
-                            "pagesOrigin": "https://quota-source.pages.dev",
+                            "workersDevOrigin": "https://quota-source.account.workers.dev",
                         },
                     },
                 )
@@ -348,7 +352,7 @@ class JobSystemTests(unittest.TestCase):
             (project / ".gamewiki" / "publish.json").write_text(json.dumps({
                 "stages": {
                     "github": {"visibility": "PRIVATE", "repo": "owner/verified-game"},
-                    "hosting": {"provider": "cloudflare-pages", "status": "manual_action_required"},
+                    "hosting": {"provider": "cloudflare-workers-static-assets", "status": "manual_action_required"},
                     "onlineVerification": {"status": "complete", "origin": "https://verified.game"},
                 },
             }), encoding="utf-8")
@@ -356,7 +360,7 @@ class JobSystemTests(unittest.TestCase):
         self.assertEqual(result["articles"]["english"], 1)
         self.assertEqual(result["factoryRelease"], "v1_0722")
         self.assertEqual(result["categories"], ["guide"])
-        self.assertEqual(result["hosting"]["provider"], "cloudflare-pages")
+        self.assertEqual(result["hosting"]["provider"], "cloudflare-workers-static-assets")
         self.assertEqual(result["onlineVerification"]["status"], "complete")
         self.assertNotIn("token", json.dumps(result).casefold())
 

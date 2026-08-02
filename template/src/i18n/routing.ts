@@ -13,7 +13,7 @@ import { PUBLISHED_LOCALES } from "@/config/publication";
 export const routing = defineRouting({
   locales: PUBLISHED_LOCALES,
   defaultLocale: "en",
-  // Cloudflare Pages branch: static export has no middleware, so "as-needed"
+  // Static export branch: there is no middleware, so "as-needed"
   // (bare English URLs via a runtime rewrite) isn't possible. Every locale,
   // including English, gets an explicit prefix; public/_redirects 301s the
   // accidental bare paths to /en/... for canonical consistency.

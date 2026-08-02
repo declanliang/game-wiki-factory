@@ -36,6 +36,10 @@ yarn-error.log*
 /.gamewiki/
 /ad.txt
 
+# Generated at publish time for Cloudflare Workers Static Assets. It contains
+# per-site runtime vars and must stay local.
+/wrangler.jsonc
+
 # vercel
 .vercel
 
