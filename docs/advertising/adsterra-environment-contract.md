@@ -48,7 +48,7 @@ Factory 的 `wrangler.jsonc` 只包含自身管理的 8 个广告变量、`NEXT_
 
 Workers Static Assets 不使用 Pages Preview。Factory 的发布输入只使用已批准的 Private GitHub `main`，但部署由服务器本地 `npm run build` + `wrangler deploy` 完成。首次上线验收使用 `workers.dev` 或已经绑定的正式域名，用于首页、metadata、sitemap、robots 和广告 API 检查。
 
-提供 `siteUrl` 时，Factory 会先用该 origin 构建 canonical/sitemap，再部署到 Workers Static Assets。正式域名 custom domain/route 绑定由运营者或域名 Agent 完成；绑定前回执会明确保留 `awaiting_domain_configuration`，不会改建项目或伪报域名已上线。
+提供 `siteUrl` 时，Factory 会先用该 origin 构建 canonical/sitemap，再部署到 Workers Static Assets，并自动创建或复用 Worker custom domain/route。若绑定或正式域名验收未完成，回执会明确保留 `awaiting_domain_configuration`，不会改建项目或伪报域名已上线。
 
 模板运行时提供：
 

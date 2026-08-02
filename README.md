@@ -1,6 +1,6 @@
 # Game Wiki Factory
 
-输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库和 Cloudflare Workers Static Assets。Factory 在服务器本地用最终 `NEXT_PUBLIC_SITE_URL` 构建静态站点，再用 `wrangler deploy` 发布 Worker + `out` 静态资产；提供正式域名但尚未绑定 Worker custom domain/route 时，以 `awaiting_domain_configuration` 明确交给运营者/域名 Agent。历史 Vercel/Pages 站点继续保留原托管，不在新任务中重建或迁移。
+输入一个 Roblox 或 Steam 游戏，自动完成游戏调研、关键词规划、文章生成、多语言翻译、Next.js Wiki 构建，并发布到 GitHub Private 仓库和 Cloudflare Workers Static Assets。Factory 在服务器本地用最终 `NEXT_PUBLIC_SITE_URL` 构建静态站点，再用 `wrangler deploy` 发布 Worker + `out` 静态资产；提供正式域名时会自动创建或复用 Worker custom domain/route，只有 zone、权限、DNS 或验证问题未解决时才以 `awaiting_domain_configuration` 明确交给运营者/域名 Agent。历史 Vercel/Pages 站点继续保留原托管，不在新任务中重建或迁移。
 
 第一次接手先读 [文档导航](docs/README.md) 和 [接手手册](docs/HANDOFF.md)。
 
@@ -31,7 +31,7 @@ Basic Info、Guide Search、SEO Scout 和发布器都会从这里读取配置。
 gh auth login
 ```
 
-无人值守或 GitHub Actions 使用 `.env`/Secrets 中的 `FACTORY_GITHUB_TOKEN`；本地没有 token 时自动复用上述 GitHub CLI 登录会话。Workers Static Assets 自动发布还需要 `CLOUDFLARE_ACCOUNT_ID` 和具有 Workers Scripts/Edit、Workers Static Assets 相关权限的 `CLOUDFLARE_API_TOKEN`。正式域名绑定当前由运营者或域名 Agent 在 Cloudflare 完成；没有绑定前不会伪报正式域名已上线。
+无人值守或 GitHub Actions 使用 `.env`/Secrets 中的 `FACTORY_GITHUB_TOKEN`；本地没有 token 时自动复用上述 GitHub CLI 登录会话。Workers Static Assets 自动发布还需要 `CLOUDFLARE_ACCOUNT_ID` 和具有 Workers Scripts/Edit、Workers Static Assets、Workers Custom Domains 以及 zone 读取相关权限的 `CLOUDFLARE_API_TOKEN`。正式域名会由 Factory 自动绑定到 Worker；没有绑定或没有通过最终域名验收前不会伪报正式域名已上线。
 
 ## 推荐执行方式：JSON 配置
 
@@ -117,7 +117,7 @@ python gamewiki.py --config jobs\my-game.json
 - `platform` 只能是 `roblox`、`steam` 或 `auto`。
 - `siteUrl` 可以是裸域名或完整 HTTPS URL；已知正式域名时填写。
 - `manualKeywords` 是可选字符串数组，最多 200 项；系统会清理空白、按大小写去重，并作为 `user_provided` 来源进入 Guide Search。它们仍受风险过滤、证据门和 Basic Info 分类边界约束。
-- `publish: true` 会创建新的 Private GitHub 仓库，自动生成本地 `wrangler.jsonc`，用最终 `NEXT_PUBLIC_SITE_URL` 执行 `npm run build`，再通过 `npx wrangler deploy` 发布 Workers Static Assets。未填写 `siteUrl` 时使用 `<slug>.<account>.workers.dev` 并自动验收。填写 `siteUrl` 时，Factory 会用正式域名生成 canonical/sitemap 并部署到 workers.dev；正式域名尚未绑定 Worker custom domain/route 时返回 `hosting.status=awaiting_domain_configuration`，交给运营者/域名 Agent 处理。
+- `publish: true` 会创建新的 Private GitHub 仓库，自动生成本地 `wrangler.jsonc`，用最终 `NEXT_PUBLIC_SITE_URL` 执行 `npm run build`，再通过 `npx wrangler deploy` 发布 Workers Static Assets。未填写 `siteUrl` 时使用 `<slug>.<account>.workers.dev` 并自动验收。填写 `siteUrl` 时，Factory 会用正式域名生成 canonical/sitemap，部署到 workers.dev，并自动创建或复用 Worker custom domain；若绑定或最终域名验收仍未完成，才返回 `hosting.status=awaiting_domain_configuration`。
 - 日常配置不需要 GitHub repo 或托管平台项目名。每个游戏都创建新的 Private GitHub repo。
 - `refresh` 默认全部为 `false`。普通续跑不要开启，防止重复 API 成本。
 - 配置中的多余换行和连续空格会在执行前规范化，未知字段和拼写错误会直接报错。
@@ -227,7 +227,7 @@ npm run build
 npm run verify:deploy
 ```
 
-后台站点任务会自动部署 Cloudflare Workers Static Assets。若提供的 `siteUrl` 尚未绑定，运营者需要在 Cloudflare Worker 上绑定 custom domain/route；`NEXT_PUBLIC_SITE_URL` 和 workers.dev 部署已经完成。域名可访问后执行同一 Job 的线上验收，或在项目根运行 `npm run verify:deploy`。`awaiting_domain_configuration` 不代表正式域名已上线。
+后台站点任务会自动部署 Cloudflare Workers Static Assets，并尝试把提供的 `siteUrl` 绑定为 Worker custom domain/route。若 Cloudflare zone、权限、DNS 冲突或证书/路由验证未完成，回执会保留 `awaiting_domain_configuration`；该状态不代表正式域名已上线。问题处理后重试同一 Job 或在项目根运行 `npm run verify:deploy` 完成最终验收。
 
 ## 共享广告模板契约
 

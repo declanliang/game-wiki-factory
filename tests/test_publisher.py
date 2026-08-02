@@ -369,11 +369,12 @@ class PublisherValidationTests(unittest.TestCase):
             self.assertIn("/wrangler.jsonc", (project / ".gitignore").read_text(encoding="utf-8"))
 
     @patch("publisher._run_logged")
+    @patch("publisher._ensure_cloudflare_worker_custom_domain")
     @patch("publisher._write_workers_static_assets_config")
     @patch("publisher.load_shared_ad_environment")
     @patch("publisher._cloudflare_workers_dev_origin")
     def test_workers_static_assets_deploy_uses_wrangler(
-        self, workers_origin, load_ads, write_config, run_logged
+        self, workers_origin, load_ads, write_config, ensure_domain, run_logged
     ) -> None:
         workers_origin.return_value = "https://game.acct.workers.dev"
         load_ads.return_value = {name: "encoded" for name in (
@@ -383,6 +384,7 @@ class PublisherValidationTests(unittest.TestCase):
             "AD_SIDEBAR_160X300_B64", "AD_MOBILE_320X50_B64",
         )}
         write_config.return_value = Path("wrangler.jsonc")
+        ensure_domain.return_value = {"name": "game.example", "status": "active"}
         run_logged.side_effect = [
             "build ok",
             "Uploaded assets\nhttps://game.acct.workers.dev",
@@ -400,6 +402,7 @@ class PublisherValidationTests(unittest.TestCase):
         self.assertEqual(result["siteUrl"], "https://game.acct.workers.dev")
         self.assertEqual(result["deploymentUrl"], "https://game.acct.workers.dev")
         self.assertIsNone(result["customDomain"])
+        ensure_domain.assert_not_called()
         self.assertEqual(len(result["environmentVariables"]), 9)
         self.assertEqual(run_logged.call_args_list[0].args[0][1:], ["run", "build"])
         build_env = run_logged.call_args_list[0].args[2]
@@ -412,6 +415,51 @@ class PublisherValidationTests(unittest.TestCase):
         deploy_env = run_logged.call_args_list[1].args[2]
         self.assertEqual(deploy_env["CLOUDFLARE_ACCOUNT_ID"], "account")
         self.assertEqual(deploy_env["CLOUDFLARE_API_TOKEN"], "hidden-token")
+
+    @patch("publisher._run_logged")
+    @patch("publisher._ensure_cloudflare_worker_custom_domain")
+    @patch("publisher._write_workers_static_assets_config")
+    @patch("publisher.load_shared_ad_environment")
+    @patch("publisher._cloudflare_workers_dev_origin")
+    def test_workers_static_assets_deploy_binds_custom_domain(
+        self, workers_origin, load_ads, write_config, ensure_domain, run_logged
+    ) -> None:
+        workers_origin.return_value = "https://game.acct.workers.dev"
+        load_ads.return_value = {name: "encoded" for name in (
+            "AD_NATIVE_BANNER_B64", "AD_NATIVE_BANNER_MOBILE_B64",
+            "AD_BANNER_728X90_B64", "AD_BANNER_300X250_B64",
+            "AD_BANNER_468X60_B64", "AD_SIDEBAR_160X600_B64",
+            "AD_SIDEBAR_160X300_B64", "AD_MOBILE_320X50_B64",
+        )}
+        write_config.return_value = Path("wrangler.jsonc")
+        ensure_domain.return_value = {
+            "name": "game.example",
+            "status": "active",
+            "dns": {"status": "managed", "target": "https://game.acct.workers.dev"},
+        }
+        run_logged.side_effect = [
+            "build ok",
+            "Uploaded assets\nhttps://game.acct.workers.dev",
+        ]
+
+        result = _deploy_cloudflare_workers_static_assets(
+            Path("C:/game"),
+            "game",
+            "owner/game",
+            "https://game.example/path",
+            "abc123",
+            {"cf_accountid": "account", "cf_pages_api_key": "hidden-token"},
+        )
+
+        self.assertEqual(result["siteUrl"], "https://game.example")
+        self.assertEqual(result["customDomain"]["status"], "active")
+        ensure_domain.assert_called_once_with(
+            "account",
+            "hidden-token",
+            "game.example",
+            "game",
+            "https://game.acct.workers.dev",
+        )
 
     @patch("publisher.time.sleep")
     @patch("publisher._cloudflare_global_request")

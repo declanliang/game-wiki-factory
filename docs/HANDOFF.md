@@ -126,12 +126,12 @@ API key、余额、模型路由、DNS、权限、schema 和核心代码问题必
 - 使用 `wrangler deploy` 发布 Workers Static Assets；
 - 自动验证部署。
 
-提供 `siteUrl` 时，发布器会用该正式域名构建 canonical/sitemap，并先部署到 `workers.dev`。当前 Workers custom domain/route 由运营者或域名 Agent 在 Cloudflare 绑定；绑定前 Job 以 `awaiting_domain_configuration` 明确交接，不能声称正式域名已上线。
+提供 `siteUrl` 时，发布器会用该正式域名构建 canonical/sitemap，部署到 `workers.dev`，并自动创建或复用 Workers custom domain/route。只有 zone、权限、DNS 冲突或最终域名验收未通过时，Job 才以 `awaiting_domain_configuration` 明确交接，不能声称正式域名已上线。
 
 `result.hosting.status`：
 
 - `complete`：目标 origin 已通过线上首页、metadata、canonical、robots、sitemap、hreflang、广告 API 验收。
-- `awaiting_domain_configuration`：Workers Static Assets、GitHub、Worker vars 和部署已完成，但正式域名仍需运营者/域名 Agent 完成 Worker custom domain/route、DNS 或验证；不能说正式域名已上线。
+- `awaiting_domain_configuration`：Workers Static Assets、GitHub、Worker vars 和 workers.dev 部署已完成，但正式域名仍有 zone、权限、DNS、custom domain 或验证问题；不能说正式域名已上线。
 
 Workers 控制台显示成功不等于 Factory 验收完成。必须验证 `/` 301 到 `/en`、广告 API，且 sitemap 内所有 loc/hreflang 直接 200。
 

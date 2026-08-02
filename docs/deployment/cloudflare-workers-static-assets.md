@@ -16,7 +16,7 @@ Cloudflare Pages 项目额度已满后，新任务默认发布到 Cloudflare Wor
 
 未提供 `siteUrl` 时，Factory 读取 Cloudflare account 的 workers.dev subdomain，使用 `https://<worker>.<subdomain>.workers.dev` 作为 `NEXT_PUBLIC_SITE_URL` 并自动验收。
 
-提供正式域名时，Factory 会先用正式域名构建 canonical/sitemap，再部署到 workers.dev。当前 custom domain/route 绑定由运营者或域名 Agent 在 Cloudflare 完成；绑定前回执为 `hosting.status=awaiting_domain_configuration`，不得声称正式域名已上线。绑定完成后重试同一 Job，完成最终线上验收。
+提供正式域名时，Factory 会先用正式域名构建 canonical/sitemap，再部署到 workers.dev，并通过 Workers Custom Domains API 自动创建或复用该 hostname 到 Worker production 环境的绑定。只有 Cloudflare zone 缺失、API 权限不足、DNS 冲突或最终域名验收未通过时，回执才会保留 `hosting.status=awaiting_domain_configuration`；该状态不得声称正式域名已上线。问题处理后重试同一 Job，完成最终线上验收。
 
 需要的凭据仍只保存在 factory 根 `.env` 或服务器 `factory.env`：
 

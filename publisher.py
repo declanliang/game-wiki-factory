@@ -579,6 +579,115 @@ def _find_cloudflare_zone(
     return None
 
 
+def _find_cloudflare_worker_custom_domain(
+    account_id: str,
+    token: str,
+    hostname: str,
+    service: str,
+) -> dict | None:
+    query = urllib.parse.urlencode({"hostname": hostname.strip(".")})
+    result = _cloudflare_request(
+        "GET",
+        account_id,
+        token,
+        f"workers/domains?{query}",
+    )
+    if not isinstance(result, list):
+        return None
+    expected_host = hostname.strip(".").casefold()
+    expected_service = service.casefold()
+    for item in result:
+        if not isinstance(item, dict):
+            continue
+        item_host = str(item.get("hostname") or "").strip(".").casefold()
+        item_service = str(item.get("service") or "").casefold()
+        if item_host == expected_host and item_service == expected_service:
+            return item
+    return None
+
+
+def _worker_custom_domain_summary(
+    domain: dict,
+    workers_origin: str,
+    *,
+    dns_status: str = "managed",
+) -> dict:
+    return {
+        "name": str(domain.get("hostname") or ""),
+        "status": "active",
+        "id": domain.get("id"),
+        "service": domain.get("service"),
+        "environment": domain.get("environment"),
+        "zoneName": domain.get("zone_name"),
+        "dns": {
+            "status": dns_status,
+            "target": workers_origin,
+            "nextAction": "No operator action required; this hostname is bound to the Worker.",
+        },
+    }
+
+
+def _ensure_cloudflare_worker_custom_domain(
+    account_id: str,
+    token: str,
+    hostname: str,
+    service: str,
+    workers_origin: str,
+) -> dict:
+    """Create or reuse a Workers custom domain for the deployed Worker."""
+    existing = _find_cloudflare_worker_custom_domain(account_id, token, hostname, service)
+    if existing:
+        return _worker_custom_domain_summary(existing, workers_origin)
+    zone = _find_cloudflare_zone(account_id, token, hostname)
+    if not zone:
+        return {
+            "name": hostname,
+            "status": "not_requested",
+            "dns": {
+                "status": "missing_zone",
+                "target": workers_origin,
+                "nextAction": "Add this zone to Cloudflare, then retry the Job to bind it to the Worker.",
+            },
+        }
+    payload = {
+        "hostname": hostname,
+        "service": service,
+        "environment": "production",
+        "zone_id": zone.get("id"),
+        "zone_name": zone.get("name"),
+    }
+    try:
+        created = _cloudflare_request(
+            "PUT",
+            account_id,
+            token,
+            "workers/domains",
+            payload,
+        )
+    except RuntimeError as exc:
+        refreshed = _find_cloudflare_worker_custom_domain(account_id, token, hostname, service)
+        if refreshed:
+            return _worker_custom_domain_summary(refreshed, workers_origin)
+        return {
+            "name": hostname,
+            "status": "not_requested",
+            "dns": {
+                "status": "api_error",
+                "target": workers_origin,
+                "nextAction": (
+                    "Cloudflare did not accept the Worker custom domain request. "
+                    f"Review DNS/custom-domain state, then retry. Error: {str(exc)[:300]}"
+                ),
+            },
+        }
+    if not isinstance(created, dict):
+        refreshed = _find_cloudflare_worker_custom_domain(account_id, token, hostname, service)
+        if refreshed:
+            return _worker_custom_domain_summary(refreshed, workers_origin)
+        raise RuntimeError("Cloudflare Workers custom domain response was not an object")
+    return _worker_custom_domain_summary(created, workers_origin, dns_status="created")
+
+
 def _ensure_cloudflare_dns_cname(
     account_id: str,
     token: str,
@@ -1066,6 +1175,16 @@ def _deploy_cloudflare_workers_static_assets(
         "wrangler deploy",
     )
     deployment_url = _parse_workers_deploy_url(output) or workers_origin
+    custom_domain = None
+    if canonical_origin != workers_origin:
+        hostname = urllib.parse.urlparse(canonical_origin).hostname or ""
+        custom_domain = _ensure_cloudflare_worker_custom_domain(
+            account_id,
+            token,
+            hostname,
+            project_name,
+            workers_origin,
+        )
     return {
         "provider": "cloudflare-workers-static-assets",
         "status": "deployed",
@@ -1076,21 +1195,7 @@ def _deploy_cloudflare_workers_static_assets(
         "deploymentUrl": deployment_url,
         "workersDevOrigin": workers_origin,
         "siteUrl": canonical_origin,
-        "customDomain": (
-            {
-                "name": urllib.parse.urlparse(canonical_origin).hostname,
-                "status": "not_requested",
-                "dns": {
-                    "status": "manual_action_required",
-                    "target": workers_origin,
-                    "nextAction": (
-                        "Bind this hostname as a Cloudflare Workers custom domain or route, "
-                        "then retry the Job for final online verification."
-                    ),
-                },
-            }
-            if canonical_origin != workers_origin else None
-        ),
+        "customDomain": custom_domain,
         "environmentVariables": ["NEXT_PUBLIC_SITE_URL", *AD_ENV_NAMES],
         "adProfile": "animal-hospital-anomalies.wiki",
         "deploymentMode": "wrangler-static-assets",

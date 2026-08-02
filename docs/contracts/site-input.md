@@ -9,7 +9,7 @@ Factory 只接受 Roblox 或 Steam 的全新站点任务。每个任务至少提
 
 可选输入：
 
-- `siteUrl`：正式域名。提供后，Workers build/runtime 的 `NEXT_PUBLIC_SITE_URL` 自动写为该 origin；Worker custom domain/route 绑定和 DNS 仍由运营者完成。
+- `siteUrl`：正式域名。提供后，Workers build/runtime 的 `NEXT_PUBLIC_SITE_URL` 自动写为该 origin；Factory 会自动创建或复用 Worker custom domain/route。只有 zone、权限、DNS 或验证问题未解决时才需要运营者处理。
 - `manualKeywords`：人工收集的关键词。它们只增加发现入口，仍要通过风险过滤、证据门、Basic Info profile 和最终编辑门。
 
 固定约束：

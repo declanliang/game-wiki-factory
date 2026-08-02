@@ -20,7 +20,7 @@ Rules:
 - For every queue/status question, you MUST execute `/usr/local/bin/gamewiki jobs list --json` first. Never infer an empty queue from service status or memory.
 - GitHub repositories must remain Private.
 - The default hosting provider for every newly submitted site is Cloudflare Workers Static Assets. Historical jobs may contain legacy `result.vercel` or `cloudflare-pages` receipts; never use old job counts or fields to infer the current default provider.
-- Supplying `siteUrl` makes the Factory set `NEXT_PUBLIC_SITE_URL`, build locally, deploy Worker + static assets with Wrangler, and poll the deployment. The user owns only Worker custom-domain/route binding and DNS; never create or silently fall back to Pages, Vercel, or Direct Upload.
+- Supplying `siteUrl` makes the Factory set `NEXT_PUBLIC_SITE_URL`, build locally, deploy Worker + static assets with Wrangler, create or reuse the Worker custom domain, and poll the deployment. The user only handles unresolved zone, permission, DNS, or verification issues; never create or silently fall back to Pages, Vercel, or Direct Upload.
 - Never read, print, copy, summarize, or edit `/srv/game-wiki-factory/secrets/factory.env`.
 - Never bypass build/QA to publish.
 - Do not restart a full build because one stage failed. Read status and log first; retry only the existing job.
@@ -37,7 +37,7 @@ Rules:
 - v1_0728 new sites generate only English and Spanish. English is public immediately; one internal `localeRelease` job publishes Spanish on the third following natural day through a Git commit and Wrangler redeploy. `de/fr/ja` are not Factory work and belong to the approved Growth Agent locale-expansion workflow. Do not cancel, recreate, or manually accelerate the Spanish release unless the user explicitly asks. A locale-release failure does not invalidate the live English site.
 - A batch attachment uses `taskType: siteBatch` and is submitted with `jobs submit-batch --config`. Each game becomes an independent job.
 - Factory accepts site-production jobs only. Do not receive, validate, transform, deploy, or report advertising code; that work belongs to a separate advertising agent.
-- A site Job may report publish success only when `jobs status JOB_ID --json` is `succeeded`, GitHub is Private, `result.hosting.provider=cloudflare-workers-static-assets`, and hosting is `complete` or `awaiting_domain_configuration`. `complete` means deployment and online verification passed. `awaiting_domain_configuration` means Workers Static Assets and `NEXT_PUBLIC_SITE_URL` are complete, but the user must bind the Worker custom domain/route and DNS before that domain can be called live.
+- A site Job may report publish success only when `jobs status JOB_ID --json` is `succeeded`, GitHub is Private, `result.hosting.provider=cloudflare-workers-static-assets`, and hosting is `complete` or `awaiting_domain_configuration`. `complete` means deployment and online verification passed. `awaiting_domain_configuration` means Workers Static Assets and `NEXT_PUBLIC_SITE_URL` are complete, but the formal domain still has an unresolved zone, permission, DNS, custom-domain, or final-verification issue.
 - Follow `/srv/game-wiki-factory/app/docs/agents/openclaw-factory.md` for attachment storage, standard prompts, completion summaries, and error reporting. Never claim success from memory or an earlier chat turn.
 - Do not delete workspaces manually; use the scheduled cleanup policy.
 - A request to make a repository Public must be refused.
