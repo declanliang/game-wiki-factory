@@ -92,6 +92,10 @@ type Category = {
 const iconByKey: Record<string, LucideIcon> = Object.fromEntries(
   NAVIGATION_CONFIG.map((item) => [item.key, item.icon]),
 );
+const newTabLinkProps = {
+  target: "_blank",
+  rel: "noopener noreferrer",
+} as const;
 
 // Renders a FAQ answer that may contain `[label](href)` links — the only Markdown syntax
 // supported here, kept intentionally minimal so answers stay easy to author without pulling
@@ -107,6 +111,7 @@ function renderFaqAnswer(text: string, locale: string) {
       <Link
         key={i}
         href={isExternal ? href : localizeHref(href, locale)}
+        {...newTabLinkProps}
         className="font-semibold text-[hsl(var(--nav-theme))] hover:underline"
       >
         {label}
@@ -135,6 +140,7 @@ function LightCard({ item, locale }: { item: LightItem; locale: string }) {
   return (
     <Link
       href={localizeHref(item.href, locale)}
+      {...newTabLinkProps}
       className="group flex w-full max-w-[22rem] flex-col overflow-hidden rounded-2xl border border-border bg-card/70 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]"
     >
       {item.image ? (
@@ -203,6 +209,7 @@ function LightSectionBlock({
         <div className="mt-6 text-center">
           <Link
             href={localizeHref(section.viewAllHref, locale)}
+            {...newTabLinkProps}
             className="inline-flex items-center text-base font-semibold text-[hsl(var(--nav-theme))] hover:underline"
           >
             {section.viewAllLabel || "View All"}{" "}
@@ -276,6 +283,7 @@ function GuideSectionsBlock({
                     <Link
                       className="group block"
                       href={localizeHref(item.href, locale)}
+                      {...newTabLinkProps}
                     >
                       {body}
                     </Link>
@@ -344,7 +352,10 @@ export default function HomePageClient({
                     size="lg"
                     className="shadow-lg shadow-black/20"
                   >
-                    <Link href={localizeHref(home.hero.primaryCtaHref, locale)}>
+                    <Link
+                      href={localizeHref(home.hero.primaryCtaHref, locale)}
+                      {...newTabLinkProps}
+                    >
                       {home.hero.primaryCta}
                     </Link>
                   </Button>
@@ -354,7 +365,7 @@ export default function HomePageClient({
                     variant="outline"
                     className="border-white/35 bg-black/25 text-white backdrop-blur-md hover:bg-white hover:text-black"
                   >
-                    <Link href={home.hero.secondaryCtaHref}>
+                    <Link href={home.hero.secondaryCtaHref} {...newTabLinkProps}>
                       {home.hero.secondaryCta}
                     </Link>
                   </Button>
@@ -413,7 +424,10 @@ export default function HomePageClient({
                   </p>
                 ))}
                 <Button asChild className="mt-6">
-                  <Link href={localizeHref(home.aboutGame.ctaHref, locale)}>
+                  <Link
+                    href={localizeHref(home.aboutGame.ctaHref, locale)}
+                    {...newTabLinkProps}
+                  >
                     {home.aboutGame.cta}
                   </Link>
                 </Button>
@@ -469,6 +483,7 @@ export default function HomePageClient({
                   <Fragment key={category.key}>
                     <Link
                       href={localizeHref(category.path, locale)}
+                      {...newTabLinkProps}
                       className="group flex w-full max-w-[19rem] flex-col rounded-2xl border border-border bg-card/70 p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]"
                     >
                       <span className="grid h-11 w-11 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]">
@@ -528,6 +543,7 @@ export default function HomePageClient({
                     <Link
                       key={articleHref}
                       href={localizeHref(articleHref, locale)}
+                      {...newTabLinkProps}
                       className="group flex flex-col gap-3 rounded-2xl border border-border bg-card/70 p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))] sm:flex-row sm:items-center sm:justify-between"
                     >
                       <span className="flex min-w-0 items-start gap-3 sm:items-center">
@@ -547,7 +563,10 @@ export default function HomePageClient({
               </div>
               <div className="mt-6 text-center">
                 <Button asChild variant="outline">
-                  <Link href={localizeHref(home.updates.browseHref, locale)}>
+                  <Link
+                    href={localizeHref(home.updates.browseHref, locale)}
+                    {...newTabLinkProps}
+                  >
                     {home.updates.browse}
                   </Link>
                 </Button>
@@ -597,13 +616,19 @@ export default function HomePageClient({
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
               <Button asChild size="lg">
-                <Link href={localizeHref(home.finalCta.primaryHref, locale)}>
+                <Link
+                  href={localizeHref(home.finalCta.primaryHref, locale)}
+                  {...newTabLinkProps}
+                >
                   {home.finalCta.primary}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <Link href={localizeHref(home.finalCta.secondaryHref, locale)}>
+                <Link
+                  href={localizeHref(home.finalCta.secondaryHref, locale)}
+                  {...newTabLinkProps}
+                >
                   {home.finalCta.secondary}
                 </Link>
               </Button>
