@@ -493,7 +493,7 @@ def _supported_active_codes(facts: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         code for code in facts.get("codes", [])
         if code.get("status") in {"verified-active", "claimed-active"}
-        and bool(code.get("code"))
+        and len(str(code.get("code") or "").strip()) >= 2
         and bool(code.get("reward"))
         and bool(code.get("sourceUrls"))
     ]

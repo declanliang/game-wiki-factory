@@ -460,6 +460,7 @@ class CoreTests(unittest.TestCase):
             "game": {}, "developer": {}, "dynamicStats": {}, "gameplayFacts": [],
             "codes": [
                 {"code": "COMMUNITY", "reward": "Ten rerolls.", "status": "claimed-active", "officiallyVerified": False, "sourceUrls": ["https://example.com/codes"]},
+                {"code": "Q", "reward": "One crate.", "status": "claimed-active", "officiallyVerified": False, "sourceUrls": ["https://example.com/short"]},
                 {"code": "NO-SOURCE", "reward": "One gem.", "status": "claimed-active", "officiallyVerified": False, "sourceUrls": []},
                 {"code": "UNKNOWN", "reward": "Unknown.", "status": "unknown", "officiallyVerified": False, "sourceUrls": ["https://example.com/unknown"]},
             ],
