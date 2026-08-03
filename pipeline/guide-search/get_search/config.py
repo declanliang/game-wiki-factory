@@ -21,6 +21,17 @@ def load_dotenv(path: Path) -> None:
         os.environ.setdefault(key, value)
 
 
+def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    return max(minimum, value)
+
+
 @dataclass(frozen=True)
 class Settings:
     api_login: str
@@ -32,6 +43,7 @@ class Settings:
     youtube_depth: int = 100
     suggest_source: str = "auto"
     timeout_seconds: int = 120
+    cluster_batch_size: int = 30
 
     @classmethod
     def from_env(cls, root: Path, **overrides: object) -> "Settings":
@@ -59,5 +71,6 @@ class Settings:
             api_login=login,
             api_password=password,
             toapis_api_key=toapis_key,
+            cluster_batch_size=_env_int("GUIDE_SEARCH_CLUSTER_BATCH_SIZE", 30),
             **overrides,
         )

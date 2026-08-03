@@ -711,7 +711,7 @@ def cluster_candidates(
     candidates: list[Candidate],
     game_context: dict[str, Any],
     model: str = DEFAULT_CLUSTER_MODEL,
-    batch_size: int = 60,
+    batch_size: int = 30,
     checkpoint_dir: Path | None = None,
 ) -> LLMCall:
     """Cluster every candidate in bounded calls and checkpoint each completed batch."""

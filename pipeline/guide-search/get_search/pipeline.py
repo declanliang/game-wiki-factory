@@ -538,6 +538,7 @@ def run_pipeline(
             candidates,
             effective_context,
             model=cluster_model,
+            batch_size=settings.cluster_batch_size,
             checkpoint_dir=run_dir / "llm",
         )
         selected, llm_rejected, llm_audit_errors = apply_cluster_decisions(
