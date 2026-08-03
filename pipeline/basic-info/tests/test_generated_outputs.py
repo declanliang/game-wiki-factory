@@ -8,7 +8,7 @@ from pathlib import Path
 from jsonschema import Draft202012Validator, FormatChecker
 
 from gamewiki_automation.schemas import HOMEPAGE_SCHEMA, MODULES_SCHEMA, TEMPLATE_SITE_CONTENT_SCHEMA, TEMPLATE_SITE_IDENTITY_SCHEMA
-from gamewiki_automation.template_contract import validate_localized_site_content, validate_site_content, validate_site_identity
+from gamewiki_automation.template_contract import build_site_content, validate_localized_site_content, validate_site_content, validate_site_identity
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -99,6 +99,48 @@ class GeneratedOutputTests(unittest.TestCase):
             facts = json.loads((directory / "facts.json").read_text(encoding="utf-8"))
             rejected = {item["placeId"] for item in facts["identity"].get("rejectedCandidates", [])}
             self.assertIn("84498985865861", rejected)
+
+    def test_non_latin_publisher_name_is_allowed_as_proper_name(self):
+        facts = {
+            "identity": {
+                "canonicalName": "Souls of Blades",
+                "currentPlatformName": "Souls of Blades",
+                "platform": "Steam",
+                "canonicalUrl": "https://store.steampowered.com/app/1091460/souls_of_blades/",
+            },
+            "developer": {"name": "离忧先生"},
+            "publisher": {"name": "方块游戏(CubeGame)"},
+            "game": {
+                "createdAt": "2021-09-22T00:00:00Z",
+                "price": 18.99,
+                "priceCurrency": "USD",
+            },
+            "languages": ["en", "es"],
+            "categories": ["Action", "Adventure", "Indie", "RPG"],
+        }
+        homepage = {
+            "metadata": {"description": "Fan-made Souls of Blades guide."},
+            "home": {
+                "meta": {
+                    "title": "Souls of Blades Wiki",
+                    "description": "Fan-made Souls of Blades guide.",
+                },
+                "hero": {
+                    "eyebrow": "Fan-made Wiki",
+                    "description": "Learn the core systems in Souls of Blades.",
+                },
+                "aboutGame": {
+                    "title": "About Souls of Blades",
+                    "paragraphs": [
+                        "Souls of Blades is a Steam action RPG with sword-core switching and magic-weapon combos.",
+                    ],
+                },
+                "finalCta": {"title": "Start Souls of Blades", "description": "Read the core guides."},
+            },
+        }
+        site_content = build_site_content(facts, homepage)
+        errors = validate_site_content(site_content, facts)
+        self.assertNotIn("TEMPLATE_LANGUAGE", {error["code"] for error in errors})
 
 
 if __name__ == "__main__":

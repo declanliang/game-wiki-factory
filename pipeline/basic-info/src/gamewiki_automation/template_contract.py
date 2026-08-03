@@ -188,8 +188,9 @@ def validate_site_content(content: dict[str, Any], facts: dict[str, Any]) -> lis
         public_game_name(facts.get("identity", {})),
         str(facts.get("identity", {}).get("developer", "")).strip(),
         str(facts.get("developer", {}).get("name", "")).strip(),
+        str(facts.get("publisher", {}).get("name", "")).strip(),
     }
-    proper_names = {name for name in proper_names if name}
+    proper_names = sorted((name for name in proper_names if name), key=len, reverse=True)
     for path, value in _strings(content):
         normalized = value.strip().casefold()
         if "__" in value or "replace-with" in normalized or normalized in PLACEHOLDERS:
