@@ -23,7 +23,16 @@ FORBIDDEN_KEYS = {
     "title@home.hero", "secondaryCtaHref@home.hero", "videoId@home.hero",
     "explore@home", "start@home", "featured@home", "categories@home", "updates@home",
 }
-PLACEHOLDERS = {"unavailable", "unknown", "n/a", "none", "not found", "暂无", "未找到"}
+PLACEHOLDERS = {
+    "unavailable",
+    "unknown",
+    "n/a",
+    "none",
+    "not found",
+    "not specified",
+    "暂无",
+    "未找到",
+}
 HERO_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif", ".avif"}
 FAVICON_FILES = (
     "favicon.ico",
@@ -503,7 +512,12 @@ def _genres(facts: dict[str, Any], homepage: dict[str, Any]) -> list[str]:
     game = facts.get("game", {})
     result: list[str] = []
     for value in [*(game.get("genres") or []), game.get("genreL1"), game.get("genreL2")]:
-        if value and value.casefold() != "all" and value not in result:
+        if (
+            value
+            and value.casefold() != "all"
+            and value.casefold() not in PLACEHOLDERS
+            and value not in result
+        ):
             result.append(value)
     searchable = " ".join([game.get("officialDescription", "")] + [f"{item.get('name', '')} {item.get('value', '')}" for item in facts.get("gameplayFacts", [])]).casefold()
     if not result:
@@ -518,9 +532,9 @@ def _genres(facts: dict[str, Any], homepage: dict[str, Any]) -> list[str]:
     if not result:
         about_stats = homepage.get("home", {}).get("aboutGame", {}).get("stats", [])
         candidate = next((item.get("value") for item in about_stats if item.get("label", "").casefold() == "genre"), None)
-        if candidate and candidate.casefold() != "all":
+        if candidate and candidate.casefold() != "all" and candidate.casefold() not in PLACEHOLDERS:
             cleaned = re.sub(r"^all\s*[;/,-]*\s*", "", candidate, flags=re.I).strip()
-            if cleaned:
+            if cleaned and cleaned.casefold() not in PLACEHOLDERS:
                 result = [cleaned]
     return result[:4]
 

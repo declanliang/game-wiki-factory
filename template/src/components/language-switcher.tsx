@@ -26,7 +26,7 @@ const LOCALE_LABELS = {
  * 支持 2+ 个语言，扩展时只需在 routing.ts 添加 locale 即可
  */
 export function LanguageSwitcher({ locale }: { locale: string }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? `/${locale}`;
   const router = useRouter();
 
   if (!routing.locales.includes(locale as Locale)) return null;

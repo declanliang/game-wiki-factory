@@ -62,6 +62,56 @@ class RobloxClient:
     def __init__(self, http: CachedHttpClient):
         self.http = http
 
+    def _game_rows(self, universe_ids: str) -> tuple[list[dict[str, Any]], str]:
+        """Read official game details with a resilient API fallback.
+
+        Roblox has intermittently returned a policy 403 from the public
+        ``games.roblox.com/v1/games`` endpoint for some network egresses while
+        the official Develop API remains available.  The fallback intentionally
+        exposes only fields supplied by Roblox; unknown fields stay absent and
+        are handled as null downstream.
+        """
+        try:
+            return (
+                self.http.get_json(
+                    f"https://games.roblox.com/v1/games?universeIds={universe_ids}",
+                    ttl=86400,
+                ).get("data", []),
+                "https://games.roblox.com/v1/games",
+            )
+        except HttpError as exc:
+            if "HTTP 403" not in str(exc):
+                raise
+            rows: list[dict[str, Any]] = []
+            for universe_id in [item.strip() for item in universe_ids.split(",") if item.strip()]:
+                detail = self.http.get_json(
+                    f"https://develop.roblox.com/v1/universes/{universe_id}",
+                    ttl=86400,
+                )
+                creator_type = detail.get("creatorType")
+                creator_id = detail.get("creatorTargetId")
+                rows.append(
+                    {
+                        "id": detail.get("id"),
+                        "name": detail.get("name"),
+                        "description": detail.get("description", ""),
+                        "rootPlaceId": detail.get("rootPlaceId"),
+                        "created": detail.get("created"),
+                        "updated": detail.get("updated"),
+                        "isPlayable": detail.get("isActive"),
+                        "creator": (
+                            {
+                                "type": creator_type,
+                                "id": creator_id,
+                                "name": detail.get("creatorName"),
+                            }
+                            if creator_type or creator_id or detail.get("creatorName")
+                            else None
+                        ),
+                    }
+                )
+            return rows, "https://develop.roblox.com/v1/universes"
+
     def discover(
         self, game_name: str, limit: int = 12, official_url: str | None = None
     ) -> list[dict[str, Any]]:
@@ -107,9 +157,7 @@ class RobloxClient:
             )
             item["universeId"] = str(data["universeId"])
         universe_ids = ",".join(item["universeId"] for item in found)
-        games = self.http.get_json(
-            f"https://games.roblox.com/v1/games?universeIds={universe_ids}", ttl=86400
-        ).get("data", [])
+        games, _ = self._game_rows(universe_ids)
         by_id = {str(game["id"]): game for game in games}
         query_norm = normalized_name(game_name)
         query_tokens = {token for token in _name_tokens(game_name) if token not in {"a", "an", "the"}}
@@ -161,9 +209,7 @@ class RobloxClient:
 
     def collect(self, query: str, selected: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         universe_id = str(selected["universeId"])
-        game_rows = self.http.get_json(
-            f"https://games.roblox.com/v1/games?universeIds={universe_id}", ttl=900
-        ).get("data", [])
+        game_rows, game_source_base = self._game_rows(universe_id)
         if not game_rows:
             raise HttpError(f"Roblox returned no game for universe {universe_id}")
         game = game_rows[0]
@@ -277,7 +323,7 @@ class RobloxClient:
                 },
                 {
                     "id": "src_roblox_api",
-                    "url": f"https://games.roblox.com/v1/games?universeIds={universe_id}",
+                    "url": f"{game_source_base}/{universe_id}" if game_source_base.endswith("/universes") else f"{game_source_base}?universeIds={universe_id}",
                     "title": "Roblox game details API",
                     "sourceType": "official-api",
                     "publisher": "Roblox",

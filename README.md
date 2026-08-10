@@ -285,7 +285,7 @@ python -m unittest discover -s pipeline\guide-search\tests -v
 
 cd template
 Get-ChildItem scripts -Filter '*.mjs' | ForEach-Object { node --check $_.FullName }
-npx tsc --noEmit
+npx tsc --noEmit --incremental false
 ```
 
 `npm run check:config` 和 `npm run build` 面向已经导入具体游戏 intake 的生成项目；干净模板没有 published 内容，不能单独通过内容同步检查。

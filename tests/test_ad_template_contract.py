@@ -50,15 +50,18 @@ class AdTemplateContractTests(unittest.TestCase):
         rail = content.split("export function DesktopArticleRailAds()", 1)[1].split(
             "export function ArticleInlineAd", 1
         )[0]
-        self.assertIn('left: "calc(50% - 632px)"', rail)
+        self.assertTrue(
+            'left-[calc(50%-632px)]' in rail
+            or 'left: "calc(50% - 632px)"' in rail
+        )
         self.assertIn('aria-label="Left advertisement"', rail)
         self.assertNotIn("right:", rail)
         self.assertNotIn("Right advertisement", rail)
 
     def test_sticky_navigation_reserves_the_top_ad_height(self) -> None:
         content = (TEMPLATE / "src/components/site.tsx").read_text(encoding="utf-8")
-        self.assertIn('style={{ top: "var(--top-ad-height, 0px)" }}', content)
-        self.assertIn('className="sticky z-50 border-b border-border bg-background"', content)
+        self.assertIn("top-[var(--top-ad-height)]", content)
+        self.assertIn('className="sticky top-[var(--top-ad-height)] z-50 border-b border-border bg-background"', content)
         self.assertNotIn("bg-background/90", content)
         self.assertNotIn('className="sticky top-0', content)
 
@@ -86,7 +89,7 @@ class AdTemplateContractTests(unittest.TestCase):
         self.assertNotIn("DesktopFooterAdGroup", content)
         self.assertNotIn("DesktopBanner728", content)
         self.assertNotIn('format="banner300x250"', content)
-        self.assertIn("cardItems.length >= 4 && index === 1", content)
+        self.assertNotIn("<NativeFlowAd", content)
 
     def test_inline_article_ads_exclude_nested_blocks_and_article_tail(self) -> None:
         placements = (TEMPLATE / "src/components/ad-placements.tsx").read_text(

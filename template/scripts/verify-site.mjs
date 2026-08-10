@@ -113,7 +113,7 @@ step("2. 类型检查");
 // imports it.  Normal verification is about to rebuild, so discard only those
 // generated types before tsc; `--skip-build` keeps the known-current build intact.
 if (!skipBuild) fs.rmSync(path.join(root, ".next", "types"), { recursive: true, force: true });
-run("npx tsc --noEmit", "npx tsc --noEmit");
+run("npx tsc --noEmit", "npx tsc --noEmit --incremental false");
 
 // --- 3. 配置同步检查 -------------------------------------------------------------
 step("3. 配置同步检查");

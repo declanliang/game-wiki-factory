@@ -92,6 +92,7 @@
   },
   "shared": {
     "wikiNavigation": "Wiki Navigation",
+    "wikiNavigationSummary": "{categories} sections · {articles} pages",
     "activeCodes": "Code Status",
     "updated": "Updated",
     "viewAllCodes": "View code status",
@@ -103,14 +104,28 @@
     "relatedReading": "Related Reading",
     "relatedGuides": "Related Guides",
     "readMore": "Read more",
+    "quickAnswer": "Quick Answer",
     "quickGuide": "What This Guide Covers",
     "quickFacts": "Quick Facts",
+    "startHere": {
+      "eyebrow": "Start here",
+      "title": "Find the right first step",
+      "guideLabel": "Read first",
+      "exploreLabel": "Browse",
+      "playLabel": "Official",
+      "browseCategory": "Explore {category}",
+      "officialAction": "Open the official game page"
+    },
     "homeVideo": {
       "eyebrow": "Gameplay Video",
       "title": "Watch the Game in Action",
       "description": "See how the game plays before you jump into the guides.",
       "play": "Play video",
       "watchOnYouTube": "Watch on YouTube"
+    },
+    "articleVideo": {
+      "label": "Related Video",
+      "description": "Watch a related gameplay video, then use the guide below for the specific steps and checks."
     },
     "viewAllInCategory": "View all {category}",
     "officialMedia": "Official media",

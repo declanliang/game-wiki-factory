@@ -5,6 +5,7 @@ import { NAVIGATION_CONFIG } from "@/config/navigation";
 import {
   CONTENT_TYPES,
   getDynamicNavigation,
+  type Heading,
   type NavGroup,
 } from "@/lib/content";
 import type { Locale } from "@/i18n/routing";
@@ -105,8 +106,7 @@ export async function SiteHeader({ locale }: { locale: string }) {
   );
   return (
     <header
-      className="sticky z-50 border-b border-border bg-background"
-      style={{ top: "var(--top-ad-height, 0px)" }}
+      className="sticky top-[var(--top-ad-height)] z-50 border-b border-border bg-background"
     >
       <div className="mx-auto max-w-[1240px] px-5 py-3 sm:px-8 lg:px-10">
         {header}
@@ -119,54 +119,124 @@ export async function WikiSidebar({
   locale,
   navGroups,
   currentPath,
-}: { locale: string; navGroups: NavGroup[]; currentPath?: string }) {
+  headings = [],
+  tocLabel,
+}: {
+  locale: string;
+  navGroups: NavGroup[];
+  currentPath?: string;
+  headings?: Heading[];
+  tocLabel?: string;
+}) {
   const t = await getTranslations({ locale, namespace: "shared" });
   const isActive = (href: string) => currentPath === href;
+  const navIconByKey = Object.fromEntries(
+    NAVIGATION_CONFIG.map((item) => [item.key, item.icon]),
+  );
   const hasCodes = CONTENT_TYPES.includes("codes");
   const activeCodes = hasCodes
     ? (t.raw("activeCodesList") as { code: string; reward: string }[])
     : [];
   return (
-    <aside className="hidden space-y-6 lg:sticky lg:top-24 lg:block lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-1">
-      <section className="rounded-2xl border border-border bg-card/60 p-5 shadow-sm">
-        <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-muted-foreground">
-          {t("wikiNavigation")}
-        </h3>
-        <div className="space-y-4">
-          {navGroups.map((group) => (
-            <CollapsibleNavGroup
-              key={group.slug}
-              title={group.title}
-              icon={
-                <span className="grid h-4 w-4 place-items-center rounded text-[10px] font-bold text-[hsl(var(--nav-theme))]">
-                  {group.title[0]}
-                </span>
-              }
-              count={group.count}
-              currentPath={currentPath}
-            >
-              <ul className="space-y-1">
-                {group.links.map((link) => (
-                  <li key={link.href}>
-                    <Link
-                      href={localizeHref(link.href, locale)}
-                      className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors ${isActive(link.href) ? "bg-[hsl(var(--nav-theme)/0.15)] font-semibold text-[hsl(var(--nav-theme))]" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+    <aside className="hidden space-y-5 lg:sticky lg:top-[calc(var(--top-ad-height,0px)+5.5rem)] lg:block lg:max-h-[calc(100vh-var(--top-ad-height,0px)-7rem)] lg:overflow-y-auto lg:pr-1">
+      {headings.length > 0 ? (
+        <section className="rounded-[1.75rem] border border-border bg-card/65 p-4 shadow-sm">
+          <p className="px-2 text-xs font-bold uppercase tracking-[0.24em] text-muted-foreground">
+            {tocLabel || t("inThisSection")}
+          </p>
+          <nav className="mt-3 space-y-1" aria-label={tocLabel || t("inThisSection")}>
+            {headings.map((heading) => (
+              <a
+                key={heading.id}
+                href={`#${heading.id}`}
+                className={`block rounded-xl px-3 py-2 text-sm leading-5 text-muted-foreground transition hover:bg-muted hover:text-foreground ${
+                  heading.level === 3 ? "ml-3 text-[13px]" : ""
+                }`}
+              >
+                {heading.text}
+              </a>
+            ))}
+          </nav>
+        </section>
+      ) : null}
+      <section className="overflow-hidden rounded-[1.75rem] border border-border bg-card/75 shadow-sm">
+        <div className="border-b border-border/80 bg-[linear-gradient(135deg,hsl(var(--nav-theme)/0.18),transparent_58%)] px-5 py-4">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[hsl(var(--nav-theme))]">
+            {t("wikiNavigation")}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {t("wikiNavigationSummary", {
+              categories: navGroups.length,
+              articles: navGroups.reduce((sum, group) => sum + group.count, 0),
+            })}
+          </p>
+        </div>
+        <div className="space-y-2 p-3">
+          {navGroups.map((group) => {
+            const Icon = navIconByKey[group.slug] ?? NAVIGATION_CONFIG[0]?.icon;
+            const groupActive =
+              currentPath === `/${group.slug}` ||
+              Boolean(currentPath?.startsWith(`/${group.slug}/`));
+            return (
+              <CollapsibleNavGroup
+                key={group.slug}
+                title={group.title}
+                icon={
+                  Icon ? (
+                    <span
+                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl border ${
+                        groupActive
+                          ? "border-[hsl(var(--nav-theme)/0.38)] bg-[hsl(var(--nav-theme)/0.16)] text-[hsl(var(--nav-theme))]"
+                          : "border-border bg-muted text-muted-foreground"
+                      }`}
                     >
-                      <span className="truncate">{link.label}</span>
-                      {link.badge && (
-                        <Badge
-                          variant="secondary"
-                          className="ml-auto h-5 border-border px-1.5 text-[10px]"
+                      <Icon className="h-5 w-5" />
+                    </span>
+                  ) : null
+                }
+                count={group.count}
+                active={groupActive}
+                defaultOpen={groupActive}
+                currentPath={currentPath}
+              >
+                <ul className="space-y-1">
+                  {group.links.map((link) => {
+                    const linkActive = isActive(link.href);
+                    return (
+                      <li key={link.href}>
+                        <Link
+                          href={localizeHref(link.href, locale)}
+                          className={`group/link flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition-colors ${
+                            linkActive
+                              ? "bg-[hsl(var(--nav-theme)/0.14)] font-semibold text-[hsl(var(--nav-theme))]"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }`}
                         >
-                          {link.badge}
-                        </Badge>
-                      )}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </CollapsibleNavGroup>
-          ))}
+                          <span
+                            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                              linkActive
+                                ? "bg-[hsl(var(--nav-theme))]"
+                                : "bg-border group-hover/link:bg-muted-foreground"
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{link.label}</span>
+                          {link.badge && (
+                            <Badge
+                              variant="secondary"
+                              className="ml-auto h-5 border-border px-1.5 text-[10px]"
+                            >
+                              {link.badge}
+                            </Badge>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </CollapsibleNavGroup>
+            );
+          })}
         </div>
       </section>
       {hasCodes ? (

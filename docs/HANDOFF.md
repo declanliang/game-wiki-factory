@@ -161,7 +161,7 @@ $env:PYTHONPATH=(Resolve-Path pipeline\guide-search).Path
 python -m unittest discover -s pipeline\guide-search\tests -v
 cd template
 Get-ChildItem scripts -Filter '*.mjs' | ForEach-Object { node --check $_.FullName }
-npx tsc --noEmit
+npx tsc --noEmit --incremental false
 ```
 
 跨模块契约变化还要做端到端 checkpoint 续跑或等价验证；不要为了测试无理由刷新付费阶段。

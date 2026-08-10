@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { CONTENT_TYPES as CONFIG_CONTENT_TYPES, SITE_PLAN_CATEGORIES } from "@/config/navigation";
 import { routing, type Locale } from "@/i18n/routing";
+import { slugifyHeading } from "@/lib/heading-id";
 
 // 从统一配置导入内容类型
 export const CONTENT_TYPES = CONFIG_CONTENT_TYPES;
@@ -49,10 +50,52 @@ export interface ContentMetadata {
   category: string;
   date: string;
   lastModified?: string;
+  order?: number;
+  priority?: number;
   image?: string;
   imageAlt?: string;
   badge?: string;
   summary?: string;
+  relatedVideo?: {
+    videoId: string;
+    title: string;
+    url?: string;
+    channelName?: string;
+  };
+}
+
+function metadataOrder(metadata: ContentMetadata): number {
+  const value = metadata.order ?? metadata.priority;
+  return Number.isFinite(value) ? Number(value) : Number.POSITIVE_INFINITY;
+}
+
+function metadataTimestamp(metadata: ContentMetadata): number {
+  const value = metadata.lastModified ?? metadata.date;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function intentRank(item: Pick<ContentItem, "slug" | "contentType" | "metadata">): number {
+  const haystack = `${item.contentType} ${item.slug} ${item.metadata.title} ${item.metadata.description} ${item.metadata.badge ?? ""}`.toLowerCase();
+  if (item.contentType === "codes" || /\bcodes?\b|redeem/.test(haystack)) return 0;
+  if (/\bbeginner\b|\bstarter\b|\bstart here\b|\bfirst\b|\bwhat to do first\b|primeros pasos|principiante/.test(haystack)) return 1;
+  if (/\btier list\b|\bbest\b|\branking\b|\bmeta\b|mejores|lista de niveles/.test(haystack)) return 2;
+  if (item.contentType === "updates" || /\bupdate\b|\bpatch\b|\brelease\b|actualizaci[oó]n/.test(haystack)) return 3;
+  if (/\bguide\b|\bwalkthrough\b|\bhow to\b|gu[ií]a|c[oó]mo/.test(haystack)) return 4;
+  return 10;
+}
+
+function compareContentItems(a: ContentItem, b: ContentItem): number {
+  const orderDelta = metadataOrder(a.metadata) - metadataOrder(b.metadata);
+  if (orderDelta !== 0) return orderDelta;
+
+  const intentDelta = intentRank(a) - intentRank(b);
+  if (intentDelta !== 0) return intentDelta;
+
+  const dateDelta = metadataTimestamp(b.metadata) - metadataTimestamp(a.metadata);
+  if (dateDelta !== 0) return dateDelta;
+
+  return a.metadata.title.localeCompare(b.metadata.title);
 }
 
 // Heading 结构（从 MDX 源文件提取）
@@ -102,12 +145,7 @@ function extractHeadings(mdxSource: string): Heading[] {
     if (match) {
       const level = match[1].length;
       const text = match[2].replace(/\{[^}]*\}/g, "").trim();
-      const id = text
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "");
+      const id = slugifyHeading(text);
       headings.push({ id, text, level });
     }
   }
@@ -238,7 +276,7 @@ export async function getAllContent(contentType: string, language: Locale): Prom
 
   return items
     .filter((item): item is ContentItem => Boolean(item))
-    .sort((a, b) => a.metadata.title.localeCompare(b.metadata.title));
+    .sort(compareContentItems);
 }
 
 /**
@@ -299,7 +337,7 @@ const GROUP_TITLES_BY_LOCALE: Record<string, Record<string, string>> = Object.fr
 
 // locale → "Overview" translation; every fixed locale is required.
 const OVERVIEW_LABEL_BY_LOCALE: Record<string, string> = {
-  en: "Overview", es: "Resumen", de: "Übersicht", fr: "Aperçu", ja: "概要", ko: "개요",
+  en: "Overview", es: "Resumen", de: "Übersicht", fr: "Aperçu", ja: "概要",
 };
 
 // 分组排序顺序，未列出的分组按发现顺序排在最后
@@ -328,6 +366,10 @@ export function getDynamicNavigation(language: Locale = "en"): NavGroup[] {
     if (slugPaths.length === 0) continue;
 
     const links: NavGroup["links"] = [];
+    const articleLinks: Array<NavGroup["links"][number] & {
+      slug: string;
+      metadata: ContentMetadata;
+    }> = [];
     // 添加 Overview 入口（按 locale 翻译）
     const overviewLabel = OVERVIEW_LABEL_BY_LOCALE[language];
     links.push({ label: overviewLabel, href: `/${groupSlug}` });
@@ -339,6 +381,9 @@ export function getDynamicNavigation(language: Locale = "en"): NavGroup[] {
 
       const fullPath = path.join(groupDir, `${mdxFilePath}.mdx`);
       let title = segments[segments.length - 1].replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+      let description = "";
+      let date = "";
+      let lastModified: string | undefined;
       let badge: string | undefined;
 
       try {
@@ -346,6 +391,12 @@ export function getDynamicNavigation(language: Locale = "en"): NavGroup[] {
         // 提取 metadata.title
         const titleMatch = source.match(/title:\s*["'](.+?)["']/);
         if (titleMatch) title = titleMatch[1];
+        const descriptionMatch = source.match(/description:\s*["'](.+?)["']/);
+        if (descriptionMatch) description = descriptionMatch[1];
+        const dateMatch = source.match(/date:\s*["'](.+?)["']/);
+        if (dateMatch) date = dateMatch[1];
+        const lastModifiedMatch = source.match(/lastModified:\s*["'](.+?)["']/);
+        if (lastModifiedMatch) lastModified = lastModifiedMatch[1];
         // 提取 metadata.badge
         const badgeMatch = source.match(/badge:\s*["'](.+?)["']/);
         if (badgeMatch) badge = badgeMatch[1];
@@ -353,8 +404,40 @@ export function getDynamicNavigation(language: Locale = "en"): NavGroup[] {
         // 读取失败用默认标题
       }
 
-      links.push({ label: title, href: `/${groupSlug}/${articleSlug}`, badge });
+      articleLinks.push({
+        label: title,
+        href: `/${groupSlug}/${articleSlug}`,
+        badge,
+        slug: articleSlug,
+        metadata: {
+          title,
+          description,
+          category: groupSlug,
+          date,
+          lastModified,
+          badge,
+        },
+      });
     }
+    articleLinks.sort((a, b) =>
+      compareContentItems(
+        {
+          slug: a.slug,
+          segments: a.slug.split("/"),
+          contentType: groupSlug,
+          locale: language,
+          metadata: a.metadata,
+        },
+        {
+          slug: b.slug,
+          segments: b.slug.split("/"),
+          contentType: groupSlug,
+          locale: language,
+          metadata: b.metadata,
+        },
+      ),
+    );
+    links.push(...articleLinks.map(({ label, href, badge }) => ({ label, href, badge })));
 
     // Site-plan validation guarantees a locale-specific title.
     const localTitles = GROUP_TITLES_BY_LOCALE[language];

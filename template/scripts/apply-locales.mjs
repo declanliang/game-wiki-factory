@@ -68,6 +68,11 @@ for (const locale of locales) {
   target.site.playUrl = env.OFFICIAL_GAME_URL;
   target.site.price = enMessages.site.price;
   target.site.priceCurrency = enMessages.site.priceCurrency;
+  // Optional factual fields still need the same object shape in every locale.
+  // When the English fact projection is empty (for example, a Roblox game
+  // whose official API does not publish a genre), preserve the empty value
+  // rather than letting the translated baseline omit the key.
+  target.site.genre = Array.isArray(enMessages.site.genre) ? [...enMessages.site.genre] : [];
   target.site.datePublished = enMessages.site.datePublished;
   target.site.developer = enMessages.site.developer;
   target.site.publisher = enMessages.site.publisher;

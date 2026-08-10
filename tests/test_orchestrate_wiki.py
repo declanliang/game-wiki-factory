@@ -14,7 +14,7 @@ import orchestrate_wiki as orchestrator
 class OrchestratorTests(unittest.TestCase):
     def test_factory_release_is_explicit_and_independent_of_git_commit(self) -> None:
         release = orchestrator.factory_release()
-        self.assertEqual(release["release"], "v1_0730")
+        self.assertEqual(release["release"], "v1_0810")
         self.assertEqual(release["contractVersion"], 1)
 
     def test_new_project_receives_current_release_stamp(self) -> None:

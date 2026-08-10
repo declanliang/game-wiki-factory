@@ -595,7 +595,7 @@ class PublisherValidationTests(unittest.TestCase):
         ):
             (root / "intake" / name).write_text("{}", encoding="utf-8")
         (root / "intake" / "factory-release.json").write_text(
-            json.dumps({"release": "v1_0730"}), encoding="utf-8"
+            json.dumps({"release": "v1_0810"}), encoding="utf-8"
         )
         return root
 
@@ -610,7 +610,7 @@ class PublisherValidationTests(unittest.TestCase):
             (project / "intake" / "factory-release.json").write_text(
                 json.dumps({"release": "v1_0728"}), encoding="utf-8"
             )
-            with self.assertRaisesRegex(RuntimeError, "expected 'v1_0730'"):
+            with self.assertRaisesRegex(RuntimeError, "expected 'v1_0810'"):
                 _validate_project(project)
 
     def test_secret_file_blocks_publish(self) -> None:

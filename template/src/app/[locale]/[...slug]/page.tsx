@@ -3,8 +3,9 @@ import { Fragment } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, Swords } from "lucide-react";
+import { BookOpen, ChevronRight } from "lucide-react";
 import { getMessages, setRequestLocale } from "next-intl/server";
+import { ArticleRelatedVideo } from "@/components/article-video";
 import { Badge } from "@/components/ui/badge";
 import {
   getAllContent,
@@ -19,10 +20,9 @@ import { localizeHref } from "@/lib/locale-path";
 import {
   ArticleInlineAd,
   DesktopArticleRailAds,
-  NativeFlowAd,
 } from "@/components/ad-placements";
 import { MobileTOC } from "@/components/table-of-contents";
-import { CONTENT_TYPES } from "@/config/navigation";
+import { CONTENT_TYPES, NAVIGATION_CONFIG } from "@/config/navigation";
 import {
   absoluteAssetUrl,
   getSiteName,
@@ -34,10 +34,19 @@ import {
   buildCategoryMetadataTitle,
   buildOpenGraph,
   buildTwitter,
+  normalizeMetadataDescription,
+  normalizeMetadataTitle,
 } from "@/lib/seo";
 import en from "@/locales/en.json";
 
 type Messages = typeof en;
+
+function getContentTypeIcon(contentType: string) {
+  return (
+    NAVIGATION_CONFIG.find((item) => item.key === contentType)?.icon ??
+    BookOpen
+  );
+}
 
 export async function generateStaticParams() {
   const paths = await getAllContentPaths("en");
@@ -66,13 +75,13 @@ export async function generateMetadata({
     const categoryDescription =
       ctMessages?.overviewDescription ||
       `Browse all ${ctTitle.toLowerCase()} guides and resources for ${messages.site.name}.`;
-    const title = buildCategoryMetadataTitle(
+    const title = normalizeMetadataTitle(buildCategoryMetadataTitle(
       categoryTitle,
       messages.site.name,
       siteName,
       locale,
-    );
-    const description = categoryDescription;
+    ), locale);
+    const description = normalizeMetadataDescription(categoryDescription, locale);
     const items = await getAllContent(ct, locale);
     return {
       title,
@@ -101,8 +110,8 @@ export async function generateMetadata({
   const image = absoluteAssetUrl(item.metadata.image ?? "/images/hero.webp");
   // Article metadata titles already contain the game identity. Appending the
   // site name pushes a large share of SERP titles past the display limit.
-  const title = item.metadata.title;
-  const description = item.metadata.description;
+  const title = normalizeMetadataTitle(item.metadata.title, locale);
+  const description = normalizeMetadataDescription(item.metadata.description, locale);
   return {
     title,
     description,
@@ -138,7 +147,12 @@ export default async function SlugPage({
       />
     );
   return (
-    <DetailPage locale={locale} contentType={slug[0]} slug={slug.slice(1)} />
+    <DetailPage
+      locale={locale}
+      contentType={slug[0]}
+      slug={slug.slice(1)}
+      navGroups={navGroups}
+    />
   );
 }
 
@@ -195,6 +209,7 @@ async function NavigationPage({
   const canUseCardMedia =
     new Set(items.map((item) => item.metadata.image).filter(Boolean)).size >= 2;
   const seenImages = new Set<string>();
+  const SectionIcon = getContentTypeIcon(contentType);
   const cardItems = items.map((item) => {
     const image =
       canUseCardMedia &&
@@ -265,7 +280,7 @@ async function NavigationPage({
                       <div className="p-5">
                         <div className="mb-4 flex items-center justify-between gap-3">
                           <span className="grid h-10 w-10 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]">
-                            <Swords className="h-5 w-5" />
+                            <SectionIcon className="h-5 w-5" />
                           </span>
                           {item.metadata.badge && (
                             <Badge variant="secondary">
@@ -285,11 +300,6 @@ async function NavigationPage({
                         </span>
                       </div>
                     </Link>
-                    {cardItems.length >= 4 && index === 1 ? (
-                      <div className="col-span-full py-4">
-                        <NativeFlowAd />
-                      </div>
-                    ) : null}
                   </Fragment>
                 ))}
               </div>
@@ -314,7 +324,13 @@ async function DetailPage({
   locale,
   contentType,
   slug,
-}: { locale: Locale; contentType: string; slug: string[] }) {
+  navGroups,
+}: {
+  locale: Locale;
+  contentType: string;
+  slug: string[];
+  navGroups: import("@/lib/content").NavGroup[];
+}) {
   if (!CONTENT_TYPES.includes(contentType)) notFound();
   const messages = (await getMessages({ locale })) as Messages;
   const item = await getContent(contentType, slug, locale);
@@ -386,20 +402,40 @@ async function DetailPage({
           })),
         }
       : null;
+  const relatedVideo = item.metadata.relatedVideo;
+  const videoData =
+    relatedVideo?.videoId && relatedVideo.title
+      ? {
+          "@context": "https://schema.org",
+          "@type": "VideoObject",
+          name: relatedVideo.title,
+          description: `Related gameplay video for ${item.metadata.title}.`,
+          thumbnailUrl: [`https://i.ytimg.com/vi/${relatedVideo.videoId}/hqdefault.jpg`],
+          embedUrl: `https://www.youtube-nocookie.com/embed/${relatedVideo.videoId}`,
+          url: relatedVideo.url || `https://www.youtube.com/watch?v=${relatedVideo.videoId}`,
+          inLanguage: locale,
+          isPartOf: articleUrl,
+        }
+      : null;
 
   const relatedLabel = messages.shared.relatedGuides || "Related Guides";
   // Quick Guide 概览框只在文章分段太少、TOC 不会显示时才出现，避免跟下面的 TOC 内容重复。
   const h2Headings = item.headings.filter((h) => h.level === 2);
+  const sidebarHeadings = item.headings
+    .filter((h) => h.level === 2 || h.level === 3)
+    .slice(0, 10);
   const showQuickGuide = item.headings.length > 0 && item.headings.length < 4;
 
   const articleBodyId = `article-body-${contentType}-${slug.join("-")}`;
   return (
-    <main className="mx-auto max-w-[760px] px-5 py-10 sm:px-8">
+    <main className="mx-auto max-w-[1140px] px-5 py-10 sm:px-8 lg:px-10">
       <JsonLd data={articleData} />
       <JsonLd data={breadcrumbData} />
       {faqPageData && <JsonLd data={faqPageData} />}
+      {videoData && <JsonLd data={videoData} />}
       <DesktopArticleRailAds />
-      <article>
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,760px)_280px] lg:justify-center">
+      <article className="min-w-0">
         <Breadcrumbs
           items={[
             { label: messages.shared.home, href: localizeHref("/", locale) },
@@ -413,9 +449,6 @@ async function DetailPage({
         <h1 className="text-4xl font-extrabold tracking-tight text-foreground sm:text-5xl">
           {item.metadata.title}
         </h1>
-        <p className="mt-5 text-lg leading-8 text-muted-foreground">
-          {item.metadata.summary ?? item.metadata.description}
-        </p>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <Badge variant="secondary">{sectionLabel}</Badge>
           {item.metadata.badge ? (
@@ -427,6 +460,14 @@ async function DetailPage({
             {siteName}
           </span>
         </div>
+        <section className="mt-6 rounded-2xl border border-[hsl(var(--nav-theme)/0.28)] bg-[hsl(var(--nav-theme)/0.08)] p-5">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[hsl(var(--nav-theme))]">
+            {messages.shared.quickAnswer}
+          </p>
+          <p className="mt-3 text-lg leading-8 text-foreground">
+            {item.metadata.summary ?? item.metadata.description}
+          </p>
+        </section>
         {item.metadata.image ? (
           <div className="relative mt-7 aspect-[16/9] overflow-hidden rounded-2xl border border-border bg-muted">
             <Image
@@ -458,6 +499,14 @@ async function DetailPage({
             </ul>
           </div>
         )}
+        {relatedVideo?.videoId && relatedVideo.title ? (
+          <ArticleRelatedVideo
+            video={relatedVideo}
+            label={messages.shared.articleVideo?.label}
+            description={messages.shared.articleVideo?.description}
+            watchLabel={messages.shared.homeVideo.watchOnYouTube}
+          />
+        ) : null}
         <MobileTOC headings={item.headings} label={tocLabel} />
         <div id={articleBodyId} className="prose prose-lg mt-10 max-w-none">
           <item.MDXContent />
@@ -472,6 +521,14 @@ async function DetailPage({
           browseAllLabel={messages.shared.viewAllInCategory}
         />
       </article>
+      <WikiSidebar
+        locale={locale}
+        navGroups={navGroups}
+        currentPath={pathname}
+        headings={sidebarHeadings}
+        tocLabel={tocLabel}
+      />
+      </div>
     </main>
   );
 }
@@ -500,6 +557,7 @@ async function ArticleCards({
 
   if (related.length === 0) return null;
 
+  const SectionIcon = getContentTypeIcon(contentType);
   const canUseRelatedMedia =
     new Set(related.map((item) => item.metadata.image).filter(Boolean)).size >=
     2;
@@ -520,7 +578,7 @@ async function ArticleCards({
             return (
               <SmallCard
                 key={`${item.contentType}/${item.slug}`}
-                icon={<Swords className="h-5 w-5" />}
+                icon={<SectionIcon className="h-5 w-5" />}
                 title={item.metadata.title}
                 description={item.metadata.description}
                 image={image}

@@ -110,6 +110,7 @@ const ALLOWED_FIELDS = new Set([
   "imageAlt",
   "badge",
   "summary",
+  "relatedVideo",
 ]);
 
 function parseMetadata(metaBody, rel) {
@@ -118,9 +119,35 @@ function parseMetadata(metaBody, rel) {
   for (const [index, rawLine] of lines.entries()) {
     const line = rawLine.trim();
     if (!line) continue;
+    const relatedVideoMatch = line.match(/^relatedVideo\s*:\s*(\{.*\})\s*,?$/);
+    if (relatedVideoMatch) {
+      if (values.has("relatedVideo")) {
+        fail(`${rel}：metadata 字段 relatedVideo 重复出现`);
+        continue;
+      }
+      try {
+        const value = JSON.parse(relatedVideoMatch[1]);
+        if (
+          !value
+          || typeof value.videoId !== "string"
+          || !/^[A-Za-z0-9_-]{11}$/.test(value.videoId)
+          || typeof value.title !== "string"
+          || !value.title.trim()
+          || (value.url !== undefined && (typeof value.url !== "string" || !/^https:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[A-Za-z0-9_-]{11}(?:[&#?].*)?$/i.test(value.url)))
+          || (value.channelName !== undefined && typeof value.channelName !== "string")
+        ) {
+          fail(`${rel}：metadata.relatedVideo 必须包含有效 videoId/title，可选 url/channelName`);
+          continue;
+        }
+        values.set("relatedVideo", value);
+      } catch {
+        fail(`${rel}：metadata.relatedVideo 不是有效 JSON 对象`);
+      }
+      continue;
+    }
     const match = line.match(/^([A-Za-z][A-Za-z0-9]*)\s*:\s*("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*,?$/);
     if (!match) {
-      fail(`${rel}：metadata 第 ${index + 1} 行必须是单行字符串字面量，禁止表达式、模板字符串、展开和嵌套对象`);
+      fail(`${rel}：metadata 第 ${index + 1} 行必须是单行字符串字面量；只有 relatedVideo 允许单行 JSON 对象`);
       continue;
     }
     const [, field, literal] = match;

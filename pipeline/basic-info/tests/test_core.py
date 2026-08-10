@@ -14,7 +14,7 @@ from gamewiki_automation.pipeline import Pipeline, _generation_evidence, _genera
 from gamewiki_automation.roblox import IdentityError, RobloxClient, clean_roblox_display_name, identity_match_confidence, roblox_place_id
 from gamewiki_automation.steam import SteamClient, steam_app_id
 from gamewiki_automation.schemas import HOMEPAGE_SCHEMA, LANGUAGE_MARKET_SCHEMA, MODULES_SCHEMA, RESEARCH_SCHEMA, TEMPLATE_SITE_CONTENT_SCHEMA, TEMPLATE_SITE_IDENTITY_SCHEMA
-from gamewiki_automation.template_contract import _youtube_channel_value, build_site_content, build_site_identity, export_existing_output, validate_localized_site_content, validate_template_contract
+from gamewiki_automation.template_contract import _genres, _youtube_channel_value, build_site_content, build_site_identity, export_existing_output, validate_localized_site_content, validate_template_contract
 from gamewiki_automation.util import clean_json_text, dump_json, normalized_name, public_game_name, slugify
 from gamewiki_automation.validate import _cost_summary
 
@@ -53,6 +53,36 @@ class FakeHttp:
                 {"id": 7613921865, "name": "Anime Expeditions [UPDATE]", "description": "tower defense", "visits": 100, "creator": {"name": "Studio"}},
                 {"id": 456, "name": "Other Anime", "description": "other", "visits": 10, "creator": {"name": "Other"}},
             ]}
+        raise AssertionError(url)
+
+
+class RobloxFallbackHttp(FakeHttp):
+    def get_json(self, url, **_kwargs):
+        if "games.roblox.com/v1/games?universeIds=" in url:
+            from gamewiki_automation.http import HttpError
+
+            raise HttpError(f"GET {url} returned HTTP 403: Roblox.com is not available")
+        if "develop.roblox.com/v1/universes/" in url:
+            return {
+                "id": 10338952197,
+                "name": "Grow a Chicken Fighter",
+                "description": "Hatch and battle chickens.",
+                "rootPlaceId": 94640181989498,
+                "created": "2026-06-16T14:59:20.347Z",
+                "updated": "2026-08-05T00:21:45.793Z",
+                "isActive": True,
+                "creatorType": "Group",
+                "creatorTargetId": 180466034,
+                "creatorName": "Sergio Verse Games",
+            }
+        if "games.roblox.com/v1/games/votes" in url:
+            return {"data": [{"id": 10338952197, "upVotes": 10, "downVotes": 1}]}
+        if "thumbnails.roblox.com/v1/games/icons" in url:
+            return {"data": [{"state": "Completed", "imageUrl": "https://cdn.example/icon.png"}]}
+        if "thumbnails.roblox.com/v1/games/multiget/thumbnails" in url:
+            return {"data": [{"thumbnails": [{"state": "Completed", "imageUrl": "https://cdn.example/hero.png"}]}]}
+        if "groups.roblox.com/v1/groups/" in url:
+            return {"memberCount": 12, "hasVerifiedBadge": False}
         raise AssertionError(url)
 
 
@@ -103,6 +133,31 @@ class FakeSteamHttp:
 
 
 class CoreTests(unittest.TestCase):
+    def test_placeholder_genre_is_not_promoted_to_a_fact(self):
+        self.assertEqual(
+            _genres(
+                {"game": {"genreL1": None, "genreL2": None}},
+                {"home": {"aboutGame": {"stats": [{"label": "Genre", "value": "Not specified"}]}}},
+            ),
+            [],
+        )
+
+    def test_roblox_collect_falls_back_to_official_develop_api_on_games_403(self):
+        client = RobloxClient(RobloxFallbackHttp())
+        facts, evidence, raw = client.collect(
+            "Grow a Chicken Fighter",
+            {
+                "placeId": "94640181989498",
+                "universeId": "10338952197",
+                "identitySelection": "explicit-place-id",
+            },
+        )
+        self.assertEqual(facts["identity"]["canonicalName"], "Grow a Chicken Fighter")
+        self.assertEqual(facts["identity"]["placeId"], "94640181989498")
+        self.assertEqual(facts["developer"]["name"], "Sergio Verse Games")
+        self.assertEqual(evidence["sources"][1]["url"], "https://develop.roblox.com/v1/universes/10338952197")
+        self.assertEqual(raw["game"]["rootPlaceId"], 94640181989498)
+
     def test_public_game_name_removes_only_leading_bracketed_cjk_alias(self) -> None:
         self.assertEqual(public_game_name({"canonicalName": "(学乱) Gakuran"}), "Gakuran")
         self.assertEqual(public_game_name({"canonicalName": "【学乱】 Gakuran"}), "Gakuran")

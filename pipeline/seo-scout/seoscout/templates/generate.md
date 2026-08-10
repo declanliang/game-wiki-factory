@@ -19,7 +19,7 @@ Generate a title based on the keyword field in the reference material:
 ## Writing Requirements
 
 1. Write a fully original focused page, usually 1,000–1,600 words; a source-rich Tier List may be longer, while a factual Codes/update status page may be shorter when padding would add no value
-2. Keep one primary search intent. Include the main keyword naturally 4–7 times when its length allows it:
+2. Keep one primary search intent. Treat this page as one keyword cluster with variants, not as a place to cover every nearby topic. Include the main keyword naturally 4–7 times when its length allows it:
    - Once in the title (H1)
    - Once within the first 120 words
    - Naturally in relevant headings or body copy without forced repetition
@@ -50,11 +50,21 @@ Generate a title based on the keyword field in the reference material:
     effects from genre conventions. If evidence is thin, publish a narrower
     factual overview and direct players to the current in-game or official
     source instead of presenting an invented how-to answer.
+15. Separate factual confidence levels in the writing:
+    - Official facts: platform pages, developer pages, official posts, official videos.
+    - Community reports: label as player experience or community reports.
+    - Editorial advice: present as advice, not as a verified game rule.
+16. If the source packet does not support a detailed how-to answer, write a
+    shorter factual status/overview page that honestly explains what is known,
+    what is not confirmed, and where players should verify details.
 
 ## Article Structure
 
 - **Do not include an H1 heading** — the title you provide serves as H1; start the body with H2 sections
 - 4–6 H2 headings, optional H3 subheadings
+- The first H2 should answer the page's main player question directly. Do not
+  open with a generic "Overview" if the keyword is really asking for codes,
+  release status, a mechanic, a build decision, or an update.
 - Use Markdown tables only when they make real source-backed information clearer; most articles need 0–2 tables, and sparse topics may need none
 - Do NOT pad table cells with extra spaces to visually align the `|` columns — GFM tables render correctly regardless of column width, and manual padding is unnecessary and error-prone
 - Use bullet lists where appropriate
@@ -89,7 +99,7 @@ Output exactly four parts, in this order, with no other text before or after:
 
 1. One line starting with `TITLE:` followed by the title (prefer 50–60 chars, never over 60, includes the keyword naturally). Plain text — no quotes, no JS/JSON syntax.
 2. One line starting with `DESCRIPTION:` followed by a specific SEO description (120–155 chars). Plain text — no quotes.
-3. A line containing only `QUICKGUIDE:`, followed by 3–5 short bullet lines (one plain-text takeaway per line, starting with `-`) summarizing the article's key points. This becomes a "Quick Guide" summary box at the top of the page — write bullets that stand alone without the rest of the article for context.
+3. A line containing only `QUICKGUIDE:`, followed by 3–5 short bullet lines (one plain-text takeaway per line, starting with `-`) summarizing the article's key points. This becomes a "Quick Guide" summary box at the top of the page — write bullets that stand alone without the rest of the article for context and directly answer the search intent.
 4. A line containing only `BODY:`, then the article body in standard Markdown starting on the next line.
 
 Example shape (do not copy this example's words, only the layout):

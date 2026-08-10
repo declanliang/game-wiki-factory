@@ -52,6 +52,28 @@ function stableMediaIndex(slug, count) {
   return Math.abs(hash) % count;
 }
 
+function repairMissingImageMetadata(source, slug) {
+  const imageMatch = source.match(/^\s*image:\s*["'`]([^"'`]+)["'`],?\s*$/m);
+  if (!imageMatch || !imageMatch[1].startsWith("/")) return source;
+
+  const imagePath = path.join(root, "public", imageMatch[1].replace(/^\/+/, ""));
+  if (fs.existsSync(imagePath)) return source;
+
+  if (gameplayImages.length > 0) {
+    const replacement = gameplayImages[stableMediaIndex(slug, gameplayImages.length)];
+    ok(`${slug} 的 image metadata 指向不存在的文件，已替换为 ${replacement}`);
+    return source.replace(
+      imageMatch[0],
+      `  image: ${JSON.stringify(replacement)},`,
+    );
+  }
+
+  ok(`${slug} 的 image metadata 指向不存在的文件，已移除以避免生成 404`);
+  return source
+    .replace(imageMatch[0], "")
+    .replace(/^\s*imageAlt:\s*["'`].*?["'`],?\s*$/m, "");
+}
+
 function addOfficialGameplayImage(source, slug) {
   if (gameplayImages.length === 0 || /\bimage\s*:\s*["'`]/.test(source)) return source;
   const image = gameplayImages[stableMediaIndex(slug, gameplayImages.length)];
@@ -160,9 +182,10 @@ for (const locale of localeDirs) {
     const destDir = path.join(root, "content", locale, category);
     fs.mkdirSync(destDir, { recursive: true });
     const { fixed, count, voidTagCount, autoLinkCount } = escapeStrayLtInBody(source);
+    const imageSafeSource = repairMissingImageMetadata(fixed, slug);
     fs.writeFileSync(
       path.join(destDir, `${slug}.mdx`),
-      addOfficialGameplayImage(fixed, slug),
+      addOfficialGameplayImage(imageSafeSource, slug),
     );
     if (count > 0) ok(`${path.relative(root, file)} — 自动转义了 ${count} 处会导致 MDX 构建失败的裸 "<"（如 "<10%"），改成 "&lt;"`);
     if (voidTagCount > 0) ok(`${path.relative(root, file)} — 自动修复了 ${voidTagCount} 个裸 <br>，改成 MDX 合法的 <br />`);

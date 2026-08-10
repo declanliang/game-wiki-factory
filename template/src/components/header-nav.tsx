@@ -30,7 +30,7 @@ export function HeaderNavLinks({
   activeClassName: string;
   onNavigate?: () => void;
 }) {
-  const pathname = usePathname();
+  const pathname = usePathname() ?? "/";
   const [openKey, setOpenKey] = useState<string | null>(null);
 
   const isActive = (path: string) => {

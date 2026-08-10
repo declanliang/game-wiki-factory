@@ -55,20 +55,21 @@ export default async function LocaleLayout({ children, params }: { children: Rea
   const adAvailability = getAdAvailability();
 
   return (
-    <html lang={locale} data-site-theme={SITE_THEME}>
-      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
-        <NextIntlClientProvider messages={messages}>
-          <AdProvider availability={adAvailability}>
-            <JsonLd data={siteGraph} />
-            <TopStickyAd />
-            <SiteHeader locale={locale} />
-            {children}
-            <GlobalFooterAds />
-            <SiteFooter locale={locale} />
-            <Analytics />
-          </AdProvider>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <div
+      data-site-theme={SITE_THEME}
+      className="min-h-screen bg-background font-sans text-foreground antialiased"
+    >
+      <NextIntlClientProvider messages={messages}>
+        <AdProvider availability={adAvailability}>
+          <JsonLd data={siteGraph} />
+          <TopStickyAd />
+          <SiteHeader locale={locale} />
+          {children}
+          <GlobalFooterAds />
+          <SiteFooter locale={locale} />
+          <Analytics />
+        </AdProvider>
+      </NextIntlClientProvider>
+    </div>
   );
 }

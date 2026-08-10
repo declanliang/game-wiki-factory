@@ -1,6 +1,6 @@
 {
-  "release": "v1_0730",
+  "release": "v1_0810",
   "contractVersion": 1,
-  "frozenAt": "2026-07-30",
+  "frozenAt": "2026-08-10",
   "policy": "Factory commits do not change the product release. Only an explicit release decision may replace this value."
 }

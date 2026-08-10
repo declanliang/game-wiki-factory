@@ -1,12 +1,13 @@
 "use client";
 
-import { Fragment } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
   ArrowRight,
   BookOpen,
   ChevronRight,
+  Compass,
+  ExternalLink,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -89,6 +90,18 @@ type Category = {
   description: string;
   count: number;
 };
+type StartHereStep = {
+  number: string;
+  label: string;
+  title: string;
+  description: string;
+  href: string;
+  external?: boolean;
+};
+type StartHereLabels = {
+  eyebrow: string;
+  title: string;
+};
 const iconByKey: Record<string, LucideIcon> = Object.fromEntries(
   NAVIGATION_CONFIG.map((item) => [item.key, item.icon]),
 );
@@ -96,6 +109,13 @@ const newTabLinkProps = {
   target: "_blank",
   rel: "noopener noreferrer",
 } as const;
+function linkPropsForHref(href: string) {
+  return /^([a-z][a-z0-9+.-]*:)?\/\//i.test(href) ? newTabLinkProps : {};
+}
+
+function assertNever(section: never): never {
+  throw new Error(`Unhandled homepage section: ${section}`);
+}
 
 // Renders a FAQ answer that may contain `[label](href)` links — the only Markdown syntax
 // supported here, kept intentionally minimal so answers stay easy to author without pulling
@@ -107,11 +127,12 @@ function renderFaqAnswer(text: string, locale: string) {
     if (!match) return <span key={i}>{part}</span>;
     const [, label, href] = match;
     const isExternal = /^([a-z][a-z0-9+.-]*:)?\/\//i.test(href);
+    const resolvedHref = isExternal ? href : localizeHref(href, locale);
     return (
       <Link
         key={i}
-        href={isExternal ? href : localizeHref(href, locale)}
-        {...newTabLinkProps}
+        href={resolvedHref}
+        {...linkPropsForHref(resolvedHref)}
         className="font-semibold text-[hsl(var(--nav-theme))] hover:underline"
       >
         {label}
@@ -135,14 +156,31 @@ function renderBoldText(text: string) {
   });
 }
 
-function LightCard({ item, locale }: { item: LightItem; locale: string }) {
+function LightCard({
+  item,
+  locale,
+  index,
+  taskRouter = false,
+}: {
+  item: LightItem;
+  locale: string;
+  index?: number;
+  taskRouter?: boolean;
+}) {
   const Icon = (item.category && iconByKey[item.category]) || BookOpen;
   return (
     <Link
       href={localizeHref(item.href, locale)}
-      {...newTabLinkProps}
-      className="group flex w-full max-w-[22rem] flex-col overflow-hidden rounded-2xl border border-border bg-card/70 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]"
+      {...linkPropsForHref(localizeHref(item.href, locale))}
+      className={`group relative flex w-full flex-col overflow-hidden rounded-2xl border border-border bg-card/70 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))] ${
+        taskRouter ? "max-w-none" : "max-w-[22rem]"
+      }`}
     >
+      {taskRouter && index !== undefined ? (
+        <span className="absolute right-4 top-4 z-10 rounded-full border border-border bg-background/80 px-2.5 py-1 text-[11px] font-bold tracking-[0.18em] text-muted-foreground backdrop-blur">
+          {String(index + 1).padStart(2, "0")}
+        </span>
+      ) : null}
       {item.image ? (
         <span className="relative block aspect-[16/9] overflow-hidden bg-muted">
           <Image
@@ -155,15 +193,17 @@ function LightCard({ item, locale }: { item: LightItem; locale: string }) {
           <span className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
         </span>
       ) : null}
-      <span className="flex items-start gap-3 p-4">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]">
-          <Icon className="h-4 w-4" />
+      <span className={`flex items-start gap-3 ${taskRouter ? "p-5" : "p-4"}`}>
+        <span className={`grid shrink-0 place-items-center rounded-2xl border border-[hsl(var(--nav-theme)/0.25)] bg-[hsl(var(--nav-theme)/0.1)] text-[hsl(var(--nav-theme))] ${
+          taskRouter ? "h-12 w-12" : "h-9 w-9"
+        }`}>
+          <Icon className={taskRouter ? "h-5 w-5" : "h-4 w-4"} />
         </span>
         <span className="min-w-0">
           <span className="block text-lg font-semibold text-foreground group-hover:text-[hsl(var(--nav-theme))]">
             {item.title}
           </span>
-          <span className="mt-1 block text-base leading-6 text-muted-foreground line-clamp-2">
+          <span className="mt-1 block text-base leading-6 text-muted-foreground line-clamp-3">
             {item.description}
           </span>
         </span>
@@ -184,12 +224,12 @@ function LightSectionBlock({
   if (!section.items || section.items.length === 0) return null;
   return (
     <section
-      className={`mx-auto ${taskRouter ? "max-w-[960px] rounded-[2rem] border border-border bg-card/40 px-5 py-8 sm:px-8 sm:py-10" : "max-w-[880px]"}`}
+      className={`mx-auto ${taskRouter ? "max-w-[1040px] overflow-hidden rounded-[2rem] border border-border bg-[linear-gradient(135deg,hsl(var(--card)/0.92),hsl(var(--nav-theme)/0.08))] px-5 py-8 shadow-2xl shadow-black/10 sm:px-8 sm:py-10" : "max-w-[880px]"}`}
       data-ad-exclusion="section"
     >
       {taskRouter ? (
-        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-[hsl(var(--nav-theme)/0.12)] text-[hsl(var(--nav-theme))]">
-          <ArrowRight className="h-5 w-5" />
+        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl border border-[hsl(var(--nav-theme)/0.28)] bg-[hsl(var(--nav-theme)/0.12)] text-[hsl(var(--nav-theme))]">
+          <BookOpen className="h-5 w-5" />
         </div>
       ) : null}
       <h2 className="text-center text-3xl font-bold tracking-tight text-foreground sm:text-5xl">
@@ -200,16 +240,22 @@ function LightSectionBlock({
           {section.description}
         </p>
       )}
-      <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {(taskRouter ? section.items.slice(0, 6) : section.items).map((item) => (
-          <LightCard key={item.href} item={item} locale={locale} />
+      <div className={`mt-6 grid grid-cols-1 gap-3 ${taskRouter ? "lg:grid-cols-2" : "sm:grid-cols-2 lg:grid-cols-3"}`}>
+        {(taskRouter ? section.items.slice(0, 6) : section.items).map((item, index) => (
+          <LightCard
+            key={item.href}
+            item={item}
+            locale={locale}
+            index={index}
+            taskRouter={taskRouter}
+          />
         ))}
       </div>
       {section.viewAllHref && (
         <div className="mt-6 text-center">
           <Link
             href={localizeHref(section.viewAllHref, locale)}
-            {...newTabLinkProps}
+            {...linkPropsForHref(localizeHref(section.viewAllHref, locale))}
             className="inline-flex items-center text-base font-semibold text-[hsl(var(--nav-theme))] hover:underline"
           >
             {section.viewAllLabel || "View All"}{" "}
@@ -283,7 +329,7 @@ function GuideSectionsBlock({
                     <Link
                       className="group block"
                       href={localizeHref(item.href, locale)}
-                      {...newTabLinkProps}
+                      {...linkPropsForHref(localizeHref(item.href, locale))}
                     >
                       {body}
                     </Link>
@@ -307,6 +353,8 @@ export default function HomePageClient({
   locale,
   recentArticles,
   categories,
+  startHere,
+  startHereLabels,
 }: {
   home: Home;
   quickFactsLabel: string;
@@ -314,6 +362,8 @@ export default function HomePageClient({
   locale: string;
   recentArticles: ContentItem[];
   categories: Category[];
+  startHere: StartHereStep[];
+  startHereLabels: StartHereLabels;
 }) {
   const nativeEnabled = useAdEnabled("nativeBanner");
   const nativeMobileEnabled = useAdEnabled("nativeBannerMobile");
@@ -354,7 +404,7 @@ export default function HomePageClient({
                   >
                     <Link
                       href={localizeHref(home.hero.primaryCtaHref, locale)}
-                      {...newTabLinkProps}
+                      {...linkPropsForHref(localizeHref(home.hero.primaryCtaHref, locale))}
                     >
                       {home.hero.primaryCta}
                     </Link>
@@ -365,7 +415,7 @@ export default function HomePageClient({
                     variant="outline"
                     className="border-white/35 bg-black/25 text-white backdrop-blur-md hover:bg-white hover:text-black"
                   >
-                    <Link href={home.hero.secondaryCtaHref} {...newTabLinkProps}>
+                    <Link href={home.hero.secondaryCtaHref} {...linkPropsForHref(home.hero.secondaryCtaHref)}>
                       {home.hero.secondaryCta}
                     </Link>
                   </Button>
@@ -389,6 +439,57 @@ export default function HomePageClient({
             </div>
           </section>
         );
+
+      case "startHere":
+        return startHere.length > 0 ? (
+          <section
+            className="mx-auto max-w-[1040px] rounded-[1.75rem] border border-border bg-card/65 px-5 py-6 shadow-sm sm:px-7 sm:py-7"
+            aria-labelledby="start-here-title"
+            data-ad-exclusion="section"
+          >
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-[hsl(var(--nav-theme)/0.28)] bg-[hsl(var(--nav-theme)/0.11)] text-[hsl(var(--nav-theme))]">
+                  <Compass className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.24em] text-[hsl(var(--nav-theme))]">
+                    {startHereLabels.eyebrow}
+                  </p>
+                  <h2 id="start-here-title" className="mt-1 text-2xl font-bold tracking-tight text-foreground">
+                    {startHereLabels.title}
+                  </h2>
+                </div>
+              </div>
+              <div className="grid flex-1 gap-2 sm:grid-cols-3 lg:max-w-[760px]">
+                {startHere.map((step) => (
+                  <Link
+                    key={step.number}
+                    href={step.href}
+                    {...(step.external ? newTabLinkProps : {})}
+                    className="group flex min-h-[5.5rem] items-start gap-3 rounded-2xl border border-border bg-background/45 p-3 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]"
+                  >
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[hsl(var(--nav-theme)/0.14)] text-xs font-bold text-[hsl(var(--nav-theme))]">
+                      {step.number}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[11px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
+                        {step.label}
+                      </span>
+                      <span className="mt-1 block font-semibold leading-5 text-foreground group-hover:text-[hsl(var(--nav-theme))]">
+                        {step.title}
+                        {step.external ? <ExternalLink className="ml-1 inline h-3.5 w-3.5" /> : null}
+                      </span>
+                      <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted-foreground">
+                        {step.description}
+                      </span>
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null;
 
       case "ads":
         return anyNativeEnabled ? <NativeFlowAd /> : null;
@@ -426,7 +527,7 @@ export default function HomePageClient({
                 <Button asChild className="mt-6">
                   <Link
                     href={localizeHref(home.aboutGame.ctaHref, locale)}
-                    {...newTabLinkProps}
+                    {...linkPropsForHref(localizeHref(home.aboutGame.ctaHref, locale))}
                   >
                     {home.aboutGame.cta}
                   </Link>
@@ -477,37 +578,31 @@ export default function HomePageClient({
               {home.categories.title}
             </h2>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
-              {categories.map((category, index) => {
+              {categories.map((category) => {
                 const Icon = iconByKey[category.key] ?? BookOpen;
                 return (
-                  <Fragment key={category.key}>
-                    <Link
-                      href={localizeHref(category.path, locale)}
-                      {...newTabLinkProps}
-                      className="group flex w-full max-w-[19rem] flex-col rounded-2xl border border-border bg-card/70 p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]"
-                    >
-                      <span className="grid h-11 w-11 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]">
-                        <Icon className="h-5 w-5" />
-                      </span>
-                      <h3 className="mt-4 text-xl font-bold text-foreground group-hover:text-[hsl(var(--nav-theme))]">
-                        {category.title}
-                      </h3>
-                      {category.description ? (
-                        <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
-                          {category.description}
-                        </p>
-                      ) : null}
-                      <p className="mt-auto pt-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                        {category.count}{" "}
-                        {category.count === 1 ? "Article" : "Articles"}
+                  <Link
+                    key={category.key}
+                    href={localizeHref(category.path, locale)}
+                    {...linkPropsForHref(localizeHref(category.path, locale))}
+                    className="group flex w-full max-w-[19rem] flex-col rounded-2xl border border-border bg-card/70 p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))]"
+                  >
+                    <span className="grid h-11 w-11 place-items-center rounded-xl bg-muted text-[hsl(var(--nav-theme))]">
+                      <Icon className="h-5 w-5" />
+                    </span>
+                    <h3 className="mt-4 text-xl font-bold text-foreground group-hover:text-[hsl(var(--nav-theme))]">
+                      {category.title}
+                    </h3>
+                    {category.description ? (
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                        {category.description}
                       </p>
-                    </Link>
-                    {anyNativeEnabled && index === 3 && categories.length > 4 ? (
-                      <div className="basis-full py-4">
-                        <NativeFlowAd />
-                      </div>
                     ) : null}
-                  </Fragment>
+                    <p className="mt-auto pt-5 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                      {category.count}{" "}
+                      {category.count === 1 ? "Article" : "Articles"}
+                    </p>
+                  </Link>
                 );
               })}
             </div>
@@ -524,6 +619,19 @@ export default function HomePageClient({
             taskRouter
           />
         );
+
+      case "extraSections":
+        return home.extraSections && home.extraSections.length > 0 ? (
+          <div className="space-y-16">
+            {home.extraSections.map((section) => (
+              <LightSectionBlock
+                key={section.title}
+                section={section}
+                locale={locale}
+              />
+            ))}
+          </div>
+        ) : null;
 
       case "updates":
         // Compact "what's new" list, title-only rows (not a mini article grid)
@@ -543,7 +651,7 @@ export default function HomePageClient({
                     <Link
                       key={articleHref}
                       href={localizeHref(articleHref, locale)}
-                      {...newTabLinkProps}
+                      {...linkPropsForHref(localizeHref(articleHref, locale))}
                       className="group flex flex-col gap-3 rounded-2xl border border-border bg-card/70 p-5 transition hover:-translate-y-0.5 hover:border-[hsl(var(--nav-theme-light))] sm:flex-row sm:items-center sm:justify-between"
                     >
                       <span className="flex min-w-0 items-start gap-3 sm:items-center">
@@ -565,7 +673,7 @@ export default function HomePageClient({
                 <Button asChild variant="outline">
                   <Link
                     href={localizeHref(home.updates.browseHref, locale)}
-                    {...newTabLinkProps}
+                    {...linkPropsForHref(localizeHref(home.updates.browseHref, locale))}
                   >
                     {home.updates.browse}
                   </Link>
@@ -618,7 +726,7 @@ export default function HomePageClient({
               <Button asChild size="lg">
                 <Link
                   href={localizeHref(home.finalCta.primaryHref, locale)}
-                  {...newTabLinkProps}
+                  {...linkPropsForHref(localizeHref(home.finalCta.primaryHref, locale))}
                 >
                   {home.finalCta.primary}
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -627,7 +735,7 @@ export default function HomePageClient({
               <Button asChild size="lg" variant="outline">
                 <Link
                   href={localizeHref(home.finalCta.secondaryHref, locale)}
-                  {...newTabLinkProps}
+                  {...linkPropsForHref(localizeHref(home.finalCta.secondaryHref, locale))}
                 >
                   {home.finalCta.secondary}
                 </Link>
@@ -635,6 +743,8 @@ export default function HomePageClient({
             </div>
           </section>
         );
+      default:
+        return assertNever(section);
     }
   }
 

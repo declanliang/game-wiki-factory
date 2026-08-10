@@ -8,7 +8,12 @@ from pathlib import Path
 SEO_SCOUT_ROOT = Path(__file__).resolve().parents[1] / "pipeline" / "seo-scout"
 sys.path.insert(0, str(SEO_SCOUT_ROOT))
 
-from seoscout.generate import _process_llm_response as process_english, page_type_brief
+from seoscout.generate import (
+    _build_mdx as build_english_mdx,
+    _process_llm_response as process_english,
+    page_type_brief,
+    select_article_youtube_video,
+)
 from seoscout.qa import _parse_verdict
 from seoscout.translate import (
     _build_mdx as build_translation_mdx,
@@ -62,6 +67,35 @@ class SeoMetadataValidationTests(unittest.TestCase):
         raw = f"TITLE: Timebomb Duels Tips: Movement and Positioning\nDESCRIPTION: {DESCRIPTION}\nBODY:\n{BODY}"
         content, error = process_english(raw, "guide", "2026-07-19")
         self.assertIsNotNone(content, error)
+
+    def test_article_metadata_can_include_safe_related_youtube_video(self) -> None:
+        video = {
+            "videoId": "abcDEF12345",
+            "title": "Timebomb Duels beginner gameplay",
+            "url": "https://www.youtube.com/watch?v=abcDEF12345",
+            "channelName": "Player Channel",
+        }
+        content = build_english_mdx(
+            "Timebomb Duels Tips",
+            DESCRIPTION,
+            "guide",
+            "2026-07-19",
+            BODY,
+            related_video=video,
+        )
+        self.assertIn("relatedVideo", content)
+        self.assertIn("abcDEF12345", content)
+
+    def test_select_article_youtube_video_skips_shorts_and_uses_rank(self) -> None:
+        selected = select_article_youtube_video({
+            "youtube": {
+                "items": [
+                    {"selected": True, "video_id": "shorts12345", "title": "Short", "is_shorts": True, "rank_absolute": 1},
+                    {"selected": True, "video_id": "validVideo2", "title": "Useful gameplay", "url": "https://youtube.com/watch?v=validVideo2", "rank_absolute": 2, "duration_seconds": 180},
+                ]
+            }
+        })
+        self.assertEqual(selected["videoId"], "validVideo2")
 
     def test_compacts_overlong_english_title(self) -> None:
         title = "Timebomb Duels Ultimate Complete Strategy Guide for Every New Player"

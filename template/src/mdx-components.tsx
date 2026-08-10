@@ -1,16 +1,7 @@
 import Link from "next/link";
 import type { MDXComponents } from "mdx/types";
 import { Info, Lightbulb, TriangleAlert, CircleCheck } from "lucide-react";
-
-function toHeadingId(children: React.ReactNode): string {
-  const text = String(children).replace(/<[^>]*>/g, "").trim();
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
+import { slugifyHeading } from "@/lib/heading-id";
 
 const CALLOUT_STYLES = {
   info: { icon: Info, className: "callout-info" },
@@ -43,8 +34,8 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
 // source of truth for how MDX content looks. This file only keeps what a typography plugin
 // genuinely can't do: heading anchor IDs, next/link routing, and the table's card wrapper div.
 const defaultComponents: MDXComponents = {
-  h2: ({ children, id }) => <h2 id={id || toHeadingId(children)}>{children}</h2>,
-  h3: ({ children, id }) => <h3 id={id || toHeadingId(children)}>{children}</h3>,
+  h2: ({ children, id }) => <h2 id={id || slugifyHeading(String(children).replace(/<[^>]*>/g, ""))}>{children}</h2>,
+  h3: ({ children, id }) => <h3 id={id || slugifyHeading(String(children).replace(/<[^>]*>/g, ""))}>{children}</h3>,
   a: ({ href = "", children }) => <Link href={href}>{children}</Link>,
   table: ({ children }) => (
     <div className="mt-9 mb-7 overflow-hidden rounded-xl border border-border bg-card" data-ad-exclusion="table">

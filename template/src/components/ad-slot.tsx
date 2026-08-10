@@ -32,8 +32,14 @@ export function AdSlot({ format, className = "", eager = false }: { format: AdFo
   if (!enabled) return null;
   const isNative = format === "nativeBanner" || format === "nativeBannerMobile";
   const size = isNative ? null : AD_SIZES[format];
+  const boxStyle = size
+    ? ({
+        "--ad-width": `${size.width}px`,
+        "--ad-height": `${size.height}px`,
+      } as React.CSSProperties)
+    : undefined;
   return (
-    <div className={`relative mx-auto ${isNative ? "w-full max-w-5xl" : "max-w-full"} ${className}`} style={size ? { width: size.width, height: size.height } : undefined} data-ad-format={format}>
+    <div className={`relative mx-auto ${isNative ? "w-full max-w-5xl" : "h-[var(--ad-height)] w-[var(--ad-width)] max-w-full"} ${className}`} style={boxStyle} data-ad-format={format}>
       <span className="sr-only">Advertisement</span>
       <iframe
         src={`${AD_RENDER_ROUTE}/${format}`}

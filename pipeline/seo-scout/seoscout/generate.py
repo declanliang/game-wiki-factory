@@ -75,6 +75,47 @@ PAGE_TYPE_BRIEFS = {
 }
 
 
+def select_article_youtube_video(entry: dict) -> dict | None:
+    """Pick one safe, relevant YouTube result for an article metadata block."""
+    youtube_items = ((entry.get("youtube") or {}).get("items") or [])
+    candidates = []
+    for item in youtube_items:
+        if not isinstance(item, dict) or not item.get("selected", True):
+            continue
+        video_id = str(item.get("video_id") or "").strip()
+        title = str(item.get("title") or "").strip()
+        if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id) or not title:
+            continue
+        if item.get("is_shorts") or item.get("is_live"):
+            continue
+        duration = (
+            item.get("duration_seconds")
+            or item.get("duration_time_seconds")
+            or item.get("duration")
+        )
+        if isinstance(duration, str) and duration.isdigit():
+            duration = int(duration)
+        if isinstance(duration, (int, float)) and duration and duration < 60:
+            continue
+        candidates.append(item)
+    if not candidates:
+        return None
+    selected = min(
+        candidates,
+        key=lambda item: (
+            int(item.get("rank_absolute") or item.get("rank_group") or 1_000_000),
+            -int(item.get("views_count") or item.get("view_count") or 0),
+        ),
+    )
+    video_id = str(selected["video_id"]).strip()
+    return {
+        "videoId": video_id,
+        "title": str(selected.get("title") or "").strip(),
+        "url": str(selected.get("url") or f"https://www.youtube.com/watch?v={video_id}").strip(),
+        "channelName": str(selected.get("channel_name") or selected.get("channel") or "").strip(),
+    }
+
+
 def page_type_brief(spec: dict, category: str) -> str:
     page_type = str(spec.get("pageType") or "").strip()
     if not page_type:
@@ -256,7 +297,7 @@ def _parse_llm_output(content: str) -> tuple:
 
 
 def _build_mdx(title: str, description: str, category: str, current_date: str,
-                body: str, quickguide: list = None) -> str:
+                body: str, quickguide: list = None, related_video: dict | None = None) -> str:
     """Assemble the final .mdx content: a code-constructed metadata block
     (never hand-written by the model) followed by the model's article body.
 
@@ -264,14 +305,19 @@ def _build_mdx(title: str, description: str, category: str, current_date: str,
     is prepended to the body — Python owns the wrapper markup (component
     tag, bullet list formatting) so it can never come out malformed; the
     model only ever supplies plain bullet text via the QUICKGUIDE: section."""
-    metadata = (
-        "export const metadata = {\n"
-        f"  title: {json.dumps(title, ensure_ascii=False)},\n"
-        f"  description: {json.dumps(description, ensure_ascii=False)},\n"
-        f"  category: {json.dumps(category, ensure_ascii=False)},\n"
-        f"  date: {json.dumps(current_date, ensure_ascii=False)},\n"
-        "}"
-    )
+    metadata_lines = [
+        "export const metadata = {",
+        f"  title: {json.dumps(title, ensure_ascii=False)},",
+        f"  description: {json.dumps(description, ensure_ascii=False)},",
+        f"  category: {json.dumps(category, ensure_ascii=False)},",
+        f"  date: {json.dumps(current_date, ensure_ascii=False)},",
+    ]
+    if related_video and related_video.get("videoId") and related_video.get("title"):
+        metadata_lines.append(
+            f"  relatedVideo: {json.dumps(related_video, ensure_ascii=False)},"
+        )
+    metadata_lines.append("}")
+    metadata = "\n".join(metadata_lines)
     if quickguide:
         bullets = "\n".join(f"- {b}" for b in quickguide)
         callout = f'<Callout type="info">\n**Quick Guide**\n\n{bullets}\n</Callout>\n\n'
@@ -419,7 +465,7 @@ def validate_markdown(content: str) -> tuple:
     return True, ""
 
 
-def _process_llm_response(raw_content: str, category: str, current_date: str) -> tuple:
+def _process_llm_response(raw_content: str, category: str, current_date: str, related_video: dict | None = None) -> tuple:
     """Clean, parse, and assemble a raw LLM response into a validated .mdx
     string. Returns (final_content, None) on success, or (None, error) on
     failure. Shared by the initial pass and the repair pass so both go
@@ -430,7 +476,7 @@ def _process_llm_response(raw_content: str, category: str, current_date: str) ->
         title, description, quickguide, body = _parse_llm_output(cleaned)
     except ValueError as e:
         return None, str(e)
-    final = _build_mdx(title, description, category, current_date, body, quickguide)
+    final = _build_mdx(title, description, category, current_date, body, quickguide, related_video)
     is_valid, err = validate_markdown(final)
     if not is_valid:
         return None, err
@@ -488,6 +534,7 @@ async def run_generate(
                         if item.get('selected') and item.get('title')
                     ][:5],
                 },
+                'related_video': select_article_youtube_video(kw),
             })
     except FileNotFoundError:
         # Fallback: load from keywords file directly
@@ -502,10 +549,10 @@ async def run_generate(
         if 'categories' in kw_data:
             for cat in kw_data['categories']:
                 for kw in cat.get('keywords', []):
-                    keyword_entries.append({'keyword': kw.strip(), 'category': cat.get('category', '')})
+                    keyword_entries.append({'keyword': kw.strip(), 'category': cat.get('category', ''), 'related_video': None})
         else:
             for kw in kw_data.get('keywords', []):
-                keyword_entries.append({'keyword': kw.strip(), 'category': ''})
+                keyword_entries.append({'keyword': kw.strip(), 'category': '', 'related_video': None})
 
     if not keyword_entries:
         print("  ❌ No keywords found")
@@ -616,6 +663,7 @@ async def run_generate(
             'current_date': current_date,
             'relative_output': relative_output,
             'source_fingerprint': source_fingerprint,
+            'related_video': entry.get('related_video'),
         }))
 
     if skipped_no_data > 0:
@@ -652,7 +700,7 @@ async def run_generate(
             failed += 1
             continue
 
-        final, err = _process_llm_response(content, meta['category'], meta['current_date'])
+        final, err = _process_llm_response(content, meta['category'], meta['current_date'], meta.get('related_video'))
 
         if final:
             output_path = meta['output_path']
@@ -681,7 +729,7 @@ async def run_generate(
             if not content:
                 failed += 1
                 continue
-            final, err = _process_llm_response(content, meta['category'], meta['current_date'])
+            final, err = _process_llm_response(content, meta['category'], meta['current_date'], meta.get('related_video'))
             if final:
                 output_path = meta['output_path']
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)

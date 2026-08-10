@@ -6,7 +6,12 @@ import { NAVIGATION_CONFIG } from "@/config/navigation";
 import { getSiteName, localizedSiteUrl } from "@/config/site";
 import { localizeHref } from "@/lib/locale-path";
 import { languageAlternates, type Locale } from "@/i18n/routing";
-import { buildOpenGraph, buildTwitter } from "@/lib/seo";
+import {
+  buildOpenGraph,
+  buildTwitter,
+  normalizeMetadataDescription,
+  normalizeMetadataTitle,
+} from "@/lib/seo";
 import en from "@/locales/en.json";
 import HomePageClient from "./HomePageClient";
 
@@ -18,8 +23,11 @@ export async function generateMetadata({
   const { locale } = await params;
   const messages = (await getMessages({ locale })) as Messages;
   const siteName = getSiteName(messages);
-  const title = messages.home.meta.title;
-  const description = messages.home.meta.description;
+  const title = normalizeMetadataTitle(messages.home.meta.title, locale);
+  const description = normalizeMetadataDescription(
+    messages.home.meta.description,
+    locale,
+  );
   return {
     title,
     description,
@@ -231,6 +239,39 @@ export default async function LocaleHomePage({
       })),
     })),
   };
+  const startHere = [
+    resolvedFeaturedItems[0]
+      ? {
+          number: "01",
+          label: messages.shared.startHere.guideLabel,
+          title: resolvedFeaturedItems[0].title,
+          description: resolvedFeaturedItems[0].description,
+          href: localizeHref(resolvedFeaturedItems[0].href, locale),
+        }
+      : null,
+    categories[0]
+      ? {
+          number: "02",
+          label: messages.shared.startHere.exploreLabel,
+          title: messages.shared.startHere.browseCategory.replace(
+            "{category}",
+            categories[0].title,
+          ),
+          description: categories[0].description || messages.home.categories.title,
+          href: localizeHref(categories[0].path, locale),
+        }
+      : null,
+    messages.site.playUrl
+      ? {
+          number: "03",
+          label: messages.shared.startHere.playLabel,
+          title: messages.shared.startHere.officialAction,
+          description: messages.site.legalNotice,
+          href: messages.site.playUrl,
+          external: true,
+        }
+      : null,
+  ].filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   return (
     <main className="mx-auto max-w-[1200px] px-5 pb-10 pt-5 sm:px-8 sm:pt-6 lg:px-10">
@@ -242,6 +283,8 @@ export default async function LocaleHomePage({
         locale={locale}
         recentArticles={recentArticles}
         categories={categories}
+        startHere={startHere}
+        startHereLabels={messages.shared.startHere}
       />
     </main>
   );

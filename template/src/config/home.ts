@@ -14,10 +14,15 @@
 // JSON-driven module system.
 export const HOME_SECTIONS = [
   "hero",
+  // Universal first-step strip. It is composed from already validated data
+  // (featured articles, published categories, official game URL), so it works
+  // for every game without per-site prompt design.
+  "startHere",
   "ads",
   // Featured pages are the homepage's task router: players choose the job
   // they need before reading the longer editorial sections below.
   "featured",
+  "extraSections",
   // Homepage ads are full siblings between content sections. Never insert an
   // ad into a card grid, callout, or other editorial section.
   "sectionAd",
