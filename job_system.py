@@ -517,7 +517,7 @@ QUOTA_PATTERNS = (
     "insufficient_user_quota", "insufficient quota", "quota exceeded",
     "quota exhausted", "insufficient balance", "balance insufficient",
     "balance exhausted", "insufficient credits", "credits exhausted",
-    "credit balance", "余额不足", "额度不足",
+    "credit balance", "all_channels_circuit_broken", "余额不足", "额度不足",
 )
 
 QUOTA_PROVIDERS = (
@@ -678,10 +678,10 @@ def retry_job(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
 
 def classify_failure(text: str) -> str:
     lowered = text.casefold()
-    if checkpoint_safe_content_retry(lowered):
-        return "retryable"
     if any(pattern in lowered for pattern in QUOTA_PATTERNS):
         return "quota_exhausted"
+    if checkpoint_safe_content_retry(lowered):
+        return "retryable"
     if any(pattern in lowered for pattern in TRANSIENT_PATTERNS):
         return "retryable"
     if any(pattern in lowered for pattern in ATTENTION_PATTERNS):

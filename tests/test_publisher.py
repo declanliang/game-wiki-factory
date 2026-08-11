@@ -697,10 +697,30 @@ class PublisherValidationTests(unittest.TestCase):
         self.assertEqual(commands[2], ["git", "push", "-u", "origin", "main"])
         append_log.assert_called_once()
 
+    @patch("publisher._append_cloudflare_log")
+    @patch("publisher._run")
+    def test_push_uses_force_with_lease_when_generated_rebase_conflicts(self, run, append_log) -> None:
+        run.side_effect = [
+            RuntimeError("! [rejected] main -> main (fetch first)"),
+            RuntimeError("Could not apply abc123... Generate game wiki site"),
+            "",
+            "",
+        ]
+
+        _push_main_with_rebase(Path("C:/game"), {"GH_TOKEN": "hidden"}, Path("C:/game/log.txt"))
+
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(commands[0], ["git", "push", "-u", "origin", "main"])
+        self.assertEqual(commands[1], ["git", "pull", "--rebase", "--autostash", "origin", "main"])
+        self.assertEqual(commands[2], ["git", "rebase", "--abort"])
+        self.assertEqual(commands[3], ["git", "push", "--force-with-lease", "-u", "origin", "main"])
+        self.assertEqual(append_log.call_count, 2)
+
     @patch("publisher.build_subprocess_env", return_value={"FACTORY_GITHUB_TOKEN": "hidden", "FACTORY_GITHUB_OWNER": "owner"})
     @patch("publisher._ensure_workers_static_assets_runtime")
     @patch("publisher._resolve_git_author", return_value=("Owner", "owner@example.com"))
     @patch("publisher._push_main_with_rebase")
+    @patch("publisher.write_json")
     @patch("publisher.subprocess.run")
     @patch("publisher.shutil.which", return_value="/usr/bin/gh")
     @patch("publisher._run")
@@ -709,6 +729,7 @@ class PublisherValidationTests(unittest.TestCase):
         run,
         _which,
         subprocess_run,
+        _write_json,
         push_with_rebase,
         _author,
         _runtime,

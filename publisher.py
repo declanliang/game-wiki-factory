@@ -1510,7 +1510,20 @@ def _push_main_with_rebase(project: Path, env: dict[str, str], log_path: Path) -
             log_path,
             "git push rejected; attempting a safe origin/main rebase before retrying",
         )
-        _run(["git", "pull", "--rebase", "--autostash", "origin", "main"], project, env)
+        try:
+            _run(["git", "pull", "--rebase", "--autostash", "origin", "main"], project, env)
+        except RuntimeError as rebase_exc:
+            _append_cloudflare_log(
+                log_path,
+                "git rebase conflicted in generated site output; aborting rebase "
+                "and publishing the current workspace snapshot with --force-with-lease",
+            )
+            try:
+                _run(["git", "rebase", "--abort"], project, env)
+            except RuntimeError:
+                pass
+            _run(["git", "push", "--force-with-lease", "-u", "origin", "main"], project, env)
+            return
         _run(["git", "push", "-u", "origin", "main"], project, env)
 
 
