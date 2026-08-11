@@ -1529,6 +1529,7 @@ def publish(argv: list[str]) -> int:
     _ensure_workers_static_assets_runtime(project)
     repo = args.repo or args.slug
     receipt_path = project / ".gamewiki" / "publish.json"
+    github_log_path = project / ".gamewiki" / "logs" / "github-publish.log"
     receipt = read_json(receipt_path) if receipt_path.is_file() else {"schemaVersion": 1, "slug": args.slug, "createdAt": _now(), "stages": {}}
 
     gh_token = runtime_env.get("FACTORY_GITHUB_TOKEN") or runtime_env.get("GH_TOKEN")
@@ -1558,7 +1559,7 @@ def publish(argv: list[str]) -> int:
         _run(["git", "add", "--all"], project)
         if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project).returncode != 0:
             _commit(project, "Generate game wiki site", env, author)
-        _push_main_with_rebase(project, env, log_path)
+        _push_main_with_rebase(project, env, github_log_path)
     _ensure_private_github_repo(full_repo, project, env)
     receipt["stages"]["github"] = {
         "status": "complete",

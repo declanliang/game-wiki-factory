@@ -31,6 +31,7 @@ from publisher import (
     _wait_cloudflare_deployment,
     _wait_cloudflare_commit_deployment,
     _workers_static_assets_config,
+    publish,
 )
 
 
@@ -695,6 +696,54 @@ class PublisherValidationTests(unittest.TestCase):
         self.assertEqual(commands[1], ["git", "pull", "--rebase", "--autostash", "origin", "main"])
         self.assertEqual(commands[2], ["git", "push", "-u", "origin", "main"])
         append_log.assert_called_once()
+
+    @patch("publisher.build_subprocess_env", return_value={"FACTORY_GITHUB_TOKEN": "hidden", "FACTORY_GITHUB_OWNER": "owner"})
+    @patch("publisher._ensure_workers_static_assets_runtime")
+    @patch("publisher._resolve_git_author", return_value=("Owner", "owner@example.com"))
+    @patch("publisher._push_main_with_rebase")
+    @patch("publisher.subprocess.run")
+    @patch("publisher.shutil.which", return_value="/usr/bin/gh")
+    @patch("publisher._run")
+    def test_publish_existing_repo_passes_github_log_path_to_rebase_push(
+        self,
+        run,
+        _which,
+        subprocess_run,
+        push_with_rebase,
+        _author,
+        _runtime,
+        _env,
+    ) -> None:
+        subprocess_run.side_effect = [
+            MagicMock(returncode=0),
+            MagicMock(returncode=0),
+        ]
+        run.side_effect = [
+            "PRIVATE",
+            "origin\n",
+            "https://github.com/owner/game.git",
+            "",
+            "",
+            "PRIVATE",
+            "abc123\n",
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            project = self._project(Path(temporary))
+            (project / ".git").mkdir()
+
+            status = publish([
+                "game",
+                "--owner",
+                "owner",
+                "--repo",
+                "game",
+                "--project-dir",
+                str(project),
+                "--skip-cloudflare",
+            ])
+
+        self.assertEqual(status, 0)
+        self.assertEqual(push_with_rebase.call_args.args[2].name, "github-publish.log")
 
     @patch("publisher._verify_online_advertising", return_value=("nativeBanner", "nativeBannerMobile", "banner728x90", "banner300x250", "banner468x60", "sidebar160x600", "sidebar160x300", "mobile320x50"))
     @patch("publisher.shutil.which", return_value="npm")
