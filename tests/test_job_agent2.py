@@ -44,6 +44,21 @@ class JobAgent2Tests(unittest.TestCase):
         self.assertEqual([item["jobId"] for item in result], [job_id])
         self.assertEqual(status, "needs_attention")
 
+    def test_dry_run_lists_article_generation_failures(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ,
+            {
+                "GAMEWIKI_DATA_DIR": str(Path(temporary) / "data"),
+                "GAMEWIKI_PROJECTS_ROOT": str(Path(temporary) / "projects"),
+            },
+        ):
+            job_id, _project = self._job(
+                temporary,
+                "Article generation failed for 5 item(s); no incomplete response was accepted. Re-run without --overwrite to retry only the missing articles.",
+            )
+            result = recover_once(dry_run=True)
+        self.assertEqual([item["jobId"] for item in result], [job_id])
+
     def test_stale_agent2_run_does_not_consume_retry_budget(self):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
             os.environ,

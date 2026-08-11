@@ -678,6 +678,8 @@ def retry_job(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
 
 def classify_failure(text: str) -> str:
     lowered = text.casefold()
+    if checkpoint_safe_content_retry(lowered):
+        return "retryable"
     if any(pattern in lowered for pattern in QUOTA_PATTERNS):
         return "quota_exhausted"
     if any(pattern in lowered for pattern in TRANSIENT_PATTERNS):

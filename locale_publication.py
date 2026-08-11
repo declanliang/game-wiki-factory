@@ -181,6 +181,18 @@ def _clone_locale_release_workspace(
         log_path,
         "install locale release dependencies",
     )
+    # publication-plan.json is changed by the scheduled GitHub commit.  Keep
+    # the generated route/metadata projection explicit before the Workers
+    # build, instead of relying only on a repository-local npm lifecycle hook.
+    # This prevents an old src/config/publication.ts (for example ["en"]) from
+    # surviving a locale wave and producing stale hreflang output.
+    _run_logged(
+        [_npm_binary("npm"), "run", "sync:publication"],
+        project,
+        env,
+        log_path,
+        "synchronize locale publication projection",
+    )
     return project
 
 

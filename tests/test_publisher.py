@@ -23,6 +23,7 @@ from publisher import (
     _set_cloudflare_project_environment,
     _ensure_cloudflare_custom_domain,
     _ensure_cloudflare_dns_cname,
+    _push_main_with_rebase,
     _validate_cloudflare_git_project,
     _validate_project,
     _verify_online_deployment,
@@ -677,6 +678,23 @@ class PublisherValidationTests(unittest.TestCase):
         author = _resolve_git_author(Path("C:/game"), {"GH_TOKEN": "hidden"})
         self.assertEqual(author, ("declanliang", "130889021+declanliang@users.noreply.github.com"))
         self.assertNotIn("hidden", run.call_args.args[0])
+
+    @patch("publisher._append_cloudflare_log")
+    @patch("publisher._run")
+    def test_push_rebases_once_when_remote_has_new_commit(self, run, append_log) -> None:
+        run.side_effect = [
+            RuntimeError("! [rejected] main -> main (fetch first)"),
+            "",
+            "",
+        ]
+
+        _push_main_with_rebase(Path("C:/game"), {"GH_TOKEN": "hidden"}, Path("C:/game/log.txt"))
+
+        commands = [call.args[0] for call in run.call_args_list]
+        self.assertEqual(commands[0], ["git", "push", "-u", "origin", "main"])
+        self.assertEqual(commands[1], ["git", "pull", "--rebase", "--autostash", "origin", "main"])
+        self.assertEqual(commands[2], ["git", "push", "-u", "origin", "main"])
+        append_log.assert_called_once()
 
     @patch("publisher._verify_online_advertising", return_value=("nativeBanner", "nativeBannerMobile", "banner728x90", "banner300x250", "banner468x60", "sidebar160x600", "sidebar160x300", "mobile320x50"))
     @patch("publisher.shutil.which", return_value="npm")

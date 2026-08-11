@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from locale_publication import publish_locale_in_github, release_locale
+from locale_publication import _clone_locale_release_workspace, publish_locale_in_github, release_locale
 from publication_plan import build_publication_plan
 
 
@@ -122,3 +122,18 @@ class LocalePublicationTests(unittest.TestCase):
         )
         self.assertEqual(payload["hosting"]["provider"], "cloudflare-workers-static-assets")
         self.assertEqual(payload["hosting"]["workerName"], "game")
+
+    @patch("locale_publication._run_logged", return_value="")
+    def test_clone_locale_release_workspace_syncs_publication_projection(self, run_logged) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = _clone_locale_release_workspace(
+                "owner/game",
+                "commit-sha",
+                {"GH_TOKEN": "hidden"},
+                Path(temporary),
+            )
+
+        self.assertEqual(project.name, "game")
+        commands = [call.args[0] for call in run_logged.call_args_list]
+        self.assertTrue(any(command[-1:] == ["ci"] for command in commands))
+        self.assertTrue(any(command[-2:] == ["run", "sync:publication"] for command in commands))

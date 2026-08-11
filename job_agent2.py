@@ -69,6 +69,10 @@ AI_RECOVERABLE_PATTERNS = (
     "http 504",
     "http 524",
     "origin_response_timeout",
+    "article generation failed",
+    "article generation error",
+    "no incomplete response was accepted",
+    "文章生成失败",
 )
 
 ALLOWED_STAGES = {

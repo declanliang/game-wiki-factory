@@ -116,6 +116,14 @@ class JobSystemTests(unittest.TestCase):
         self.assertEqual(classify_failure("all_channels_circuit_broken"), "retryable")
         self.assertEqual(classify_failure("insufficient_user_quota"), "quota_exhausted")
         self.assertEqual(classify_failure("account balance exhausted"), "quota_exhausted")
+        self.assertEqual(
+            classify_failure(
+                "LLM key slot 1 has insufficient quota. "
+                "Article generation failed for 5 item(s); "
+                "Re-run without --overwrite to retry only the missing articles."
+            ),
+            "retryable",
+        )
         self.assertEqual(classify_failure("Two Roblox candidates are too close to select safely"), "needs_attention")
         self.assertEqual(classify_failure("unknown build problem"), "needs_attention")
         self.assertEqual(

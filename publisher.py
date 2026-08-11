@@ -1499,6 +1499,21 @@ def _validate_project(project: Path) -> dict:
     return manifest
 
 
+def _push_main_with_rebase(project: Path, env: dict[str, str], log_path: Path) -> None:
+    try:
+        _run(["git", "push", "-u", "origin", "main"], project, env)
+    except RuntimeError as exc:
+        message = str(exc).casefold()
+        if "fetch first" not in message and "non-fast-forward" not in message:
+            raise
+        _append_cloudflare_log(
+            log_path,
+            "git push rejected; attempting a safe origin/main rebase before retrying",
+        )
+        _run(["git", "pull", "--rebase", "--autostash", "origin", "main"], project, env)
+        _run(["git", "push", "-u", "origin", "main"], project, env)
+
+
 def publish(argv: list[str]) -> int:
     runtime_env = build_subprocess_env(ROOT)
     parser = argparse.ArgumentParser(prog="gamewiki.py publish")
@@ -1543,7 +1558,7 @@ def publish(argv: list[str]) -> int:
         _run(["git", "add", "--all"], project)
         if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project).returncode != 0:
             _commit(project, "Generate game wiki site", env, author)
-        _run(["git", "push", "-u", "origin", "main"], project, env)
+        _push_main_with_rebase(project, env, log_path)
     _ensure_private_github_repo(full_repo, project, env)
     receipt["stages"]["github"] = {
         "status": "complete",
