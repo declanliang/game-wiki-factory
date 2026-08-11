@@ -643,10 +643,27 @@ def _resume_quota_circuit(db: sqlite3.Connection, provider: str) -> int:
     ).rowcount
 
 
+def _job_needs_quota_provider(row: sqlite3.Row, provider: str | None) -> bool:
+    """Return whether retrying this job still depends on an open provider circuit."""
+    if not provider:
+        return False
+    task_type = str(row["task_type"] if "task_type" in row.keys() else "").strip()
+    if task_type == "localeRelease":
+        return False
+    stage = str(row["current_stage"] if "current_stage" in row.keys() else "").strip()
+    if stage in {"publish", "complete"}:
+        return False
+    return True
+
+
 def retry_job(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     """Retry one job and, when applicable, release its provider circuit."""
     provider = row["quota_provider"]
-    resumed = _resume_quota_circuit(db, provider) if provider else 0
+    if provider and not _job_needs_quota_provider(row, provider):
+        resumed = 0
+        provider = None
+    else:
+        resumed = _resume_quota_circuit(db, provider) if provider else 0
     remaining_circuit = db.execute(
         """SELECT provider FROM quota_circuits
            WHERE status='open' ORDER BY opened_at LIMIT 1"""
@@ -654,12 +671,13 @@ def retry_job(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
     next_provider = remaining_circuit["provider"] if remaining_circuit else None
     # A maintainer-triggered retry has already paid the diagnosis/repair cost.
     # Put it ahead of untouched batch jobs so the fix is validated promptly.
-    status = "quota_wait" if next_provider else "retry_wait"
+    status = "quota_wait" if _job_needs_quota_provider(row, next_provider) else "retry_wait"
+    quota_provider = next_provider if status == "quota_wait" else None
     db.execute(
         """UPDATE jobs SET status=?,available_at=?,cancel_requested=0,
                   last_error=NULL,finished_at=NULL,result_json=NULL,
                   quota_provider=?,updated_at=? WHERE id=?""",
-        (status, _now(), next_provider, _now(), row["id"]),
+        (status, _now(), quota_provider, _now(), row["id"]),
     )
     _event(
         db,

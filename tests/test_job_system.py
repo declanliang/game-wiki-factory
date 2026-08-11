@@ -208,6 +208,44 @@ class JobSystemTests(unittest.TestCase):
                 "quota_provider": "dataforseo",
             })
 
+    def test_publish_retry_bypasses_unrelated_llm_quota_circuit(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ, {"GAMEWIKI_DATA_DIR": temporary}
+        ):
+            config = Path(temporary) / "game.json"
+            config.write_text(json.dumps({"game": "Circuit Source"}), encoding="utf-8")
+            source = submit(config)
+            config.write_text(json.dumps({"game": "Ready To Publish"}), encoding="utf-8")
+            publish_job = submit(config)
+            provider = identify_quota_provider("LLM API: all_channels_circuit_broken")
+            with connect() as db:
+                db.execute("UPDATE jobs SET status='running' WHERE id=?", (source,))
+                _open_quota_circuit(db, source, provider)
+                db.execute(
+                    "UPDATE jobs SET status='quota_wait',current_stage='publish',quota_provider=? WHERE id=?",
+                    (provider["id"], publish_job),
+                )
+                result = retry_job(
+                    db,
+                    db.execute("SELECT * FROM jobs WHERE id=?", (publish_job,)).fetchone(),
+                )
+                publish = db.execute(
+                    "SELECT status,quota_provider FROM jobs WHERE id=?", (publish_job,)
+                ).fetchone()
+                circuit = db.execute(
+                    "SELECT status FROM quota_circuits WHERE provider=?", (provider["id"],)
+                ).fetchone()
+                source_row = db.execute(
+                    "SELECT status,quota_provider FROM jobs WHERE id=?", (source,)
+                ).fetchone()
+            self.assertEqual(result["status"], "retry_wait")
+            self.assertEqual(dict(publish), {"status": "retry_wait", "quota_provider": None})
+            self.assertEqual(circuit["status"], "open")
+            self.assertEqual(dict(source_row), {
+                "status": "running",
+                "quota_provider": None,
+            })
+
     def test_checkpoint_safe_content_failures_allow_bounded_extra_retries(self) -> None:
         self.assertTrue(checkpoint_safe_content_retry(
             "Translation failed; existing valid locale checkpoints were preserved."
