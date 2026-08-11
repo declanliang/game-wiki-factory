@@ -36,16 +36,53 @@ unique answer. Ask for approval once; do not start implementation implicitly.
 
 ## 5. Implement an approved plan
 
-Preserve URLs. Improve the first-screen answer, title/description, headings,
-internal links, and official imagery only where they serve the approved intent.
-Create a new page only when an existing page cannot satisfy the distinct
-decision without becoming unfocused.
+For approved English article creation, convert each accepted opportunity into a
+Factory `siteGrowthContent` proposal. Do not edit the repository directly.
+
+```json
+{
+  "schemaVersion": 1,
+  "taskType": "siteGrowthContent",
+  "slug": "existing-site-slug",
+  "siteUrl": "https://existing-site.example",
+  "githubRepo": "declanliang/existing-site-slug",
+  "source": "agent-ff5e1a69:gsc",
+  "publish": true,
+  "proposals": [
+    {
+      "action": "create_article",
+      "keyword": "Existing Site specific guide",
+      "targetCategory": "guide",
+      "intent": "The concrete player question this page answers.",
+      "reason": "GSC-backed opportunity summary.",
+      "evidence": {"impressions28d": 100, "avgPosition28d": 12.5}
+    }
+  ]
+}
+```
+
+Submit it to the background queue:
+
+```bash
+/usr/local/bin/gamewiki jobs submit --config /path/to/growth.json
+```
+
+The current executable Growth job is intentionally narrow: English only, at
+most five new-article proposals per run, and every `targetCategory` must already
+be a published category in `intake/site-plan.json`. If the opportunity needs a
+new navigation category, locale, rewrite, redirect, ad change, or domain work,
+stop and produce a separate proposal instead of forcing it into this task.
 
 ## 6. Verify and measure
 
-Run local checks and production build, commit intentionally, push `main`, then
-redeploy the existing Cloudflare Workers Static Assets Worker with Wrangler and
-verify live output.
+Watch the submitted Job ID. The Factory Worker runs SEO Scout, connects the MDX
+article, refreshes Latest Articles/homepage links, commits/pushes the Private
+repo, deploys the existing Cloudflare Workers Static Assets Worker, and verifies
+live output.
+
+Only report success after the job is `succeeded` and its result contains changed
+URLs plus online verification. If the job fails because evidence is too thin or
+QA rejects the article, do not invent filler; report the rejected opportunity.
 Choose a follow-up date at least 14 days later; compare like-for-like GSC
 windows and do not declare success from same-day rank movement.
 

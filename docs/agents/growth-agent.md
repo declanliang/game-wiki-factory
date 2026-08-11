@@ -4,9 +4,9 @@
 `agent-ff5e1a69`（游戏管理员）承担，不再维护独立 `game-wiki-growth` Agent：
 
 - `game-wiki-operator`：输入游戏信息，创建新站并交付 Cloudflare Workers Static Assets。
-- `agent-ff5e1a69` 的 Growth 专项：读取 GSC 数据，给一个已上线站点制定关键词/页面优化方案；用户批准后才修改该游戏自己的 Private repo。
+- `agent-ff5e1a69` 的 Growth 专项：读取 GSC 数据，给一个已上线站点制定关键词/页面优化方案；用户批准或命中预先允许的高置信规则后，提交 Factory 后台 `siteGrowthContent` 任务，由 Worker 实际生成文章、push Private repo 并部署。
 
-它不修改 Factory、不接触广告、不修改 Cloudflare 环境变量或域名。
+它不修改 Factory、不接触广告、不修改 Cloudflare 环境变量或域名，也不直接 push 游戏仓库。最终写文件、GitHub push 和 Cloudflare Workers Static Assets 发布仍由 Factory Worker 执行，避免多个 Agent 对同一站点并发写入。
 
 Factory 新站默认只生成并发布英语。西班牙语、德语、法语、日语等后续语言由 Growth Agent 根据 GSC/GSA 的“查询语言 + 国家 + 当前排名页面”共同判断；国家流量本身不构成翻译依据。用户批准后，它只扩展现有 Private repo，不重建站点、repo、Worker 或域名。
 
@@ -41,7 +41,7 @@ openclaw agent --local --agent agent-ff5e1a69 \
 1. 线上域名；
 2. 对应 Private GitHub repo 或本地 checkout；
 3. GSC 的 7 天、28 天导出，最好再加 90 天；
-4. 本轮只读分析，还是已经批准某个 `growth-plan.json`。
+4. 本轮只读分析，还是已经批准某个 `growth-plan.json` 或其中的机会条目。
 
 推荐首次 Prompt：
 
@@ -55,9 +55,9 @@ openclaw agent --local --agent agent-ff5e1a69 \
 批准后：
 
 ```text
-我批准 growth-plan 中的 [条目 ID]。只修改这个游戏 repo，保留现有 URL；
-如果必须改 URL，要同时提供永久重定向。完成构建和 SEO 验收后再 push main，
-并报告 commit、变更 URL、线上验证和 14 天后的复盘日期。
+我批准 growth-plan 中的 [条目 ID]。请转换为 Factory `siteGrowthContent`
+任务并提交后台队列。不要直接修改 repo、不要直接 push、不要直接部署。
+提交后报告 Job ID；完成后报告新增 URL、Private repo commit、Worker 线上验证和 14 天后的复盘日期。
 ```
 
 ## Growth plan 最小字段
@@ -83,3 +83,78 @@ openclaw agent --local --agent agent-ff5e1a69 \
 ```
 
 Growth Agent 可以提出页面扩展，但不能绕过事实证据、风险过滤和人工批准。
+
+## 可执行任务：siteGrowthContent
+
+`siteGrowthContent` 是 Agent3 真正“产生文章”的稳定接口。它只面向已经存在的站点 workspace，不创建新站、不重建 Basic Info、不重跑 Guide Search，不做翻译。当前版本只支持英文新增文章。
+
+提交示例：
+
+```json
+{
+  "schemaVersion": 1,
+  "taskType": "siteGrowthContent",
+  "slug": "my-game",
+  "siteUrl": "https://my-game.example",
+  "githubRepo": "declanliang/my-game",
+  "source": "agent-ff5e1a69:gsc",
+  "publish": true,
+  "proposals": [
+    {
+      "action": "create_article",
+      "keyword": "My Game late game guide",
+      "targetCategory": "guide",
+      "intent": "What should a player do first after reaching late game?",
+      "reason": "GSC shows impressions for this query family but no dedicated page.",
+      "evidence": {
+        "clicks28d": 12,
+        "impressions28d": 640,
+        "avgPosition28d": 11.8,
+        "confidence": "high",
+        "urls": ["https://official.example/guide"]
+      }
+    }
+  ]
+}
+```
+
+提交命令：
+
+```bash
+/usr/local/bin/gamewiki jobs submit --config /path/to/growth.json
+```
+
+字段规则：
+
+- `slug`：必填，必须对应已有站点 workspace，例如 `/srv/game-wiki-factory/workspaces/<slug>`。
+- `siteUrl`：建议填写正式域名；发布器会用它设置/验证 canonical origin。
+- `githubRepo`：可选但建议填写，格式 `owner/repo`；不填时发布器使用现有 origin。
+- `publish`：默认 `true`。设为 `false` 时只生成和本地构建，不 push/部署。
+- `proposals`：每次最多 5 条，避免一次 Growth 任务成本失控。
+- `action`：当前只能是 `create_article`。
+- `targetCategory`：必须是该站 `intake/site-plan.json` 中已经 `published` 的分类；Agent3 不得在这个任务里新增导航分类。
+- `keyword`：一个真实搜索意图对应一个页面，可以包含自然变体，但不能把多个不相干需求塞进同一页。
+
+任务执行后会：
+
+1. 生成 `.gamewiki/growth/<timestamp>/growth-seo-keywords.json`；
+2. 调用 SEO Scout 搜索、收集、英文文章生成和 QA；
+3. 只接入通过 QA 的 `en/<category>/<slug>.mdx`；
+4. 更新 `intake/site-plan.json` 的关键词/主题记录；
+5. 运行模板 `launch:site`，刷新首页 `Latest Articles`/精选文章；
+6. 如果 `publish=true`，走 Factory 发布器 push Private GitHub 并部署 Cloudflare Workers Static Assets；
+7. 把非敏感结果写入 Job result。
+
+失败处理：
+
+- 如果文章因证据不足或 QA 删除，Job 会失败并保留 checkpoint；不要改成不相关内容硬补。
+- 如果是 ToAPIs/DataForSEO/Serper/Jina/LLM 瞬时错误，Worker/Supervisor/Agent2 按现有规则续跑。
+- 如果目标 workspace 不存在、分类未发布、GitHub/Cloudflare 权限或域名问题失败，升级给维护者或域名 Agent。
+
+## 暂不支持
+
+- 西班牙语或其他语言扩展；
+- 新增站点分类/导航；
+- 改写已有文章；
+- 批量重做整个站点；
+- 广告变量、Cloudflare 环境变量或域名绑定专项。

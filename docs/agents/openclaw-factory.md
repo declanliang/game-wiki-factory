@@ -143,6 +143,36 @@ OpenClaw cron 建议每2分钟执行一次 `/usr/local/bin/gamewiki notifier --o
 
 在尚未绑定具体聊天渠道前，只部署 outbox，不得假装已经具备主动送达能力。渠道绑定完成后，应做一次“生成测试事件 → 收到消息 → acknowledge → 再次查询为空”的端到端验收。
 
+## Growth Agent 新增英文文章
+
+飞书游戏管理员 `cli_aad59e06a3fa5bee` 的 Growth 专项可以根据 GSC 报告提交
+`taskType: siteGrowthContent`，用于给已经上线的站点新增英文文章。OpenClaw 只负责验证 JSON 和提交后台队列，不在聊天进程运行 SEO Scout，不直接修改游戏 repo，不直接 push 或部署。
+
+```json
+{
+  "schemaVersion": 1,
+  "taskType": "siteGrowthContent",
+  "slug": "existing-site-slug",
+  "siteUrl": "https://existing-site.example",
+  "githubRepo": "declanliang/existing-site-slug",
+  "source": "agent-ff5e1a69:gsc",
+  "publish": true,
+  "proposals": [
+    {
+      "action": "create_article",
+      "keyword": "Existing Site specific guide",
+      "targetCategory": "guide",
+      "intent": "The concrete player question this page answers.",
+      "reason": "GSC-backed opportunity summary.",
+      "evidence": {"impressions28d": 100, "avgPosition28d": 12.5}
+    }
+  ]
+}
+```
+
+当前 Growth 任务只支持英文新增文章，且 `targetCategory` 必须已经在站点
+`intake/site-plan.json` 中发布。西班牙语/小语种、新增导航分类、改写旧文章和广告配置都不属于这个任务类型。
+
 ## 故障处理权限
 
 - **Worker 自动处理**：429、常见 5xx、SSL/网络超时等已分类的瞬时错误；使用有界重试和 checkpoint。

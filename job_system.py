@@ -236,8 +236,11 @@ def defer_notification(notification_id: int, error: str) -> None:
 
 def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     task_type = str(config.get("taskType") or "site").strip().casefold()
+    if task_type == "sitegrowthcontent":
+        from growth_content import normalize_growth_config
+        return normalize_growth_config({**config, "taskType": "siteGrowthContent"})
     if task_type != "site":
-        raise ValueError("config.taskType must be site")
+        raise ValueError("config.taskType must be site or siteGrowthContent")
     allowed = {
         "schemaVersion", "taskType", "operation", "game", "platform", "officialUrl",
         "siteUrl", "publish", "refresh", "manualKeywords",
@@ -273,8 +276,8 @@ def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
 
 
 def _submit_normalized(config: dict[str, Any], source: str, *, max_attempts: int = 4) -> str:
-    display_name = str(config.get("game") or config.get("domain_name") or "task")
-    slug = slugify(display_name)
+    display_name = str(config.get("game") or config.get("slug") or config.get("domain_name") or "task")
+    slug = str(config.get("slug") or slugify(display_name))
     job_id = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}-{slug}-{uuid.uuid4().hex[:6]}"
     now = _now()
     with connect() as db:
@@ -609,7 +612,7 @@ def _open_quota_circuit(
     paused = db.execute(
         """UPDATE jobs SET status='quota_wait',quota_provider=?,updated_at=?
            WHERE status IN ('queued','retry_wait') AND cancel_requested=0 AND id<>?
-             AND COALESCE(json_extract(config_json,'$.taskType'),'site')='site'""",
+             AND COALESCE(json_extract(config_json,'$.taskType'),'site') IN ('site','siteGrowthContent')""",
         (provider["id"], now, job_id),
     ).rowcount
     return is_primary, paused
@@ -696,10 +699,10 @@ def retry_job(db: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
 
 def classify_failure(text: str) -> str:
     lowered = text.casefold()
-    if any(pattern in lowered for pattern in QUOTA_PATTERNS):
-        return "quota_exhausted"
     if checkpoint_safe_content_retry(lowered):
         return "retryable"
+    if any(pattern in lowered for pattern in QUOTA_PATTERNS):
+        return "quota_exhausted"
     if any(pattern in lowered for pattern in TRANSIENT_PATTERNS):
         return "retryable"
     if any(pattern in lowered for pattern in ATTENTION_PATTERNS):
@@ -831,6 +834,18 @@ def _locale_release_command(config_path: Path, result_path: Path) -> list[str]:
     ]
 
 
+def _growth_content_command(config_path: Path, result_path: Path) -> list[str]:
+    return [
+        sys.executable,
+        str(ROOT / "gamewiki.py"),
+        "growth-content",
+        "--config",
+        str(config_path),
+        "--result",
+        str(result_path),
+    ]
+
+
 def _run_process(command: list[str], log, env: dict[str, str], job_id: str) -> int:
     process = subprocess.Popen(
         command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
@@ -880,11 +895,16 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
     )
     env = build_subprocess_env(ROOT)
     stop = threading.Event()
-    heartbeat_slug = job["slug"] if task_type == "site" else "__locale_release__"
+    heartbeat_slug = "__locale_release__" if task_type == "localeRelease" else job["slug"]
     heartbeat = threading.Thread(target=_heartbeat, args=(job_id, heartbeat_slug, worker, stop, lease_seconds), daemon=True)
     heartbeat.start()
     with connect() as db:
-        initial_stage = "pipeline" if task_type == "site" else f"localeRelease:{config.get('locale')}"
+        if task_type == "site":
+            initial_stage = "pipeline"
+        elif task_type == "siteGrowthContent":
+            initial_stage = "growthContent"
+        else:
+            initial_stage = f"localeRelease:{config.get('locale')}"
         db.execute("UPDATE jobs SET log_path=?,current_stage=?,updated_at=? WHERE id=?", (str(log_path), initial_stage, _now(), job_id))
         db.execute(
             "INSERT INTO attempts(job_id,number,worker,status,started_at,log_path) VALUES(?,?,?,?,?,?)",
@@ -899,6 +919,13 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
             if task_type == "localeRelease":
                 code = _run_process(
                     _locale_release_command(config_path, result_path),
+                    log,
+                    env,
+                    job_id,
+                )
+            elif task_type == "siteGrowthContent":
+                code = _run_process(
+                    _growth_content_command(config_path, result_path),
                     log,
                     env,
                     job_id,
@@ -919,7 +946,7 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                 try:
                     completion_result = (
                         read_json(result_path)
-                        if task_type == "localeRelease"
+                        if task_type in {"localeRelease", "siteGrowthContent"}
                         else _completion_result(config, job["slug"])
                     )
                 except (OSError, ValueError, KeyError) as exc:
@@ -929,7 +956,7 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                 try:
                     pruned = (
                         _prune_success_build_artifacts(config, job["slug"])
-                        if task_type == "site"
+                        if task_type in {"site", "siteGrowthContent"}
                         else []
                     )
                     if pruned:
@@ -996,7 +1023,7 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                WHERE job_id=? AND number=?""",
             (status, _now(), code, error_class, job_id, attempt),
         )
-        if code == 0 and completion_result is not None:
+        if code == 0 and completion_result is not None and task_type == "site":
             _schedule_next_locale_release(db, job, config, completion_result)
         final_locale_release = (
             task_type == "localeRelease"
@@ -1013,7 +1040,7 @@ def execute(job: sqlite3.Row, worker: str, lease_seconds: int = 90) -> None:
                 status in {"failed", "needs_attention", "cancelled"}
                 or (
                     status == "succeeded"
-                    and (task_type == "site" or final_locale_release)
+                    and (task_type in {"site", "siteGrowthContent"} or final_locale_release)
                 )
             )
             and (error_class != "quota_exhausted" or quota_primary),

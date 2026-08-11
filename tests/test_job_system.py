@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_system import _completion_result, _event, _execution_config, _new_workspace_conflict, _open_quota_circuit, _prune_success_build_artifacts, _publish_command, _resume_quota_circuit, _schedule_next_locale_release, acknowledge_notifications, checkpoint_safe_content_retry, classify_failure, claim, connect, identify_quota_provider, normalize_config, pending_notifications, retry_job, submit, submit_batch
+from job_system import _completion_result, _event, _execution_config, _growth_content_command, _new_workspace_conflict, _open_quota_circuit, _prune_success_build_artifacts, _publish_command, _resume_quota_circuit, _schedule_next_locale_release, acknowledge_notifications, checkpoint_safe_content_retry, classify_failure, claim, connect, identify_quota_provider, normalize_config, pending_notifications, retry_job, submit, submit_batch
 
 
 class JobSystemTests(unittest.TestCase):
@@ -52,6 +52,11 @@ class JobSystemTests(unittest.TestCase):
         config["publication"]["skipCloudflare"] = True
         self.assertIn("--skip-cloudflare", _publish_command(config, "manual-pages"))
 
+    def test_growth_content_command_writes_result(self) -> None:
+        command = _growth_content_command(Path("config.json"), Path("result.json"))
+        self.assertEqual(command[1:4], [str(Path(__file__).resolve().parents[1] / "gamewiki.py"), "growth-content", "--config"])
+        self.assertEqual(command[-2:], ["--result", "result.json"])
+
     def test_new_job_does_not_force_paid_refresh(self) -> None:
         config = normalize_config({"game": "Test Game", "platform": "roblox"})
         self.assertEqual(_execution_config(config, 1)["refresh"], {"basicInfo": False, "keywords": False, "articles": False})
@@ -77,8 +82,22 @@ class JobSystemTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "legacy rebuild jobs are no longer accepted"):
             normalize_config({"game": "Old Site", "operation": "rebuild"})
 
-    def test_background_jobs_only_accept_site_tasks(self) -> None:
-        with self.assertRaisesRegex(ValueError, "taskType must be site"):
+    def test_background_jobs_accept_growth_content_tasks(self) -> None:
+        config = normalize_config({
+            "taskType": "siteGrowthContent",
+            "slug": "my-game",
+            "siteUrl": "https://my-game.example",
+            "proposals": [
+                {"keyword": "My Game secret ending guide", "targetCategory": "guide"}
+            ],
+        })
+        self.assertEqual(config["taskType"], "siteGrowthContent")
+        self.assertEqual(config["slug"], "my-game")
+        self.assertEqual(config["siteUrl"], "https://my-game.example")
+        self.assertEqual(config["proposals"][0]["targetCategory"], "guide")
+
+    def test_background_jobs_reject_unknown_tasks(self) -> None:
+        with self.assertRaisesRegex(ValueError, "taskType must be site or siteGrowthContent"):
             normalize_config({"taskType": "ads", "game": "Ads Game"})
 
     def test_manual_keywords_are_normalized_and_preserved_on_retry(self) -> None:
@@ -122,14 +141,14 @@ class JobSystemTests(unittest.TestCase):
                 "Article generation failed for 5 item(s); "
                 "Re-run without --overwrite to retry only the missing articles."
             ),
-            "quota_exhausted",
+            "retryable",
         )
         self.assertEqual(
             classify_failure(
                 "API 503: all_channels_circuit_broken. "
                 "Re-run without --overwrite to retry only the missing articles."
             ),
-            "quota_exhausted",
+            "retryable",
         )
         self.assertEqual(classify_failure("Two Roblox candidates are too close to select safely"), "needs_attention")
         self.assertEqual(classify_failure("unknown build problem"), "needs_attention")
@@ -185,6 +204,32 @@ class JobSystemTests(unittest.TestCase):
             self.assertEqual(resumed, 2)
             self.assertEqual(resumed_statuses[primary], "queued")
             self.assertEqual(resumed_statuses[waiting], "queued")
+
+    def test_quota_circuit_pauses_growth_content_jobs_too(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ, {"GAMEWIKI_DATA_DIR": temporary}
+        ):
+            site_config = Path(temporary) / "site.json"
+            site_config.write_text(json.dumps({"game": "Quota Primary"}), encoding="utf-8")
+            primary = submit(site_config)
+            growth_config = Path(temporary) / "growth.json"
+            growth_config.write_text(json.dumps({
+                "taskType": "siteGrowthContent",
+                "slug": "existing-site",
+                "proposals": [
+                    {"keyword": "Existing Site secret ending guide", "targetCategory": "guide"}
+                ],
+            }), encoding="utf-8")
+            growth = submit(growth_config)
+            provider = identify_quota_provider("LLM API insufficient quota")
+            with connect() as db:
+                db.execute("UPDATE jobs SET status='running' WHERE id=?", (primary,))
+                _open_quota_circuit(db, primary, provider)
+                row = db.execute(
+                    "SELECT status,quota_provider FROM jobs WHERE id=?",
+                    (growth,),
+                ).fetchone()
+            self.assertEqual(dict(row), {"status": "quota_wait", "quota_provider": "llm"})
 
     def test_new_submission_waits_behind_open_quota_circuit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
