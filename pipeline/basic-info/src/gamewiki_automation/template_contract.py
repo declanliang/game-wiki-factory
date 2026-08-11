@@ -107,6 +107,7 @@ def build_site_content(facts: dict[str, Any], homepage: dict[str, Any]) -> dict[
             site["price"] = "Free" if price == 0 else f"{price:g} Robux"
             site["priceCurrency"] = ""
 
+    hero_stats = _hero_stats(facts, genres, updated_label)
     content: dict[str, Any] = {
         "site": site,
         "home": {
@@ -117,16 +118,12 @@ def build_site_content(facts: dict[str, Any], homepage: dict[str, Any]) -> dict[
             "hero": {
                 "eyebrow": home.get("hero", {}).get("eyebrow", ""),
                 "description": home.get("hero", {}).get("description", ""),
-                "stats": _hero_stats(facts, genres, updated_label),
+                "stats": hero_stats,
             },
             "aboutGame": {
                 "title": home.get("aboutGame", {}).get("title") or f"What is {name}?",
                 "paragraphs": about_paragraphs,
-                "stats": [item for item in [
-                    {"label": "Developer", "value": developer} if developer else None,
-                    {"label": "Platform", "value": platform},
-                    {"label": "Genre", "value": " / ".join(genres)} if genres else None,
-                ] if item],
+                "stats": _about_game_stats(developer, platform, genres, hero_stats),
             },
             "guideSections": list(home.get("guideSections") or []),
             "faq": {
@@ -563,6 +560,30 @@ def _hero_stats(facts: dict[str, Any], genres: list[str], updated_label: str) ->
         {"value": compact_number(dynamic.get("favorites")), "label": "Favorites"} if dynamic.get("favorites") else None,
     ]
     return [item for item in candidates if item][:4]
+
+
+def _about_game_stats(
+    developer: str,
+    platform: str,
+    genres: list[str],
+    hero_stats: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    hero_numbers = {_number_signature(item.get("value", "")) for item in hero_stats}
+    hero_numbers.discard("")
+    candidates = [
+        {"label": "Developer", "value": developer} if developer else None,
+        {"label": "Platform", "value": platform},
+        {"label": "Genre", "value": " / ".join(genres)} if genres else None,
+    ]
+    stats: list[dict[str, str]] = []
+    for item in candidates:
+        if not item:
+            continue
+        signature = _number_signature(item.get("value", ""))
+        if signature and signature in hero_numbers:
+            continue
+        stats.append(item)
+    return stats
 
 
 def _faq_items(facts: dict[str, Any], paragraphs: list[str], genres: list[str]) -> list[dict[str, str]]:

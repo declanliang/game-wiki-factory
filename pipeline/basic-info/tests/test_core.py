@@ -193,6 +193,30 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(content["home"]["aboutGame"]["paragraphs"], ["Gakuran is a Roblox game."])
         self.assertEqual(content["site"]["developer"], "(学乱) Gakuran")
 
+    def test_about_stats_drop_numeric_duplicate_from_hero_stats(self) -> None:
+        facts = {
+            "identity": {"canonicalName": "BreakDoor", "platform": "Roblox"},
+            "developer": {"name": "GhostTribe"},
+            "game": {
+                "genres": ["Survival", "1 vs All"],
+                "updatedAt": "2026-08-01T00:00:00Z",
+                "maxPlayers": 80,
+            },
+            "dynamicStats": {"visits": 33200000},
+        }
+        content = build_site_content(facts, {"metadata": {}, "home": {}})
+
+        hero_values = [item["value"] for item in content["home"]["hero"]["stats"]]
+        about_labels = [item["label"] for item in content["home"]["aboutGame"]["stats"]]
+        self.assertIn("1 vs All", hero_values)
+        self.assertNotIn("Genre", about_labels)
+        report = validate_template_contract(
+            build_site_identity(facts),
+            content,
+            facts,
+        )
+        self.assertNotIn("TEMPLATE_DUPLICATE_STAT", {error["code"] for error in report["errors"]})
+
     def test_research_merge_preserves_rejected_identity_candidates(self):
         pipeline = Pipeline.__new__(Pipeline)
         pipeline.http = FakeHttp()
