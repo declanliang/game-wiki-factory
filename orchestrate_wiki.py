@@ -296,14 +296,16 @@ def validate_basic_output(path: Path) -> tuple[Path, dict, list[str]]:
     normalized_languages = [item.strip() for item in languages if isinstance(item, str) and item.strip()]
     if len(normalized_languages) != len(languages) or len(set(normalized_languages)) != len(normalized_languages):
         raise PipelineError("LANGUAGES must contain unique, non-empty language codes.")
-    if normalized_languages != FIXED_LANGUAGES:
+    missing_required = [locale for locale in FIXED_LANGUAGES if locale not in normalized_languages]
+    if missing_required:
         raise PipelineError(
-            f"LANGUAGES must match the fixed product policy {FIXED_LANGUAGES}; "
+            f"LANGUAGES must include the fixed product policy {FIXED_LANGUAGES}; "
             f"found {normalized_languages}."
         )
+    active_languages = [locale for locale in normalized_languages if locale in FIXED_LANGUAGES]
 
     required = {"site-identity.json", "site-content.json"}
-    required.update(f"site-content.{locale}.json" for locale in normalized_languages if locale != "en")
+    required.update(f"site-content.{locale}.json" for locale in active_languages if locale != "en")
     missing = sorted(name for name in required if not (intake / name).is_file())
     heroes = [item for item in intake.glob("hero.*") if item.is_file()]
     if len(heroes) != 1:
@@ -322,7 +324,8 @@ def validate_basic_output(path: Path) -> tuple[Path, dict, list[str]]:
         report = read_json(report_path)
         if report.get("status") != "pass":
             raise PipelineError(f"Template contract did not pass: {report_path}")
-    return intake, identity, normalized_languages
+    identity = {**identity, "LANGUAGES": active_languages}
+    return intake, identity, active_languages
 
 
 def build_trusted_keyword_context(intake: Path, identity: dict) -> dict:
@@ -649,6 +652,21 @@ def copy_directory_contents(source: Path, destination: Path) -> None:
             shutil.copytree(item, target, dirs_exist_ok=True)
         else:
             shutil.copy2(item, target)
+
+
+def prune_intake_to_languages(intake_dir: Path, languages: list[str]) -> None:
+    """Keep the deployable intake aligned to the currently active language policy."""
+    identity_path = intake_dir / "site-identity.json"
+    identity = read_json(identity_path)
+    identity["LANGUAGES"] = list(languages)
+    write_json(identity_path, identity)
+
+    allowed_locale_files = {f"site-content.{locale}.json" for locale in languages if locale != "en"}
+    for content_path in sorted(intake_dir.glob("site-content.*.json")):
+        if content_path.name == "site-content.json":
+            continue
+        if content_path.name not in allowed_locale_files:
+            content_path.unlink()
 
 
 def replace_directory(source: Path, destination: Path) -> None:
@@ -1046,6 +1064,7 @@ def main(argv: list[str] | None = None) -> int:
         if intake_dir.exists():
             shutil.rmtree(intake_dir)
         copy_directory_contents(basic_intake, intake_dir)
+        prune_intake_to_languages(intake_dir, languages)
         article_counts = project_articles_for_site_plan(
             articles_dir,
             intake_dir / "articles",

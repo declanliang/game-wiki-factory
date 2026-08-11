@@ -290,11 +290,11 @@ class OrchestratorTests(unittest.TestCase):
             intake = output / "template-intake"
             favicon = intake / "favicon"
             favicon.mkdir(parents=True)
-            languages = ["en"]
-            identity = {"GAME_NAME": "Test Game", "LANGUAGES": languages}
+            legacy_languages = ["en", "es"]
+            identity = {"GAME_NAME": "Test Game", "LANGUAGES": legacy_languages}
             (intake / "site-identity.json").write_text(json.dumps(identity), encoding="utf-8")
             (intake / "site-content.json").write_text("{}", encoding="utf-8")
-            for locale in languages[1:]:
+            for locale in legacy_languages[1:]:
                 (intake / f"site-content.{locale}.json").write_text("{}", encoding="utf-8")
             (intake / "hero.png").write_bytes(b"png")
             for name in orchestrator.FAVICON_FILES:
@@ -310,8 +310,27 @@ class OrchestratorTests(unittest.TestCase):
             actual_intake, actual_identity, languages = orchestrator.validate_basic_output(output)
 
         self.assertEqual(actual_intake, intake)
-        self.assertEqual(actual_identity, identity)
+        self.assertEqual(actual_identity, {"GAME_NAME": "Test Game", "LANGUAGES": ["en"]})
         self.assertEqual(languages, ["en"])
+
+    def test_deployable_intake_prunes_inactive_language_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            intake = Path(temporary)
+            (intake / "site-identity.json").write_text(
+                json.dumps({"GAME_NAME": "Test Game", "LANGUAGES": ["en", "es"]}),
+                encoding="utf-8",
+            )
+            (intake / "site-content.json").write_text("{}", encoding="utf-8")
+            (intake / "site-content.es.json").write_text("{}", encoding="utf-8")
+            (intake / "site-content.fr.json").write_text("{}", encoding="utf-8")
+
+            orchestrator.prune_intake_to_languages(intake, ["en"])
+
+            identity = json.loads((intake / "site-identity.json").read_text(encoding="utf-8"))
+            self.assertEqual(identity["LANGUAGES"], ["en"])
+            self.assertTrue((intake / "site-content.json").is_file())
+            self.assertFalse((intake / "site-content.es.json").exists())
+            self.assertFalse((intake / "site-content.fr.json").exists())
 
     def test_homepage_guide_links_only_use_published_site_plan_categories(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
