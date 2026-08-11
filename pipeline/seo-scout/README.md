@@ -689,7 +689,7 @@ LLM_API_KEY_1=your_llm_api_key_here
 
 ### 生成的文章体积异常大，或表格里有大段空白/重复内容
 
-这是小/快模型（如 `gemini-2.0-flash-official`）在生成长表格时偶尔出现的"重复陷阱"退化输出——不是 seoscout 的 bug，`generate.py`/`translate.py` 都没有任何表格对齐/填充的后处理逻辑。`validate_markdown()` 已经内置了检测（单文件超过 50,000 字符、`export const metadata` 出现次数不为 1、或存在异常长的连续空白/重复片段，都会判定为无效并触发自动重新生成）。如果仍然偶尔出现：
+这是小/快模型（如 `gemini-2.5-flash-official`）在生成长表格时偶尔出现的"重复陷阱"退化输出——不是 seoscout 的 bug，`generate.py`/`translate.py` 都没有任何表格对齐/填充的后处理逻辑。`validate_markdown()` 已经内置了检测（单文件超过 50,000 字符、`export const metadata` 出现次数不为 1、或存在异常长的连续空白/重复片段，都会判定为无效并触发自动重新生成）。如果仍然偶尔出现：
 - 确认 `config.json` 的 `llm.frequency_penalty`/`llm.presence_penalty`（默认 `0.3`）已生效，可以适当调高（如 `0.5`）进一步降低复读概率
 - 确认所用的 LLM 网关支持 `frequency_penalty`/`presence_penalty` 这两个字段——少数 OpenAI 兼容代理会拒绝未知字段导致请求报错，如遇到可以把这两个值改回 `0` 关闭
 
