@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 from datetime import datetime, timezone
+from pathlib import Path
 
 from publication_plan import (
     build_publication_plan,
@@ -43,3 +44,14 @@ class PublicationPlanTests(unittest.TestCase):
         plan["releasePolicy"]["localeOrder"] = ["en", "es"]
         plan["releasePolicy"]["intervalDays"] = 3
         validate_publication_plan(plan)
+
+    def test_template_intake_check_accepts_english_only_policy(self) -> None:
+        script = (
+            Path(__file__).resolve().parents[1]
+            / "template"
+            / "scripts"
+            / "check-intake.mjs"
+        ).read_text(encoding="utf-8")
+        self.assertIn('generated.length === 1 ? "english-only" : "sequential"', script)
+        self.assertIn("generated.length === 1 ? 0 : 3", script)
+        self.assertNotIn("必须是每 3 个自然日、Asia/Shanghai、顺序发布", script)

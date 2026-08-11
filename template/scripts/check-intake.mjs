@@ -94,13 +94,15 @@ if (!fs.existsSync(publicationPlanPath)) {
     ) {
       fail(`publication-plan.publishedLocales 必须按 ${generated.join(" → ")} 顺序逐步增加`);
     }
+    const expectedMode = generated.length === 1 ? "english-only" : "sequential";
+    const expectedIntervalDays = generated.length === 1 ? 0 : 3;
     if (
-      policy.mode !== "sequential"
+      policy.mode !== expectedMode
       || JSON.stringify(policy.localeOrder) !== JSON.stringify(generated)
-      || policy.intervalDays !== 3
+      || policy.intervalDays !== expectedIntervalDays
       || policy.timezone !== "Asia/Shanghai"
     ) {
-      fail("publication-plan.releasePolicy 必须是每 3 个自然日、Asia/Shanghai、顺序发布");
+      fail("publication-plan.releasePolicy 不符合当前语言发布契约");
     } else {
       ok(`公开语言：${published.join(", ")}；其余已生成语言暂不进入公开路由`);
     }
