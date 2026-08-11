@@ -433,8 +433,8 @@ async function DetailPage({
       <JsonLd data={breadcrumbData} />
       {faqPageData && <JsonLd data={faqPageData} />}
       {videoData && <JsonLd data={videoData} />}
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,760px)_280px] lg:justify-center 2xl:grid-cols-[160px_minmax(0,760px)_280px]">
       <DesktopArticleRailAds />
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,760px)_280px] lg:justify-center">
       <article className="min-w-0">
         <Breadcrumbs
           items={[

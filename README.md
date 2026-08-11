@@ -4,7 +4,7 @@
 
 第一次接手先读 [文档导航](docs/README.md) 和 [接手手册](docs/HANDOFF.md)。
 
-固定语言为英语、西班牙语、德语、法语和日语。生成的网站位于 factory 同级目录，例如 `Games/hellhole/`。
+模板保留英语、西班牙语、德语、法语和日语能力；Factory 新站默认只生成并发布英语。生成的网站位于 factory 同级目录，例如 `Games/hellhole/`。
 
 ## 首次安装
 

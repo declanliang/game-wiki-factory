@@ -17,8 +17,9 @@ from typing import Any
 
 SCHEMA_VERSION = 2
 # Default production policy. The template can still support additional locales,
-# but new Factory jobs pay for and declare only English and Spanish.
-FIXED_LANGUAGES = ["en", "es"]
+# but new Factory jobs pay for and declare only English. Spanish and other
+# locales are post-launch Growth projects backed by measured demand.
+FIXED_LANGUAGES = ["en"]
 MINIMUM_CATEGORIES = 1
 MAXIMUM_CATEGORIES = 8
 MAXIMUM_PROFILE_CANDIDATES = 16

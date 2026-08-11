@@ -1,8 +1,7 @@
-"""Shared contract for staged locale publication.
+"""Shared contract for locale publication.
 
-English and Spanish are generated and quality-checked together. Only English is
-initially public; Spanish is released three natural days later by a persistent
-background job. Other template-supported locales are explicit Growth projects.
+New Factory sites generate and publish English only. Additional locales are
+explicit post-launch Growth projects and are not scheduled by the core worker.
 """
 
 from __future__ import annotations
@@ -11,22 +10,23 @@ from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 
-GENERATED_LOCALES = ("en", "es")
-LOCALE_RELEASE_ORDER = ("en", "es")
+GENERATED_LOCALES = ("en",)
+LOCALE_RELEASE_ORDER = ("en",)
+SUPPORTED_LOCALES = ("en", "es", "de", "fr", "ja")
 PUBLICATION_TIMEZONE = "Asia/Shanghai"
-PUBLICATION_INTERVAL_DAYS = 3
+PUBLICATION_INTERVAL_DAYS = 0
 PUBLICATION_HOUR = 10
 
 
 def build_publication_plan(created_at: datetime | None = None) -> dict:
-    """Return the v1_0728 generation/publication split for a new site."""
+    """Return the current generation/publication split for a new site."""
     instant = (created_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
     return {
         "schemaVersion": 1,
         "generatedLocales": list(GENERATED_LOCALES),
         "publishedLocales": ["en"],
         "releasePolicy": {
-            "mode": "sequential",
+            "mode": "english-only",
             "localeOrder": list(LOCALE_RELEASE_ORDER),
             "intervalDays": PUBLICATION_INTERVAL_DAYS,
             "timezone": PUBLICATION_TIMEZONE,
@@ -72,28 +72,43 @@ def next_locale(published_locales: list[str]) -> str | None:
     )
 
 
+def next_locale_for_plan(value: dict) -> str | None:
+    generated = value.get("generatedLocales") or []
+    published = set(value.get("publishedLocales") or [])
+    return next((locale for locale in generated if locale not in published), None)
+
+
 def validate_publication_plan(value: dict) -> None:
     if value.get("schemaVersion") != 1:
         raise ValueError("publication-plan schemaVersion must be 1")
-    if value.get("generatedLocales") != list(GENERATED_LOCALES):
-        raise ValueError("publication-plan generatedLocales must keep the fixed generation contract")
+    generated = value.get("generatedLocales")
+    if (
+        not isinstance(generated, list)
+        or not generated
+        or generated[0] != "en"
+        or len(generated) != len(set(generated))
+        or any(locale not in SUPPORTED_LOCALES for locale in generated)
+    ):
+        raise ValueError("publication-plan generatedLocales must be an en-first supported locale subset")
     published = value.get("publishedLocales")
     if not isinstance(published, list) or not published or published[0] != "en":
         raise ValueError("publication-plan publishedLocales must start with en")
     if len(published) != len(set(published)):
         raise ValueError("publication-plan publishedLocales contains duplicates")
-    expected_prefix = list(LOCALE_RELEASE_ORDER[: len(published)])
+    expected_prefix = list(generated[: len(published)])
     if published != expected_prefix:
         raise ValueError(
             "publication-plan publishedLocales must be a prefix of the locale release order"
         )
     policy = value.get("releasePolicy") or {}
-    if policy.get("mode") != "sequential":
-        raise ValueError("publication-plan releasePolicy.mode must be sequential")
-    if policy.get("localeOrder") != list(LOCALE_RELEASE_ORDER):
+    expected_mode = "english-only" if generated == list(GENERATED_LOCALES) else "sequential"
+    expected_interval = 0 if expected_mode == "english-only" else 3
+    if policy.get("mode") != expected_mode:
+        raise ValueError(f"publication-plan releasePolicy.mode must be {expected_mode}")
+    if policy.get("localeOrder") != list(generated):
         raise ValueError("publication-plan localeOrder is invalid")
-    if policy.get("intervalDays") != PUBLICATION_INTERVAL_DAYS:
-        raise ValueError("publication-plan intervalDays must be 3")
+    if policy.get("intervalDays") != expected_interval:
+        raise ValueError(f"publication-plan intervalDays must be {expected_interval}")
     if policy.get("timezone") != PUBLICATION_TIMEZONE:
         raise ValueError("publication-plan timezone must be Asia/Shanghai")
 

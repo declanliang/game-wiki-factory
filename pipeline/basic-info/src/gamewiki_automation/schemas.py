@@ -22,9 +22,9 @@ ISO_639_1_CODES = [
     "ug", "uk", "ur", "uz", "ve", "vi", "vo", "wa", "wo", "xh", "yi", "yo", "za", "zh", "zu",
 ]
 # Product policy, not a per-game research result. New Factory sites generate
-# English and Spanish only. Other template-supported locales are post-launch
-# Growth Agent expansions backed by measured search demand and user approval.
-DEFAULT_LANGUAGE_CODES = ["en", "es"]
+# English only. Other template-supported locales are post-launch Growth
+# expansions backed by measured search demand and user approval.
+DEFAULT_LANGUAGE_CODES = ["en"]
 MONETIZATION_LANGUAGE_CODES = list(DEFAULT_LANGUAGE_CODES)
 
 
@@ -111,7 +111,7 @@ LANGUAGE_MARKET_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
                 "required": ["code", "language", "recommendation", "officialSupport", "confidence", "reason", "signals"],
                 "properties": {
-                    "code": {"type": "string", "enum": MONETIZATION_LANGUAGE_CODES},
+                    "code": {"type": "string", "enum": ["en", "es", "de", "fr", "ja", "ko", "it", "nl"]},
                     "language": {"type": "string", "minLength": 2},
                     "recommendation": {"enum": ["include", "exclude"]},
                     "officialSupport": {"type": "boolean"},

@@ -11,10 +11,19 @@ from locale_publication import _clone_locale_release_workspace, publish_locale_i
 from publication_plan import build_publication_plan
 
 
+def sequential_plan() -> dict:
+    plan = build_publication_plan()
+    plan["generatedLocales"] = ["en", "es"]
+    plan["releasePolicy"]["mode"] = "sequential"
+    plan["releasePolicy"]["localeOrder"] = ["en", "es"]
+    plan["releasePolicy"]["intervalDays"] = 3
+    return plan
+
+
 class LocalePublicationTests(unittest.TestCase):
     @patch("locale_publication._github_request")
     def test_locale_release_updates_only_next_locale(self, request) -> None:
-        plan = build_publication_plan()
+        plan = sequential_plan()
         request.side_effect = [
             {
                 "sha": "blob-sha",
@@ -41,7 +50,7 @@ class LocalePublicationTests(unittest.TestCase):
 
     @patch("locale_publication._github_request")
     def test_locale_release_rejects_skipped_wave(self, request) -> None:
-        plan = build_publication_plan()
+        plan = sequential_plan()
         request.return_value = {
             "sha": "blob-sha",
             "content": base64.b64encode(

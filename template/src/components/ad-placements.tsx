@@ -92,7 +92,7 @@ export function DesktopArticleRailAds() {
       ? "sidebar160x300"
       : null;
   if (!format) return null;
-  return <aside className="fixed left-[calc(50%-632px)] top-[calc(var(--top-ad-height)+88px)] z-10" aria-label="Left advertisement"><AdSlot format={format} eager /></aside>;
+  return <aside className="sticky top-[calc(var(--top-ad-height,0px)+5.5rem)] hidden self-start 2xl:block" aria-label="Left advertisement"><AdSlot format={format} eager /></aside>;
 }
 
 export function ArticleInlineAd({ containerId }: { containerId: string }) {

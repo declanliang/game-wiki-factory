@@ -50,13 +50,19 @@ class AdTemplateContractTests(unittest.TestCase):
         rail = content.split("export function DesktopArticleRailAds()", 1)[1].split(
             "export function ArticleInlineAd", 1
         )[0]
-        self.assertTrue(
-            'left-[calc(50%-632px)]' in rail
-            or 'left: "calc(50% - 632px)"' in rail
-        )
+        self.assertIn("sticky", rail)
+        self.assertIn("2xl:block", rail)
+        self.assertNotIn("fixed", rail)
+        self.assertNotIn("left-[calc", rail)
+        self.assertNotIn('left: "calc', rail)
         self.assertIn('aria-label="Left advertisement"', rail)
         self.assertNotIn("right:", rail)
         self.assertNotIn("Right advertisement", rail)
+
+        article_page = (TEMPLATE / "src/app/[locale]/[...slug]/page.tsx").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("2xl:grid-cols-[160px_minmax(0,760px)_280px]", article_page)
 
     def test_sticky_navigation_reserves_the_top_ad_height(self) -> None:
         content = (TEMPLATE / "src/components/site.tsx").read_text(encoding="utf-8")

@@ -86,7 +86,7 @@ output/<game-slug>/
 └── template-intake/          最终可直接复制的完整交付包
     ├── site-identity.json    7 个规范大写 key（含 LANGUAGES）
     ├── site-content.json     与 identity 同级；顶层仅 site/home
-    ├── site-content.es.json  LANGUAGES 每个非英语代码各一份
+    ├── site-content.<locale>.json  仅显式扩展非英语时存在
     ├── hero.png              唯一一张 Hero（后缀按源图保留）
     └── favicon/              规范要求的 7 个文件
 ```
@@ -119,7 +119,7 @@ ToAPIs Responses API + web_search_preview 联网研究外部官方资源
   ↓（失败时才用 Perplexity）
 事实与证据合并、URL 检查
   ↓
-应用新站固定产品语言策略 en/es（不调用调研 API）
+应用新站固定产品语言策略 en（不调用调研 API）
   ↓
 关闭联网生成首页配置
   ↓
@@ -148,7 +148,7 @@ Schema + 业务规则验证
 - 资料不足时允许 warning、空字段或少于 8 个模块，不为凑数编造内容。
 - Tavily 已从代码、配置和降级链完全移除。
 - 模板 JSON 的执行格式不依赖 LLM 自报正确：程序确定性组包，并对基础及本地化对象使用 `additionalProperties: false` 的严格 Schema。
-- `site-identity.json` 只允许规范中的 7 个大写 key。Factory 新站语言策略固定为 `en/es`；`de/fr/ja` 只由上线后的 Growth Agent 按真实搜索需求扩展。`site-content.json` 顶层只能是 `site/home`。
+- `site-identity.json` 只允许规范中的 7 个大写 key。Factory 新站语言策略固定为 `en`；`es/de/fr/ja` 只由上线后的 Growth Agent 按真实搜索需求扩展。`site-content.json` 顶层只能是 `site/home`。
 - `LANGUAGES` 每声明一个非英语语言，最终包必须包含对应的 `site-content.<locale>.json`。它与英文版必须拥有完全相同的 key、数组长度和顺序；`href`、`*Href`、`category` 以及代码等标识符不得变化。缺文件、结构漂移、数字事实丢失或大段照抄英文都会使模板契约失败。
 - `themeColor/modules/displayType/home.start` 等旧字段，以及 Hero 自动字段，会被强校验直接拒绝。
 - 模板契约失败会把整次运行标记为 `fail`，不能进入自动导入。
@@ -166,7 +166,7 @@ Schema + 业务规则验证
 |游戏|Place ID|结果|备注|
 |---|---:|---|---|
 |Anime Expeditions|84515722934860|warning|结构正确；兑换码只有第三方佐证|
-|Anime Paradox X|76806550943352|warning|`en/es` 本地化模板契约通过|
+|Anime Paradox X|76806550943352|warning|`en` 模板契约通过|
 |PursuitCore|121903154323395|warning|自动发现并排除 Linktree 中旧 Place 84498985865861；本地化模板契约通过|
 
 详细数据见 [验收报告](docs/testing/验收报告.md)。

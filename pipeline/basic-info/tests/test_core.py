@@ -434,7 +434,7 @@ class CoreTests(unittest.TestCase):
             {"code": "vi", "recommendation": "include", "confidence": 0.88, "officialSupport": False, "sourceUrls": ["https://youtube.com/watch?v=one"], "signals": [{"publisher": "Label A"}, {"publisher": "Label B"}]},
             {"code": "ja", "recommendation": "include", "confidence": 0.85, "officialSupport": True, "sourceUrls": ["https://official.example/ja"], "signals": [{"signalType": "official-localization", "publisher": "Game Studio", "sourceUrls": ["https://official.example/ja"]}]},
         ]
-        expected = ["en", "es"]
+        expected = ["en"]
         self.assertEqual(_select_language_codes([]), expected)
         self.assertEqual(_select_language_codes(candidates), expected)
 

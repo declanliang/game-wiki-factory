@@ -52,7 +52,7 @@ class GeneratedOutputTests(unittest.TestCase):
         self.assertNotIn("footer", site_content)
         self.assertEqual(set(site_content), {"site", "home"})
         self.assertEqual(set(site_identity), {"GAME_NAME", "OFFICIAL_GAME_URL", "DISCORD_URL", "YOUTUBE_CHANNEL_URL", "FANDOM_URL", "YOUTUBE_VIDEO_ID", "LANGUAGES"})
-        self.assertEqual(site_identity["LANGUAGES"], ["en", "es"])
+        self.assertEqual(site_identity["LANGUAGES"], ["en"])
         intake = directory / "template-intake"
         self.assertEqual(site_identity, json.loads((intake / "site-identity.json").read_text(encoding="utf-8")))
         self.assertEqual(site_content, json.loads((intake / "site-content.json").read_text(encoding="utf-8")))
@@ -115,7 +115,7 @@ class GeneratedOutputTests(unittest.TestCase):
                 "price": 18.99,
                 "priceCurrency": "USD",
             },
-            "languages": ["en", "es"],
+            "languages": ["en"],
             "categories": ["Action", "Adventure", "Indie", "RPG"],
         }
         homepage = {

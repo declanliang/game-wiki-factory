@@ -286,7 +286,7 @@ class JobSystemTests(unittest.TestCase):
             self.assertEqual(claimed["id"], retry_id)
             self.assertNotEqual(claimed["id"], queued_id)
 
-    def test_successful_site_schedules_only_the_next_locale_wave(self) -> None:
+    def test_successful_english_only_site_does_not_schedule_locale_wave(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
             os.environ, {"GAMEWIKI_DATA_DIR": temporary}
         ):
@@ -317,16 +317,8 @@ class JobSystemTests(unittest.TestCase):
                 rows = db.execute(
                     "SELECT id,status,available_at,config_json FROM jobs ORDER BY id"
                 ).fetchall()
-            self.assertEqual(release_id, f"{job_id}-locale-es")
-            self.assertEqual(len(rows), 2)
-            release = next(row for row in rows if row["id"] == release_id)
-            release_config = json.loads(release["config_json"])
-            self.assertEqual(release["status"], "queued")
-            self.assertEqual(release_config["taskType"], "localeRelease")
-            self.assertEqual(release_config["locale"], "es")
-            self.assertEqual(release_config["githubRepo"], "owner/wave-game")
-            self.assertEqual(release_config["workerName"], "wave-game")
-            self.assertEqual(release_config["workersDevOrigin"], "https://wave-game.account.workers.dev")
+            self.assertIsNone(release_id)
+            self.assertEqual(len(rows), 1)
 
     def test_quota_circuit_does_not_pause_scheduled_locale_releases(self) -> None:
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
@@ -356,10 +348,7 @@ class JobSystemTests(unittest.TestCase):
                 db.execute("UPDATE jobs SET status='running' WHERE id=?", (source_id,))
                 provider = identify_quota_provider("DataForSEO insufficient balance")
                 _open_quota_circuit(db, source_id, provider)
-                release = db.execute(
-                    "SELECT status,quota_provider FROM jobs WHERE id=?", (release_id,)
-                ).fetchone()
-            self.assertEqual(dict(release), {"status": "queued", "quota_provider": None})
+            self.assertIsNone(release_id)
 
     def test_full_build_is_rejected_for_new_jobs(self) -> None:
         with self.assertRaisesRegex(ValueError, "unknown config field"):

@@ -10,7 +10,7 @@
 - 所有未来游戏都作为新项目从空 workspace 创建；不再处理 `operation: rebuild`、`fullBuild` 或旧 repo 覆盖。
 - Factory 源码只在本仓库；真实游戏产物写入 Factory 同级的 `../<slug>/`，游戏目录本身就是 Next.js 根。
 - 最终部署输入在游戏根 `intake/`；调研、cache、manifest 和日志在游戏根 `.gamewiki/`。
-- 新站默认只生成 `en/es`；首发只公开 `en`，第三个自然日自动公开 `es`。`de/fr/ja` 只由 Growth 专项根据真实搜索需求和用户批准扩展；不生成韩语。
+- 新站默认只生成并发布 `en`。`es/de/fr/ja` 只由 Growth 专项根据真实搜索需求和用户批准扩展；不生成韩语。
 - 默认发布到 Cloudflare Workers Static Assets，不再新增 Cloudflare Pages 或 Vercel 项目。
 - 每个游戏创建自己的 Private GitHub repo。禁止创建或改成 Public。
 - Factory 只负责站点生产和发布；广告代码采集/转换不属于主流程。发布器只从 `config/ads/animal-hospital-profile.json` 自动配置固定 shared ad profile。
@@ -22,7 +22,7 @@ site/job JSON
   → Basic Info：Roblox/Steam 官方身份、事实、首页、图片、语言和分类候选
   → Guide Search：Suggest/DataForSEO/联网证据、manualKeywords、机会审计
   → site-plan：最多 8 个有证据分类，声明页面意图和语言
-  → SEO Scout：搜索、采集、英文文章、QA、西语翻译
+  → SEO Scout：搜索、采集、英文文章、QA
   → intake/content：物化网站输入和文章树
   → template：Next.js 静态站点、metadata、sitemap、hreflang、广告 API
   → publisher：Private GitHub + Workers Static Assets + 线上验收

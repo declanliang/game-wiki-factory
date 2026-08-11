@@ -185,7 +185,7 @@ class OrchestratorTests(unittest.TestCase):
         self.assertEqual(env["PYTHONIOENCODING"], "utf-8")
         self.assertEqual(env["PYTHONUTF8"], "1")
 
-    def test_keyword_bridge_uses_canonical_name_and_non_english_languages(self) -> None:
+    def test_keyword_bridge_uses_canonical_name_and_declared_non_english_languages(self) -> None:
         raw = {
             "topic_name": "anime paradox x",
             "categories": [
@@ -195,13 +195,13 @@ class OrchestratorTests(unittest.TestCase):
                 {"category": "traits", "keywords": ["anime paradox x traits"]},
             ],
         }
-        identity = {"GAME_NAME": "Anime Paradox X", "LANGUAGES": ["en", "es"]}
+        identity = {"GAME_NAME": "Anime Paradox X", "LANGUAGES": ["en"]}
 
         bridged = orchestrator.bridge_keywords(raw, identity)
 
         self.assertEqual(bridged["game_name"], "Anime Paradox X")
         self.assertEqual(bridged["filter_keyword"], "Roblox Anime Paradox X")
-        self.assertEqual(bridged["languages"], ["es"])
+        self.assertEqual(bridged["languages"], [])
         self.assertEqual(bridged["categories"], raw["categories"])
 
     def test_keyword_bridge_accepts_one_evidence_backed_category(self) -> None:
@@ -212,7 +212,7 @@ class OrchestratorTests(unittest.TestCase):
                 {"category": "floors", "keywords": ["hellhole roblox floor"]},
             ]
         }
-        identity = {"GAME_NAME": "Hellhole", "LANGUAGES": ["en", "es"]}
+        identity = {"GAME_NAME": "Hellhole", "LANGUAGES": ["en"]}
         bridged = orchestrator.bridge_keywords(raw, identity)
         self.assertEqual(len(bridged["categories"]), 3)
 
@@ -290,7 +290,7 @@ class OrchestratorTests(unittest.TestCase):
             intake = output / "template-intake"
             favicon = intake / "favicon"
             favicon.mkdir(parents=True)
-            languages = ["en", "es"]
+            languages = ["en"]
             identity = {"GAME_NAME": "Test Game", "LANGUAGES": languages}
             (intake / "site-identity.json").write_text(json.dumps(identity), encoding="utf-8")
             (intake / "site-content.json").write_text("{}", encoding="utf-8")
@@ -311,7 +311,7 @@ class OrchestratorTests(unittest.TestCase):
 
         self.assertEqual(actual_intake, intake)
         self.assertEqual(actual_identity, identity)
-        self.assertEqual(languages, ["en", "es"])
+        self.assertEqual(languages, ["en"])
 
     def test_homepage_guide_links_only_use_published_site_plan_categories(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

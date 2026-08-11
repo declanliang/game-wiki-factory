@@ -19,7 +19,7 @@ from pathlib import Path
 from xml.etree import ElementTree
 
 from orchestrate_wiki import ROOT, build_subprocess_env, read_json, write_json
-from publication_plan import next_locale, validate_publication_plan
+from publication_plan import next_locale_for_plan, validate_publication_plan
 from publisher import (
     _cloudflare_credentials,
     _deploy_cloudflare_workers_static_assets,
@@ -121,7 +121,7 @@ def publish_locale_in_github(token: str, repo: str, locale: str) -> tuple[dict, 
     published = list(plan["publishedLocales"])
     if locale in published:
         return plan, _latest_path_commit(token, encoded_repo), False
-    expected = next_locale(published)
+    expected = next_locale_for_plan(plan)
     if locale != expected:
         raise RuntimeError(
             f"Locale release order violation: expected {expected or 'no further locale'}, got {locale}"

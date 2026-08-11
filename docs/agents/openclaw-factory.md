@@ -68,12 +68,9 @@ Factory 和 OpenClaw 不接收 `taskType: ads` 或 Job 内原始广告代码。�
 
 当前稳定版本读取根目录 `release.json`。普通 Git commit 不改变产品版本。OpenClaw 不得按日期、外观或文章数量推断版本；必须检查任务结果中的 `factoryRelease` 和站点的 `intake/factory-release.json`。线上认证还必须完成 Cloudflare Workers Static Assets 验收并登记到 release 站点清单。
 
-从 `v1_0728` 开始，Factory 新站只生成英语和西班牙语，但第一次部署只公开英文。Worker
-会在 SQLite 中创建一个内部 `localeRelease` Job，在第三个后续自然日发布
-`es`。该 Job 只修改 Private GitHub 中的发布计划并由 Worker 通过 `wrangler deploy`
-重新发布，不重复调用生成/翻译 API，也不修改广告变量。`de/fr/ja`
-只能由 Growth 专项根据真实搜索需求和用户批准扩展。OpenClaw 查询队列时应把
-`localeRelease` 标明为“定时西班牙语发布”，不得误报成重复建站。
+当前 Factory 新站默认只生成并发布英语，不再自动生成西班牙语，也不再创建第三日
+`localeRelease` Job。`es/de/fr/ja` 只能由 Growth 专项根据真实搜索需求和用户批准扩展。
+OpenClaw 不得把缺少西班牙语视为异常。
 
 当前 `v1_0730` 只固定模板的广告展示预算、区块隔离和内容宽度，不改变 shared
 profile 的 8 个 `AD_*_B64` 变量。OpenClaw 不得要求用户为 0730 新增或重命名

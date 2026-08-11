@@ -15,7 +15,7 @@ Factory 只接受 Roblox 或 Steam 的全新站点任务。每个任务至少提
 固定约束：
 
 - 每个游戏都从新的 `../<slug>/` 目录开始，不接受 rebuild、fullBuild 或覆盖旧仓库。
-- Factory 新站生成语言固定为 `en/es`，公开语言由 `publication-plan.json` 控制；`de/fr/ja` 仅作为经批准的 Growth Agent 扩展。
+- Factory 新站默认只生成并发布 `en`；`es/de/fr/ja` 仅作为经批准的 Growth Agent 扩展。
 - `site-plan.json` 是语言与分类唯一事实源；最多发布 8 类。
 - 调研/cache/日志写入游戏根 `.gamewiki/`，最终模板输入写入游戏根 `intake/`。
 - Factory 根 `.env` 是唯一密钥配置；禁止复制、打印或提交。

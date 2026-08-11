@@ -227,6 +227,10 @@ export default async function LocaleHomePage({
   });
   const home = {
     ...messages.home,
+    updates: {
+      ...messages.home.updates,
+      title: "Latest Articles",
+    },
     featured: {
       ...messages.home.featured,
       items: resolvedFeaturedItems,
