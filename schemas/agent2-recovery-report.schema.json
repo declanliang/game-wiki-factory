@@ -3,7 +3,14 @@
   "title": "Game Wiki Agent2 Recovery Report",
   "type": "object",
   "additionalProperties": false,
-  "required": ["status", "summary", "filesChanged", "verification"],
+  "required": [
+    "status",
+    "summary",
+    "filesChanged",
+    "verification",
+    "escalationReason",
+    "retrySafety"
+  ],
   "properties": {
     "status": {
       "type": "string",

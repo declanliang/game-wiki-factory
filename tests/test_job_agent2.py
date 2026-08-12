@@ -158,6 +158,14 @@ class JobAgent2Tests(unittest.TestCase):
         text = "noise before\n{\"status\":\"repaired\",\"summary\":\"fixed\"}\nnoise after"
         self.assertEqual(_extract_last_json_object(text), "{\"status\":\"repaired\",\"summary\":\"fixed\"}")
 
+    def test_codex_output_schema_requires_every_property(self):
+        schema = json.loads(
+            (Path(__file__).resolve().parents[1] / "schemas" / "agent2-recovery-report.schema.json").read_text(
+                encoding="utf-8",
+            )
+        )
+        self.assertEqual(set(schema["required"]), set(schema["properties"]))
+
     def test_repaired_stdout_report_is_accepted_when_report_file_is_missing(self):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
             os.environ,
