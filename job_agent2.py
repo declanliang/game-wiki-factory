@@ -590,12 +590,39 @@ def _run_codex(item: dict[str, Any]) -> tuple[int, dict[str, Any] | None, str | 
             log.write(f"\nfinished={_now()}\nexitCode=124\n")
             return 124, None, "Codex CLI timed out"
     if not item["reportPath"].is_file():
+        stdout_tail = _redact(completed.stdout or "", limit=12000)
+        inline_report = _extract_last_json_object(stdout_tail)
+        if inline_report is not None:
+            try:
+                report = json.loads(inline_report)
+            except json.JSONDecodeError as exc:
+                return code, None, f"Could not read inline Codex report: {exc}"
+            return code, report, None
+        if completed.returncode == 0:
+            return code, None, "Codex CLI completed but did not write a report"
         return code, None, "Codex CLI did not write a report"
     try:
         report = read_json(item["reportPath"])
     except (OSError, ValueError, RuntimeError) as exc:
         return code, None, f"Could not read Codex report: {exc}"
     return code, report, None
+
+
+def _extract_last_json_object(text: str) -> str | None:
+    """Best-effort salvage for Codex CLI builds that print the report instead of writing it."""
+    end = text.rfind("}")
+    while end != -1:
+        start = text.rfind("{", 0, end + 1)
+        if start == -1:
+            return None
+        candidate = text[start:end + 1]
+        try:
+            json.loads(candidate)
+        except json.JSONDecodeError:
+            end = text.rfind("}", 0, start)
+            continue
+        return candidate
+    return None
 
 
 def _finish(

@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from job_agent2 import _codex_child_env, _codex_command, _ensure_schema, recover_once
+from job_agent2 import _codex_child_env, _codex_command, _ensure_schema, _extract_last_json_object, recover_once
 from job_system import _event, connect, submit
 from orchestrate_wiki import write_json
 
@@ -139,6 +139,40 @@ class JobAgent2Tests(unittest.TestCase):
                     "-c",
                     "import json,sys; json.dump({'status':'repaired','summary':'fixed mdx','filesChanged':['content/en/a.mdx'],'verification':['local check passed']}, open(sys.argv[1], 'w', encoding='utf-8'))",
                     "{report}",
+                ]),
+            },
+        ):
+            job_id, _project = self._job(temporary, "article preflight failed: duplicate description")
+            result = recover_once(limit=1)
+            with connect() as db:
+                status = db.execute("SELECT status FROM jobs WHERE id=?", (job_id,)).fetchone()[0]
+                event_count = db.execute(
+                    "SELECT COUNT(*) FROM events WHERE job_id=? AND event='job.agent2_requeued'",
+                    (job_id,),
+                ).fetchone()[0]
+        self.assertEqual(result[0]["status"], "succeeded")
+        self.assertEqual(status, "retry_wait")
+        self.assertEqual(event_count, 1)
+
+    def test_extract_last_json_object_salvages_inline_report(self):
+        text = "noise before\n{\"status\":\"repaired\",\"summary\":\"fixed\"}\nnoise after"
+        self.assertEqual(_extract_last_json_object(text), "{\"status\":\"repaired\",\"summary\":\"fixed\"}")
+
+    def test_repaired_stdout_report_is_accepted_when_report_file_is_missing(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ,
+            {
+                "GAMEWIKI_DATA_DIR": str(Path(temporary) / "data"),
+                "GAMEWIKI_PROJECTS_ROOT": str(Path(temporary) / "projects"),
+                "GAMEWIKI_AGENT2_CODEX_BIN": sys.executable,
+                "GAMEWIKI_AGENT2_CODEX_COMMAND_JSON": json.dumps([
+                    sys.executable,
+                    "-c",
+                    (
+                        "import json,sys; "
+                        "print('prefix'); "
+                        "print(json.dumps({'status':'repaired','summary':'fixed mdx','filesChanged':['content/en/a.mdx'],'verification':['local check passed']}));"
+                    ),
                 ]),
             },
         ):
