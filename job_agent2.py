@@ -47,6 +47,7 @@ AI_RECOVERABLE_PATTERNS = (
     "formatting issue",
     "duplicate title",
     "duplicate description",
+    "metadata.relatedvideo",
     "title 未完成",
     "description 未完成",
     "未完成连接词",
