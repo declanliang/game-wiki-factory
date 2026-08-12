@@ -487,7 +487,7 @@ def _codex_command(project: Path, report_path: Path, env: dict[str, str]) -> lis
         str(project),
         "--skip-git-repo-check",
         "--sandbox",
-        os.environ.get("GAMEWIKI_AGENT2_SANDBOX", "workspace-write"),
+        os.environ.get("GAMEWIKI_AGENT2_SANDBOX", "danger-full-access"),
         "--config",
         'approval_policy="never"',
         "--output-schema",

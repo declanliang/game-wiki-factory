@@ -127,6 +127,10 @@ class JobAgent2Tests(unittest.TestCase):
         self.assertNotIn("LLM_API_KEY_1", env)
         self.assertNotIn("GAMEWIKI_CONTROL_TOKEN", env)
 
+    def test_codex_command_defaults_to_non_bwrap_sandbox(self):
+        command = _codex_command(Path("project"), Path("report.json"), {})
+        self.assertEqual(command[command.index("--sandbox") + 1], "danger-full-access")
+
     def test_repaired_report_requeues_for_worker(self):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
             os.environ,
