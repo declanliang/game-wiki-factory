@@ -75,6 +75,29 @@ class JobAgent2Tests(unittest.TestCase):
             result = recover_once(dry_run=True)
         self.assertEqual([item["jobId"] for item in result], [job_id])
 
+    def test_dry_run_uses_attempt_log_when_last_error_was_overwritten(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.dict(
+            os.environ,
+            {
+                "GAMEWIKI_DATA_DIR": str(Path(temporary) / "data"),
+                "GAMEWIKI_PROJECTS_ROOT": str(Path(temporary) / "projects"),
+            },
+        ):
+            job_id, _project = self._job(
+                temporary,
+                "Codex CLI did not write a report",
+                stage="siteCopy",
+            )
+            log_path = Path(temporary) / "attempt.log"
+            log_path.write_text(
+                "metadata.relatedVideo 必须包含有效 videoId/title\n",
+                encoding="utf-8",
+            )
+            with connect() as db:
+                db.execute("UPDATE jobs SET log_path=? WHERE id=?", (str(log_path), job_id))
+            result = recover_once(dry_run=True)
+        self.assertEqual([item["jobId"] for item in result], [job_id])
+
     def test_stale_agent2_run_does_not_consume_retry_budget(self):
         with tempfile.TemporaryDirectory() as temporary, patch.dict(
             os.environ,

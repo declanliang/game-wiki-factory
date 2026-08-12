@@ -203,7 +203,11 @@ def _is_eligible(row: sqlite3.Row) -> tuple[bool, str]:
         return False, f"stage {stage or '<unknown>'} is outside agent2 scope"
     if row["quota_provider"]:
         return False, "quota circuit requires human credential action"
-    error = str(row["last_error"] or "").casefold()
+    error = (
+        str(row["last_error"] or "")
+        + "\n"
+        + _read_tail(row["log_path"], limit=8000)
+    ).casefold()
     if any(pattern in error for pattern in BLOCKED_PATTERNS):
         return False, "credentials, quota, schema, DNS, or security issue"
     if any(pattern in error for pattern in AI_RECOVERABLE_PATTERNS):
